@@ -14,6 +14,8 @@ A mobile-friendly Next.js web application for jobsite check-ins with GPS trackin
 - Configured Google Sheets and Google Drive integrations via Replit connectors
 - Fixed Tailwind CSS compatibility issue (downgraded from v4 to v3.4)
 - Fixed viewport configuration warning in Next.js 16
+- **Updated authentication layer** to support both Replit connectors (dev) and Google service account credentials (production)
+- Added comprehensive Vercel deployment documentation with step-by-step service account setup
 
 ## Project Architecture
 
@@ -61,6 +63,9 @@ A mobile-friendly Next.js web application for jobsite check-ins with GPS trackin
 - `GOOGLE_SHEET_ID`: The ID of the Google Sheet where check-in data will be logged
   - Format: Extract from Sheet URL `https://docs.google.com/spreadsheets/d/SHEET_ID/edit`
   - Example: `1abc123xyz456...`
+- `GOOGLE_SERVICE_ACCOUNT_CREDENTIALS` (Production only): JSON service account credentials for Vercel deployment
+  - Format: Single-line JSON string from Google Cloud service account key file
+  - Only required for production deployments outside Replit
 
 ### Google Sheet Format
 Expected columns (row 1 headers recommended):
@@ -77,19 +82,32 @@ Expected columns (row 1 headers recommended):
 ### Running Locally (Replit)
 1. Set `GOOGLE_SHEET_ID` environment variable
 2. Workflow runs automatically on port 5000
-3. Google integrations handle authentication automatically
+3. Google integrations handle authentication automatically via Replit connectors
 
 ### Deploying to Vercel
-1. Push code to Git repository
-2. Import to Vercel
-3. Set environment variable: `GOOGLE_SHEET_ID`
-4. **Important**: Google authentication will need to be reconfigured for Vercel deployment (Replit connectors only work in Replit environment)
+The application now fully supports Vercel deployment:
+
+1. **Authentication**: Dual-mode authentication automatically detects environment:
+   - In Replit: Uses Replit connector tokens (no additional setup needed)
+   - On Vercel: Uses Google service account credentials
+
+2. **Required Setup**:
+   - Create Google Cloud service account (see README.md for detailed steps)
+   - Download service account JSON key
+   - Share Google Sheet with service account email
+   - Add environment variables to Vercel:
+     - `GOOGLE_SHEET_ID`
+     - `GOOGLE_SERVICE_ACCOUNT_CREDENTIALS` (full JSON as single line)
+
+3. **Deploy**: Standard Vercel deployment process works without code modifications
 
 ## Known Issues & Warnings
 - Cross-origin request warning from Next.js (safe to ignore in Replit environment)
-- For production deployment outside Replit, Google authentication code in `lib/google-auth.ts` needs modification to use standard OAuth
+- Service account must be granted Editor access to the Google Sheet
+- For mobile photo capture to work, site must be accessed via HTTPS (Vercel provides this automatically)
 
 ## Next Steps
-- Configure `GOOGLE_SHEET_ID` environment variable
-- Test full workflow (form submission, photo upload, GPS capture, Sheet append)
+- ✅ Google Sheet ID configured
+- ✅ Application running and tested
+- ✅ Vercel deployment support implemented
 - Optional enhancements: Add installer management, offline support, admin dashboard

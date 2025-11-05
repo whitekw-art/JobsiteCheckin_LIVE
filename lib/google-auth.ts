@@ -3,6 +3,29 @@ import { google } from 'googleapis';
 let sheetConnectionSettings: any;
 let driveConnectionSettings: any;
 
+function getServiceAccountCredentials() {
+  const credentials = process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS;
+  
+  if (!credentials) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(credentials);
+    
+    if (!parsed.type || !parsed.project_id || !parsed.private_key || !parsed.client_email) {
+      throw new Error('Service account credentials are missing required fields (type, project_id, private_key, client_email)');
+    }
+    
+    return parsed;
+  } catch (error) {
+    console.error('Failed to parse GOOGLE_SERVICE_ACCOUNT_CREDENTIALS:', error);
+    console.error('Ensure the credentials are valid JSON with escaped newlines (\\n) in the private_key field.');
+    console.error('The JSON should be formatted as a single line with no actual line breaks.');
+    throw new Error(`Invalid GOOGLE_SERVICE_ACCOUNT_CREDENTIALS: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
 async function getSheetAccessToken() {
   if (sheetConnectionSettings && sheetConnectionSettings.settings.expires_at && new Date(sheetConnectionSettings.settings.expires_at).getTime() > Date.now()) {
     return sheetConnectionSettings.settings.access_token;
@@ -72,6 +95,20 @@ async function getDriveAccessToken() {
 }
 
 export async function getUncachableGoogleSheetClient() {
+  const serviceAccountCreds = getServiceAccountCredentials();
+
+  if (serviceAccountCreds) {
+    const auth = new google.auth.GoogleAuth({
+      credentials: serviceAccountCreds,
+      scopes: [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive.file',
+      ],
+    });
+
+    return google.sheets({ version: 'v4', auth });
+  }
+
   const accessToken = await getSheetAccessToken();
 
   const oauth2Client = new google.auth.OAuth2();
@@ -83,6 +120,20 @@ export async function getUncachableGoogleSheetClient() {
 }
 
 export async function getUncachableGoogleDriveClient() {
+  const serviceAccountCreds = getServiceAccountCredentials();
+
+  if (serviceAccountCreds) {
+    const auth = new google.auth.GoogleAuth({
+      credentials: serviceAccountCreds,
+      scopes: [
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/drive',
+      ],
+    });
+
+    return google.drive({ version: 'v3', auth });
+  }
+
   const accessToken = await getDriveAccessToken();
 
   const oauth2Client = new google.auth.OAuth2();
