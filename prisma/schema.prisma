@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id          String        @id @default(uuid())
+  name        String
+  createdAt   DateTime      @default(now())
+  phone       String?
+  website     String?
+  Invitations Invitations[]
+  users       User[]
+  checkIns    CheckIn[]
+}
+
+model User {
+  id             String        @id @default(cuid())
+  email          String        @unique
+  name           String?
+  password       String?
+  role           Role          @default(USER)
+  organizationId String?
+  createdAt      DateTime      @default(now())
+  accounts       Account[]
+  sessions       Session[]
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+}
+
+model CheckIn {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  installer      String
+  street         String?
+  notes          String?
+  latitude       Float?
+  longitude      Float?
+  timestamp      DateTime?      @db.Timestamptz(6)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  userId         String?
+  city           String?
+  state          String?
+  seoTitle       String?
+  seoDescription String?
+  doorType       String?
+  zip            String?
+  photoUrls      String?
+  isPublic       Boolean        @default(false)
+  locationSource String?
+  events         CheckInEvent[]
+}
+
+model CheckInEvent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  checkInId String   @db.Uuid
+  eventType String
+  createdAt DateTime @default(now())
+  metadata  String?
+  checkIn   CheckIn  @relation(fields: [checkInId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/// RLS-managed legacy table
+model Client_Registrations {
+  id               String   @id
+  registrationType String
+  firstName        String
+  lastName         String
+  fullName         String
+  email            String
+  phone            String
+  address          String
+  pin              String
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+  businessName     String?
+  businessAddress  String?
+  fax              String?
+  ownerName        String?
+  adminName        String?
+  adminEmail       String?
+  additionalEmails String?
+
+  @@map("Client Registrations")
+}
+
+model Photo {
+  id        String   @id
+  filename  String
+  url       String
+  checkInId String?
+  createdAt DateTime @default(now())
+}
+
+model companies {
+  id                                                   String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                                                 String
+  normalized_name                                      String          @unique(map: "companies_normalized_name_idx")
+  owner_user_id                                        String?         @db.Uuid
+  created_at                                           DateTime        @default(now()) @db.Timestamptz(6)
+  registrations_companies_owner_user_idToregistrations registrations?  @relation("companies_owner_user_idToregistrations", fields: [owner_user_id], references: [id], onUpdate: NoAction)
+  registrations_registrations_company_idTocompanies    registrations[] @relation("registrations_company_idTocompanies")
+}
+
+model registrations {
+  id                                               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  registration_type                                String
+  first_name                                       String?
+  last_name                                        String?
+  full_name                                        String?
+  email                                            String         @unique
+  phone                                            String?
+  address                                          String?
+  heard_about_us                                   String?
+  created_at                                       DateTime       @default(now()) @db.Timestamptz(6)
+  company_id                                       String?        @db.Uuid
+  role                                             user_role_enum @default(employee)
+  display_name                                     String?
+  pin_hash                                         String?
+  business_name                                    String?
+  business_address                                 String?
+  fax                                              String?
+  owner_name                                       String?
+  admin_name                                       String?
+  admin_email                                      String?
+  additional_emails                                String?
+  date                                             String?
+  companies_companies_owner_user_idToregistrations companies[]    @relation("companies_owner_user_idToregistrations")
+  companies_registrations_company_idTocompanies    companies?     @relation("registrations_company_idTocompanies", fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Invitations {
+  id             String        @id
+  email          String
+  organizationId String?
+  role           String        @default("USER")
+  createdAt      DateTime?     @default(now()) @db.Timestamptz(6)
+  Organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  USER
+  SUPER_ADMIN
+}
+
+enum user_role_enum {
+  owner
+  employee
+}

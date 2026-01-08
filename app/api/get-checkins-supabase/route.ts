@@ -1,0 +1,55 @@
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth'
+
+export async function GET() {
+  try {
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser || !currentUser.organizationId) {
+      return NextResponse.json({ checkIns: [] })
+    }
+
+    const rawCheckIns = await prisma.checkIn.findMany({
+      where: {
+        organizationId: currentUser.organizationId,
+      },
+      select: {
+        id: true,
+        installer: true,
+        street: true,
+        city: true,
+        state: true,
+        zip: true,
+        notes: true,
+        latitude: true,
+        longitude: true,
+        locationSource: true,
+        timestamp: true,
+        isPublic: true,
+        photoUrls: true,
+      },
+      orderBy: {
+        timestamp: 'desc',
+      },
+    })
+
+    const checkIns = rawCheckIns.map((checkIn) => ({
+      ...checkIn,
+      photoUrls: checkIn.photoUrls
+        ? checkIn.photoUrls
+            .split(',')
+            .map((url) => url.trim())
+            .filter(Boolean)
+        : [],
+    }))
+
+    return NextResponse.json({ checkIns })
+  } catch (error: any) {
+    console.error('Error fetching Supabase check-ins:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch check-ins' },
+      { status: 500 }
+    )
+  }
+}

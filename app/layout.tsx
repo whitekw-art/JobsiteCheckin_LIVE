@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import Providers from '@/components/Providers'
+import Navigation from '@/components/Navigation'
 
 export const metadata: Metadata = {
   title: 'Jobsite Check-In',
@@ -19,7 +21,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Providers>
+          <Navigation />
+          {children}
+        </Providers>
+      </body>
     </html>
   )
 }
