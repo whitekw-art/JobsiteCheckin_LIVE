@@ -17,7 +17,7 @@ export async function GET() {
     const checkIns = rows.slice(1).map(row => {
       const photoField = row[6] || ''
       const photoUrls = photoField
-        ? photoField.split(',').map(url => url.trim()).filter(Boolean)
+        ? photoField.split(',').map((url: string) => url.trim()).filter(Boolean)
         : []
 
       return {

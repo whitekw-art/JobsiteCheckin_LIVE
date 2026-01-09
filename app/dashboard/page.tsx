@@ -16,6 +16,7 @@ interface CheckIn {
   latitude?: number | null
   longitude?: number | null
   locationSource?: string | null
+  doorType?: string | null
   isPublic: boolean
   photoUrls?: string[]
 }

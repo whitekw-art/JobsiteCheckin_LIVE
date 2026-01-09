@@ -12,8 +12,10 @@ interface JobPageProps {
   }
 }
 
-export default async function JobPage({ params }: JobPageProps) {
-  const { slug } = params
+export default async function JobPage(
+  { params }: { params: Promise<{ location: string; slug: string }> }
+) {
+  const { slug } = await params
 
   const uuidMatch = slug.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)
   const checkInId = uuidMatch ? uuidMatch[0] : ''
