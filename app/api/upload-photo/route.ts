@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
+import { createClient } from '@supabase/supabase-js'
 import convert from 'heic-convert'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,14 +18,6 @@ export async function POST(request: NextRequest) {
 
     const timestamp = Date.now()
     const filename = `jobsite-${timestamp}.jpg`
-    const filepath = path.join(process.cwd(), 'public', 'temp-photos', filename)
-    
-    // Create temp-photos directory if it doesn't exist
-    const dir = path.dirname(filepath)
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true })
-    }
-
     const arrayBuffer = await photo.arrayBuffer()
     const inputBuffer = Buffer.from(arrayBuffer)
     
@@ -44,9 +40,26 @@ export async function POST(request: NextRequest) {
       outputBuffer = inputBuffer
     }
     
-    fs.writeFileSync(filepath, outputBuffer)
+    const { error: uploadError } = await supabase.storage
+      .from('checkin-photos')
+      .upload(filename, outputBuffer, {
+        contentType: photo.type || 'image/jpeg',
+        upsert: false,
+      })
 
-    const photoUrl = `/temp-photos/${filename}`
+    if (uploadError) {
+      console.error('Supabase upload error:', uploadError)
+      return NextResponse.json(
+        { error: 'Failed to upload photo' },
+        { status: 500 }
+      )
+    }
+
+    const { data } = supabase.storage
+      .from('checkin-photos')
+      .getPublicUrl(filename)
+
+    const photoUrl = data.publicUrl
 
     return NextResponse.json({ photoUrl })
   } catch (error: any) {
