@@ -7,6 +7,9 @@ import Navigation from '@/components/Navigation'
 export const metadata: Metadata = {
   title: 'Jobsite Check-In',
   description: 'Mobile-friendly jobsite check-in application',
+   verification: {
+    google: 'XqifA49nAacc21QeSSWjavqCfJMlv_1-lvj8vibmR2k',
+  },
 }
 
 export const viewport: Viewport = {
