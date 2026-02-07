@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'Jobsite Check-In',
   description: 'Mobile-friendly jobsite check-in application',
    verification: {
-    google: 'XqifA49nAacc21QeSSWjavqCfJMlv_1-lvj8vibmR2k',
+    google: 'XqifA49nAacc21QeSSWjavqCfJM1v_l-1vj8vibmR2k',
   },
 }
 
