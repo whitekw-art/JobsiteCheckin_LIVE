@@ -2,11 +2,9 @@
 
 export const dynamic = "force-dynamic";
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
 
 export default function ResetPasswordPage() {
-  const searchParams = useSearchParams()
-  const token = searchParams.get('token') || ''
+  const [token, setToken] = useState('')
 
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -16,6 +14,11 @@ export default function ResetPasswordPage() {
   const [email, setEmail] = useState<string | null>(null)
   const [isValidating, setIsValidating] = useState(true)
   const [isTokenValid, setIsTokenValid] = useState(true)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setToken(params.get('token') || '')
+  }, [])
 
   useEffect(() => {
     let isMounted = true
