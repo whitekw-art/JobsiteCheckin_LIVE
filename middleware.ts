@@ -7,7 +7,15 @@ export default withAuth(
     const { pathname } = req.nextUrl
 
     // Redirect to signin if not authenticated
-    const publicPaths = ['/', '/auth/signin', '/auth/register', '/auth/invite', '/payments/checkout']
+    const publicPaths = [
+      '/',
+      '/auth/signin',
+      '/auth/register',
+      '/auth/invite',
+      '/auth/forgot-password',
+      '/auth/reset-password',
+      '/payments/checkout',
+    ]
     const isPublicAssetPath = pathname.startsWith('/temp-photos/')
 
     if (
@@ -43,7 +51,15 @@ export default withAuth(
         
         // Allow access to signin page, home page, and public routes
         if (
-          ['/auth/signin', '/', '/auth/register', '/auth/invite', '/payments/checkout'].includes(pathname) ||
+          [
+            '/auth/signin',
+            '/',
+            '/auth/register',
+            '/auth/invite',
+            '/auth/forgot-password',
+            '/auth/reset-password',
+            '/payments/checkout',
+          ].includes(pathname) ||
           pathname.startsWith('/jobs/') ||
           pathname.startsWith('/temp-photos/')
         ) {

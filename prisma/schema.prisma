@@ -20,6 +20,7 @@ model Organization {
 
 model User {
   id             String        @id @default(cuid())
+  passwordResetTokens PasswordResetToken[]
   email          String        @unique
   name           String?
   password       String?
@@ -172,6 +173,20 @@ model Invitations {
   role           String        @default("USER")
   createdAt      DateTime?     @default(now()) @db.Timestamptz(6)
   Organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 enum Role {

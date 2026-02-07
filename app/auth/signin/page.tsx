@@ -80,6 +80,12 @@ export default function SignIn() {
           >
             {loading ? 'Loading...' : 'Sign In'}
           </button>
+
+          <div className="text-sm text-center">
+            <Link href="/auth/forgot-password" className="text-blue-600 hover:underline">
+              Forgot password?
+            </Link>
+          </div>
         </form>
 
         <div className="mt-4 text-center">
