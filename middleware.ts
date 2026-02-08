@@ -48,30 +48,9 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token, req }) => {
-        const { pathname } = req.nextUrl
-        
-        // Allow access to signin page, home page, and public routes
-        if (
-          [
-            '/auth/signin',
-            '/',
-            '/auth/register',
-            '/auth/invite',
-            '/auth/forgot-password',
-            '/auth/reset-password',
-            '/payments/checkout',
-          ].includes(pathname) ||
-          pathname.startsWith('/jobs/') ||
-          pathname.startsWith('/temp-photos/')
-        ) {
-          return true
-        }
-        
-        // Require authentication for all other pages
-        return !!token
-      },
-    },
+  authorized: () => true,
+},
+
   }
 )
 
