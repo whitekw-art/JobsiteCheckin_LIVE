@@ -32,8 +32,12 @@ export async function POST(request: Request) {
         },
       })
 
-      const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL
-      const resetUrl = `${appUrl}/auth/reset-password?token=${token}`
+      const appUrl =
+        process.env.APP_URL ??
+        process.env.NEXT_PUBLIC_APP_URL ??
+        ''
+
+      const resetUrl = `${appUrl.replace(/\/$/, '')}/auth/reset-password?token=${token}`
 
       const from = 'Jobsite Check-In (Staging) <no-reply@resend.dev>'
       const resendApiKey = process.env.RESEND_API_KEY
