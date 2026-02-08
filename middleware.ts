@@ -3,10 +3,14 @@ import { NextResponse } from 'next/server'
 
 export default withAuth(
   function middleware(req) {
+    console.log('MIDDLEWARE HIT:', {
+      url: req.url,
+      pathname: req.nextUrl.pathname,
+      hasToken: !!req.nextauth.token,
+    })
     const token = req.nextauth.token
     const rawPathname = req.nextUrl.pathname
     const pathname = rawPathname.replace(/\/$/, '')
-
 
     // Redirect to signin if not authenticated
     const publicPaths = [
