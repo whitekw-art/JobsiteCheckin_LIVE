@@ -20,7 +20,7 @@ export default withAuth(
 
     if (
       !token &&
-      !publicPaths.includes(pathname) &&
+      !publicPaths.some(p => pathname.startsWith(p)) &&
       !pathname.startsWith('/jobs/') &&
       !isPublicAssetPath
     ) {
