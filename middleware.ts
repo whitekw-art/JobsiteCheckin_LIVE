@@ -20,14 +20,18 @@ export default withAuth(
     ]
     const isPublicAssetPath = pathname.startsWith('/temp-photos/')
 
-    if (
-      !token &&
-      !publicPaths.some(p => pathname.startsWith(p)) &&
-      !pathname.startsWith('/jobs/') &&
-      !isPublicAssetPath
-    ) {
-      return NextResponse.redirect(new URL('/auth/signin', req.url))
-    }
+    // Always allow auth routes
+if (pathname.startsWith('/auth/')) {
+  return NextResponse.next()
+}
+
+if (
+  !token &&
+  !pathname.startsWith('/jobs/') &&
+  !isPublicAssetPath
+) {
+  return NextResponse.redirect(new URL('/auth/signin', req.url))
+}
 
     // Role-based access control
     if (token) {
