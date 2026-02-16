@@ -76,13 +76,13 @@ export default function SignIn() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50"
+            className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 min-h-[44px]"
           >
             {loading ? 'Loading...' : 'Sign In'}
           </button>
 
           <div className="text-sm text-center">
-            <Link href="/auth/forgot-password" className="text-blue-600 hover:underline">
+            <Link href="/auth/forgot-password" className="inline-block py-2 text-blue-600 hover:underline min-h-[44px]">
               Forgot password?
             </Link>
           </div>
@@ -91,7 +91,7 @@ export default function SignIn() {
         <div className="mt-4 text-center">
           <p className="text-sm text-gray-600">
             Need an account?{' '}
-            <Link href="/auth/register" className="text-blue-600 font-medium hover:underline">
+            <Link href="/auth/register" className="inline-block py-2 text-blue-600 font-medium hover:underline min-h-[44px]">
               Create one now
             </Link>
           </p>

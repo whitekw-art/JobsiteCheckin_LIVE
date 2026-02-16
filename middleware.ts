@@ -32,6 +32,7 @@ if (pathname.startsWith('/auth/')) {
 if (
   !token &&
   !pathname.startsWith('/jobs/') &&
+  !pathname.startsWith('/sitemap') &&
   !isPublicAssetPath
 ) {
   return NextResponse.redirect(new URL('/auth/signin', req.url))
