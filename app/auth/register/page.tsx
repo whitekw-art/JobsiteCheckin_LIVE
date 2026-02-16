@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 type RegistrationType = 'individual' | 'business'
 
@@ -229,7 +230,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => handleRegistrationTypeChange('individual')}
-                  className={`py-2 rounded-lg border text-sm font-medium transition-colors ${
+                  className={`py-3 rounded-lg border text-sm font-medium transition-colors min-h-[44px] ${
                     registerForm.registrationType === 'individual'
                       ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                       : 'border-gray-200 text-gray-600 hover:border-emerald-400'
@@ -240,7 +241,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => handleRegistrationTypeChange('business')}
-                  className={`py-2 rounded-lg border text-sm font-medium transition-colors ${
+                  className={`py-3 rounded-lg border text-sm font-medium transition-colors min-h-[44px] ${
                     registerForm.registrationType === 'business'
                       ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                       : 'border-gray-200 text-gray-600 hover:border-emerald-400'
@@ -518,6 +519,15 @@ export default function RegisterPage() {
               {isRegistering ? 'Submitting...' : 'Complete Registration'}
             </button>
           </form>
+
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-600">
+              Already have an account?{' '}
+              <Link href="/auth/signin" className="inline-block py-2 text-blue-600 font-medium hover:underline min-h-[44px]">
+                Sign in
+              </Link>
+            </p>
+          </div>
 
           {feedback && (
             <div
