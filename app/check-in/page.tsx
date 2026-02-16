@@ -338,38 +338,53 @@ export default function CheckInPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Installer */}
-          <input
-            className="w-full p-3 border rounded-lg"
-            placeholder="Installer"
-            value={installer}
-            onChange={(e) => setInstaller(e.target.value)}
-            readOnly={isUserRole}
-          />
+          <div>
+            <label htmlFor="installer" className="block text-sm font-medium text-gray-700 mb-1">Installer</label>
+            <input
+              id="installer"
+              className="w-full p-3 border rounded-lg"
+              placeholder="Installer name"
+              value={installer}
+              onChange={(e) => setInstaller(e.target.value)}
+              readOnly={isUserRole}
+            />
+          </div>
 
           {/* Address fields */}
           <div className="space-y-2">
-            <input
-              className="w-full p-3 border rounded-lg"
-              placeholder="Street"
-              value={street}
-              onChange={(e) => setStreet(e.target.value)}
-              required
-            />
-            <input
-              className="w-full p-3 border rounded-lg"
-              placeholder="City"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              required
-            />
-            <div className="flex gap-2">
-              <select
-                className="w-1/2 p-3 border rounded-lg"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
+            <div>
+              <label htmlFor="street" className="block text-sm font-medium text-gray-700 mb-1">Street</label>
+              <input
+                id="street"
+                className="w-full p-3 border rounded-lg"
+                placeholder="123 Main St"
+                value={street}
+                onChange={(e) => setStreet(e.target.value)}
                 required
-              >
-                <option value="">State</option>
+              />
+            </div>
+            <div>
+              <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">City</label>
+              <input
+                id="city"
+                className="w-full p-3 border rounded-lg"
+                placeholder="City"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex gap-2">
+              <div className="w-1/2">
+                <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                <select
+                  id="state"
+                  className="w-full p-3 border rounded-lg"
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  required
+                >
+                  <option value="">State</option>
                 <option value="AL">AL</option>
                 <option value="AK">AK</option>
                 <option value="AZ">AZ</option>
@@ -421,46 +436,62 @@ export default function CheckInPage() {
                 <option value="WI">WI</option>
                 <option value="WY">WY</option>
               </select>
-              <input
-                className="w-1/2 p-3 border rounded-lg"
-                placeholder="Zip"
-                value={zip}
-                onChange={(e) => setZip(e.target.value)}
-                required
-              />
+              </div>
+              <div className="w-1/2">
+                <label htmlFor="zip" className="block text-sm font-medium text-gray-700 mb-1">Zip</label>
+                <input
+                  id="zip"
+                  className="w-full p-3 border rounded-lg"
+                  placeholder="Zip"
+                  value={zip}
+                  onChange={(e) => setZip(e.target.value)}
+                  required
+                />
+              </div>
             </div>
-            <select
-              className="w-full p-3 border rounded-lg"
-              value={doorType}
-              onChange={(e) => setDoorType(e.target.value)}
-            >
-              <option value="">Door Type</option>
+            <div>
+              <label htmlFor="doorType" className="block text-sm font-medium text-gray-700 mb-1">Door Type</label>
+              <select
+                id="doorType"
+                className="w-full p-3 border rounded-lg"
+                value={doorType}
+                onChange={(e) => setDoorType(e.target.value)}
+              >
+                <option value="">Select type</option>
               <option value="Wood Door">Wood Door</option>
               <option value="Iron Door">Iron Door</option>
               <option value="Fiberglass Front Door">Fiberglass Front Door</option>
               <option value="Fiberglass Back / Patio Door">Fiberglass Back / Patio Door</option>
               <option value="Barn Door">Barn Door</option>
-            </select>
+              </select>
+            </div>
           </div>
 
           {/* Notes */}
-          <textarea
-            className="w-full p-3 border rounded-lg"
-            placeholder="Notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={3}
-          />
+          <div>
+            <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea
+              id="notes"
+              className="w-full p-3 border rounded-lg"
+              placeholder="Any additional notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+            />
+          </div>
 
           {/* Photos */}
-          <input
-            id="photo-input"
-            type="file"
-            accept="image/jpeg,image/jpg,image/png"
-            multiple
-            onChange={handlePhotoChange}
-            className="w-full p-3 border rounded-lg"
-          />
+          <div>
+            <label htmlFor="photo-input" className="block text-sm font-medium text-gray-700 mb-1">Photos</label>
+            <input
+              id="photo-input"
+              type="file"
+              accept="image/jpeg,image/jpg,image/png"
+              multiple
+              onChange={handlePhotoChange}
+              className="w-full p-3 border rounded-lg"
+            />
+          </div>
 
           {photoPreviews.length > 0 && (
             <div className="grid gap-3 mt-2">

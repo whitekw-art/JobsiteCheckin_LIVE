@@ -31,7 +31,7 @@ export function JobWebsiteLink({ checkInId, href, label }: JobWebsiteLinkProps) 
       target="_blank"
       rel="noopener noreferrer"
       onClick={handleClick}
-      className="text-blue-600 hover:underline"
+      className="text-blue-600 hover:underline inline-flex items-center min-h-[44px] py-2"
     >
       {label}
     </a>

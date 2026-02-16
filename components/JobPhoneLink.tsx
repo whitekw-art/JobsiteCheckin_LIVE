@@ -29,7 +29,7 @@ export function JobPhoneLink({ checkInId, href, label }: JobPhoneLinkProps) {
     <a
       href={href}
       onClick={handleClick}
-      className="text-blue-600 hover:underline"
+      className="text-blue-600 hover:underline inline-flex items-center min-h-[44px] py-2"
     >
       {label}
     </a>

@@ -255,11 +255,11 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <Link 
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
+          <Link
             href="/check-in"
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 min-h-[44px] inline-flex items-center"
           >
             New Check-In
           </Link>
@@ -285,213 +285,390 @@ export default function Dashboard() {
         </div>
 
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b">
+          <div className="px-4 sm:px-6 py-4 border-b">
             <h2 className="text-xl font-semibold">Recent Check-Ins</h2>
           </div>
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="p-8 text-center">Loading...</div>
-            ) : checkIns.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">No check-ins yet</div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Installer</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Photo</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Public</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {checkIns.slice(0, 10).map((checkIn, index) => (
-                    <tr key={checkIn.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(checkIn.timestamp).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {checkIn.installer}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
+
+          {loading ? (
+            <div className="p-8 text-center">Loading...</div>
+          ) : checkIns.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">No check-ins yet</div>
+          ) : (
+            <>
+              {/* Mobile card layout */}
+              <div className="md:hidden divide-y divide-gray-200">
+                {checkIns.slice(0, 10).map((checkIn, index) => {
+                  const address = (() => {
+                    const parts: string[] = []
+                    if (checkIn.street) parts.push(checkIn.street)
+                    if (checkIn.city) parts.push(checkIn.city)
+                    const stateZip = [checkIn.state, checkIn.zip].filter(Boolean).join(' ')
+                    if (stateZip) parts.push(stateZip)
+                    return parts.join(', ') || '-'
+                  })()
+
+                  return (
+                    <div key={checkIn.id} className="p-4 space-y-3">
+                      <div className="flex justify-between items-start">
                         <div>
-                          {(() => {
-                            const parts: string[] = []
-                            if (checkIn.street) parts.push(checkIn.street)
-                            if (checkIn.city) parts.push(checkIn.city)
-                            const stateZip = [checkIn.state, checkIn.zip]
-                              .filter(Boolean)
-                              .join(' ')
-                            if (stateZip) parts.push(stateZip)
-                            return parts.join(', ') || '-'
-                          })()}
+                          <p className="font-medium text-gray-900">{checkIn.installer}</p>
+                          <p className="text-sm text-gray-500">
+                            {new Date(checkIn.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {' '}
+                            {new Date(checkIn.timestamp).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                          </p>
                         </div>
-                        {typeof checkIn.latitude === 'number' &&
-                          typeof checkIn.longitude === 'number' && (
-                            <a
-                              href={`https://www.google.com/maps?q=${checkIn.latitude},${checkIn.longitude}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-blue-600 hover:underline"
-                            >
-                              View on Map
-                            </a>
-                          )}
-                        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
-                          <button
-                            type="button"
-                            onClick={() => handleEditStart(checkIn)}
-                            className="text-blue-600 hover:underline"
+                        <span className={`text-xs px-2 py-1 rounded-full ${checkIn.isPublic ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {checkIn.isPublic ? 'Public' : 'Draft'}
+                        </span>
+                      </div>
+
+                      <div className="text-sm text-gray-700">
+                        <p>{address}</p>
+                        {typeof checkIn.latitude === 'number' && typeof checkIn.longitude === 'number' && (
+                          <a
+                            href={`https://www.google.com/maps?q=${checkIn.latitude},${checkIn.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center min-h-[44px] py-2 text-sm text-blue-600 hover:underline"
                           >
-                            Edit Address
-                          </button>
-                          {checkIn.locationSource === 'DEVICE' && (
-                            <span className="text-amber-600">
-                              Location based on installer device — please verify address
-                            </span>
-                          )}
-                        </div>
-                        {editingId === checkIn.id && (
-                          <div className="mt-2 space-y-2">
-                            <input
-                              className="w-full rounded border px-2 py-1 text-sm"
-                              value={editAddress.street}
-                              onChange={(e) =>
-                                setEditAddress((prev) => ({ ...prev, street: e.target.value }))
-                              }
-                              placeholder="Street"
-                            />
-                            <div className="flex gap-2">
-                              <input
-                                className="w-full rounded border px-2 py-1 text-sm"
-                                value={editAddress.city}
-                                onChange={(e) =>
-                                  setEditAddress((prev) => ({ ...prev, city: e.target.value }))
-                                }
-                                placeholder="City"
-                              />
-                              <input
-                                className="w-20 rounded border px-2 py-1 text-sm"
-                                value={editAddress.state}
-                                onChange={(e) =>
-                                  setEditAddress((prev) => ({ ...prev, state: e.target.value }))
-                                }
-                                placeholder="State"
-                              />
-                              <input
-                                className="w-24 rounded border px-2 py-1 text-sm"
-                                value={editAddress.zip}
-                                onChange={(e) =>
-                                  setEditAddress((prev) => ({ ...prev, zip: e.target.value }))
-                                }
-                                placeholder="Zip"
-                              />
-                            </div>
-                            <div className="flex items-center gap-3 text-xs">
-                              <button
-                                type="button"
-                                onClick={() => handleEditSave(checkIn)}
-                                disabled={savingId === checkIn.id}
-                                className="text-green-700 hover:underline disabled:text-gray-400"
-                              >
-                                {savingId === checkIn.id ? 'Saving...' : 'Save'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleEditCancel}
-                                className="text-gray-500 hover:underline"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
+                            View on Map
+                          </a>
                         )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {checkIn.notes || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {checkIn.photoUrls && checkIn.photoUrls.length > 0 ? (
-                          <div className="flex flex-col gap-1">
-                            {checkIn.photoUrls.map((url, idx) => (
-                              <div key={idx} className="flex items-center gap-2">
-                                <a
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  View{checkIn.photoUrls!.length > 1 ? ` ${idx + 1}` : ''}
-                                </a>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeletePhoto(checkIn, url)}
-                                  className="text-xs text-red-600 hover:underline"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            ))}
-                            <button
-                              type="button"
-                              onClick={() => handleDownload(checkIn, index)}
-                              disabled={downloadingRow === index}
-                              className="text-sm text-green-600 hover:underline disabled:text-gray-400"
-                            >
-                              {downloadingRow === index ? 'Preparing...' : 'Download All'}
-                            </button>
-                          </div>
-                        ) : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {checkIn.locationSource === 'DEVICE' && (
+                          <p className="text-xs text-amber-600 mt-1">Device location — please verify address</p>
+                        )}
+                      </div>
+
+                      {checkIn.doorType && (
+                        <p className="text-sm text-gray-600">{checkIn.doorType}</p>
+                      )}
+
+                      {checkIn.notes && (
+                        <p className="text-sm text-gray-600">{checkIn.notes}</p>
+                      )}
+
+                      {/* Actions row */}
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleEditStart(checkIn)}
+                          className="text-sm text-blue-600 hover:underline py-2 min-h-[44px]"
+                        >
+                          Edit Address
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleTogglePublish(checkIn)}
                           disabled={togglingId === checkIn.id}
-                          className="text-xs text-blue-600 hover:underline disabled:text-gray-400"
+                          className="text-sm text-blue-600 hover:underline py-2 min-h-[44px] disabled:text-gray-400"
                         >
-                          {togglingId === checkIn.id
-                            ? 'Saving...'
-                            : checkIn.isPublic
-                            ? 'Unpublish'
-                            : 'Publish'}
+                          {togglingId === checkIn.id ? 'Saving...' : checkIn.isPublic ? 'Unpublish' : 'Publish'}
                         </button>
-                        {checkIn.isPublic && (
-                          <div className="mt-1 text-xs">
+                        {checkIn.isPublic && (() => {
+                          const citySlug = slugify(checkIn.city || '')
+                          const stateSlug = slugify(checkIn.state || '')
+                          const doorTypeSlug = slugify(checkIn.doorType || 'job')
+                          const base = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '') || ''
+                          const path = `/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${doorTypeSlug}-${checkIn.id}`
+                          const href = base ? `${base}${path}` : path
+                          return (
+                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline py-2 min-h-[44px] inline-flex items-center">
+                              View Public Page
+                            </a>
+                          )
+                        })()}
+                        {checkIn.photoUrls && checkIn.photoUrls.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleDownload(checkIn, index)}
+                            disabled={downloadingRow === index}
+                            className="text-sm text-green-600 hover:underline py-2 min-h-[44px] disabled:text-gray-400"
+                          >
+                            {downloadingRow === index ? 'Preparing...' : `Download ${checkIn.photoUrls.length} Photo${checkIn.photoUrls.length > 1 ? 's' : ''}`}
+                          </button>
+                        )}
+                      </div>
+
+                      {publishWarnings[checkIn.id] && (
+                        <p className="text-xs text-amber-600">{publishWarnings[checkIn.id]}</p>
+                      )}
+
+                      {/* Inline address edit */}
+                      {editingId === checkIn.id && (
+                        <div className="space-y-2 bg-gray-50 p-3 rounded-lg">
+                          <input
+                            className="w-full rounded border px-3 py-2 text-sm min-h-[44px]"
+                            value={editAddress.street}
+                            onChange={(e) => setEditAddress((prev) => ({ ...prev, street: e.target.value }))}
+                            placeholder="Street"
+                          />
+                          <input
+                            className="w-full rounded border px-3 py-2 text-sm min-h-[44px]"
+                            value={editAddress.city}
+                            onChange={(e) => setEditAddress((prev) => ({ ...prev, city: e.target.value }))}
+                            placeholder="City"
+                          />
+                          <div className="flex gap-2">
+                            <input
+                              className="w-1/2 rounded border px-3 py-2 text-sm min-h-[44px]"
+                              value={editAddress.state}
+                              onChange={(e) => setEditAddress((prev) => ({ ...prev, state: e.target.value }))}
+                              placeholder="State"
+                            />
+                            <input
+                              className="w-1/2 rounded border px-3 py-2 text-sm min-h-[44px]"
+                              value={editAddress.zip}
+                              onChange={(e) => setEditAddress((prev) => ({ ...prev, zip: e.target.value }))}
+                              placeholder="Zip"
+                            />
+                          </div>
+                          <div className="flex gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handleEditSave(checkIn)}
+                              disabled={savingId === checkIn.id}
+                              className="bg-green-600 text-white px-4 py-2 rounded text-sm min-h-[44px] disabled:opacity-50"
+                            >
+                              {savingId === checkIn.id ? 'Saving...' : 'Save'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleEditCancel}
+                              className="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm min-h-[44px]"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Photo thumbnails */}
+                      {checkIn.photoUrls && checkIn.photoUrls.length > 0 && (
+                        <div className="flex gap-2 overflow-x-auto">
+                          {checkIn.photoUrls.map((url, idx) => (
+                            <div key={idx} className="relative flex-shrink-0">
+                              <a href={url} target="_blank" rel="noopener noreferrer">
+                                <img src={url} alt={`Photo ${idx + 1}`} className="w-16 h-16 object-cover rounded" />
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePhoto(checkIn, url)}
+                                className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center"
+                                aria-label={`Delete photo ${idx + 1}`}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Desktop table layout */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Installer</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Photo</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Public</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {checkIns.slice(0, 10).map((checkIn, index) => (
+                      <tr key={checkIn.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {new Date(checkIn.timestamp).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {checkIn.installer}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          <div>
                             {(() => {
-                              const citySlug = slugify(checkIn.city || '')
-                              const stateSlug = slugify(checkIn.state || '')
-                              const doorTypeSlug = slugify(checkIn.doorType || 'job')
-                              const base =
-                                (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '') || ''
-                              const path = `/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${doorTypeSlug}-${checkIn.id}`
-                              const href = base ? `${base}${path}` : path
-                              return (
-                                <a
-                                  href={href}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  Public URL
-                                </a>
-                              )
+                              const parts: string[] = []
+                              if (checkIn.street) parts.push(checkIn.street)
+                              if (checkIn.city) parts.push(checkIn.city)
+                              const stateZip = [checkIn.state, checkIn.zip]
+                                .filter(Boolean)
+                                .join(' ')
+                              if (stateZip) parts.push(stateZip)
+                              return parts.join(', ') || '-'
                             })()}
                           </div>
-                        )}
-                        {publishWarnings[checkIn.id] && (
-                          <div className="mt-1 text-xs text-amber-600">
-                            {publishWarnings[checkIn.id]}
+                          {typeof checkIn.latitude === 'number' &&
+                            typeof checkIn.longitude === 'number' && (
+                              <a
+                                href={`https://www.google.com/maps?q=${checkIn.latitude},${checkIn.longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-600 hover:underline"
+                              >
+                                View on Map
+                              </a>
+                            )}
+                          <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => handleEditStart(checkIn)}
+                              className="text-blue-600 hover:underline"
+                            >
+                              Edit Address
+                            </button>
+                            {checkIn.locationSource === 'DEVICE' && (
+                              <span className="text-amber-600">
+                                Location based on installer device — please verify address
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                          {editingId === checkIn.id && (
+                            <div className="mt-2 space-y-2">
+                              <input
+                                className="w-full rounded border px-2 py-1 text-sm"
+                                value={editAddress.street}
+                                onChange={(e) =>
+                                  setEditAddress((prev) => ({ ...prev, street: e.target.value }))
+                                }
+                                placeholder="Street"
+                              />
+                              <div className="flex gap-2">
+                                <input
+                                  className="w-full rounded border px-2 py-1 text-sm"
+                                  value={editAddress.city}
+                                  onChange={(e) =>
+                                    setEditAddress((prev) => ({ ...prev, city: e.target.value }))
+                                  }
+                                  placeholder="City"
+                                />
+                                <input
+                                  className="w-20 rounded border px-2 py-1 text-sm"
+                                  value={editAddress.state}
+                                  onChange={(e) =>
+                                    setEditAddress((prev) => ({ ...prev, state: e.target.value }))
+                                  }
+                                  placeholder="State"
+                                />
+                                <input
+                                  className="w-24 rounded border px-2 py-1 text-sm"
+                                  value={editAddress.zip}
+                                  onChange={(e) =>
+                                    setEditAddress((prev) => ({ ...prev, zip: e.target.value }))
+                                  }
+                                  placeholder="Zip"
+                                />
+                              </div>
+                              <div className="flex items-center gap-3 text-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditSave(checkIn)}
+                                  disabled={savingId === checkIn.id}
+                                  className="text-green-700 hover:underline disabled:text-gray-400"
+                                >
+                                  {savingId === checkIn.id ? 'Saving...' : 'Save'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleEditCancel}
+                                  className="text-gray-500 hover:underline"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {checkIn.notes || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {checkIn.photoUrls && checkIn.photoUrls.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {checkIn.photoUrls.map((url, idx) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <a
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline"
+                                  >
+                                    View{checkIn.photoUrls!.length > 1 ? ` ${idx + 1}` : ''}
+                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeletePhoto(checkIn, url)}
+                                    className="text-xs text-red-600 hover:underline"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => handleDownload(checkIn, index)}
+                                disabled={downloadingRow === index}
+                                className="text-sm text-green-600 hover:underline disabled:text-gray-400"
+                              >
+                                {downloadingRow === index ? 'Preparing...' : 'Download All'}
+                              </button>
+                            </div>
+                          ) : '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePublish(checkIn)}
+                            disabled={togglingId === checkIn.id}
+                            className="text-xs text-blue-600 hover:underline disabled:text-gray-400"
+                          >
+                            {togglingId === checkIn.id
+                              ? 'Saving...'
+                              : checkIn.isPublic
+                              ? 'Unpublish'
+                              : 'Publish'}
+                          </button>
+                          {checkIn.isPublic && (
+                            <div className="mt-1 text-xs">
+                              {(() => {
+                                const citySlug = slugify(checkIn.city || '')
+                                const stateSlug = slugify(checkIn.state || '')
+                                const doorTypeSlug = slugify(checkIn.doorType || 'job')
+                                const base =
+                                  (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '') || ''
+                                const path = `/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${doorTypeSlug}-${checkIn.id}`
+                                const href = base ? `${base}${path}` : path
+                                return (
+                                  <a
+                                    href={href}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline"
+                                  >
+                                    Public URL
+                                  </a>
+                                )
+                              })()}
+                            </div>
+                          )}
+                          {publishWarnings[checkIn.id] && (
+                            <div className="mt-1 text-xs text-amber-600">
+                              {publishWarnings[checkIn.id]}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
