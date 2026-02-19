@@ -19,7 +19,7 @@ export default function Navigation() {
 
   const navLinks = [
     { href: '/check-in', label: 'Check-In', show: true },
-    { href: '/my-jobs', label: 'My Jobs', show: true },
+    { href: '/my-jobs', label: 'My Jobs', show: !canAccessDashboard },
     { href: '/dashboard', label: 'Dashboard', show: canAccessDashboard },
     { href: '/dashboard/team', label: 'Team', show: canAccessDashboard },
     { href: '/reporting', label: 'Reporting & Key Metrics', show: isOwner },
