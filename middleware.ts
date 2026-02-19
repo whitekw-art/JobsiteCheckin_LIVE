@@ -32,6 +32,7 @@ if (pathname.startsWith('/auth/')) {
 if (
   !token &&
   !pathname.startsWith('/jobs/') &&
+  !pathname.startsWith('/portfolio/') &&
   !pathname.startsWith('/sitemap') &&
   !isPublicAssetPath
 ) {

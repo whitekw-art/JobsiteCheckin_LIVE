@@ -91,6 +91,7 @@ const handler = NextAuth({
         session.user.id = token.id as string
         session.user.role = token.role as string
         session.user.organizationId = token.organizationId as string
+        session.user.orgSlug = token.orgSlug as string | null
         if (token.companyName) {
           // @ts-expect-error - extended at runtime
           session.user.companyName = token.companyName as string
@@ -118,6 +119,7 @@ const handler = NextAuth({
         if (dbUser) {
           token.organizationId = dbUser.organizationId
           token.companyName = dbUser.organization?.name
+          token.orgSlug = dbUser.organization?.slug
         }
       } catch (error) {
         console.error('Error loading user organization for JWT:', error)

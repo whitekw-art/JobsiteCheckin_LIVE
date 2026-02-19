@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { geocodeJobAddress } from '@/lib/geocode'
+import { slugify } from '@/lib/slugify'
 
 interface CheckIn {
   id: string
@@ -22,8 +24,10 @@ interface CheckIn {
 }
 
 export default function Dashboard() {
+  const { data: session } = useSession()
   const [checkIns, setCheckIns] = useState<CheckIn[]>([])
   const [loading, setLoading] = useState(true)
+  const [copied, setCopied] = useState(false)
   const [downloadingRow, setDownloadingRow] = useState<number | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [publishWarnings, setPublishWarnings] = useState<Record<string, string>>({})
@@ -35,14 +39,6 @@ export default function Dashboard() {
     state: '',
     zip: '',
   })
-
-  const slugify = (value: string) =>
-    value
-      .toLowerCase()
-      .trim()
-      .replace(/[\/]+/g, '-') // replace slashes with hyphens
-      .replace(/[^a-z0-9]+/g, '-') // non-alphanumerics to hyphen
-      .replace(/^-+|-+$/g, '') // trim hyphens
 
   useEffect(() => {
     fetchCheckIns()
@@ -264,6 +260,46 @@ export default function Dashboard() {
             New Check-In
           </Link>
         </div>
+
+        {/* Portfolio Link */}
+        {(() => {
+          const orgSlug = session?.user?.orgSlug
+          const publishedCount = checkIns.filter(c => c.isPublic).length
+          if (!orgSlug || publishedCount === 0) return null
+          const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
+          const portfolioUrl = `${baseUrl}/portfolio/${orgSlug}`
+          return (
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Your Public Portfolio</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {publishedCount} published {publishedCount === 1 ? 'job' : 'jobs'} visible to the public
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={portfolioUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:underline truncate max-w-[260px]"
+                >
+                  {portfolioUrl.replace(/^https?:\/\//, '')}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(portfolioUrl)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }}
+                  className="shrink-0 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded"
+                >
+                  {copied ? 'Copied' : 'Copy Link'}
+                </button>
+              </div>
+            </div>
+          )
+        })()}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white p-6 rounded-lg shadow">
