@@ -1,14 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { prisma } from '@/lib/prisma'
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[\/]+/g, '-')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
+import { slugify } from '@/lib/slugify'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
@@ -40,6 +32,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   })
 
+  // Portfolio pages for orgs with at least one public check-in
+  const orgsWithPublicJobs = await prisma.organization.findMany({
+    where: {
+      slug: { not: null },
+      checkIns: { some: { isPublic: true } },
+    },
+    select: {
+      slug: true,
+      createdAt: true,
+    },
+  })
+
+  const portfolioEntries: MetadataRoute.Sitemap = orgsWithPublicJobs
+    .filter((org) => org.slug)
+    .map((org) => ({
+      url: `${baseUrl}/portfolio/${org.slug}`,
+      lastModified: org.createdAt,
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+    }))
+
   return [
     {
       url: baseUrl || 'https://localhost:3000',
@@ -48,5 +61,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1.0,
     },
     ...jobEntries,
+    ...portfolioEntries,
   ]
 }

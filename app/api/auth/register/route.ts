@@ -2,6 +2,7 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcrypt'
 import { prisma } from '@/lib/prisma'
+import { slugify } from '@/lib/slugify'
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,9 +65,18 @@ export async function POST(request: NextRequest) {
     let organization = null
 
     if (registrationType === 'business') {
+      let baseSlug = slugify(companyName)
+      let slug = baseSlug
+      let suffix = 2
+      while (await prisma.organization.findUnique({ where: { slug } })) {
+        slug = `${baseSlug}-${suffix}`
+        suffix++
+      }
+
       organization = await prisma.organization.create({
         data: {
           name: companyName,
+          slug,
           phone,
           website,
         },
