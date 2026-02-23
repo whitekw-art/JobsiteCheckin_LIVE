@@ -6,9 +6,10 @@ interface JobPhoneLinkProps {
   checkInId: string
   href: string
   label: string
+  className?: string
 }
 
-export function JobPhoneLink({ checkInId, href, label }: JobPhoneLinkProps) {
+export function JobPhoneLink({ checkInId, href, label, className }: JobPhoneLinkProps) {
   const handleClick = async (event: MouseEvent<HTMLAnchorElement>) => {
     try {
       await fetch('/api/checkins/events', {
@@ -29,7 +30,7 @@ export function JobPhoneLink({ checkInId, href, label }: JobPhoneLinkProps) {
     <a
       href={href}
       onClick={handleClick}
-      className="text-blue-600 hover:underline inline-flex items-center min-h-[44px] py-2"
+      className={className || "text-blue-600 hover:underline inline-flex items-center min-h-[44px] py-2"}
     >
       {label}
     </a>
