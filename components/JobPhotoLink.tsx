@@ -7,6 +7,7 @@ interface JobPhotoLinkProps {
   href: string
   label: ReactNode
   metadata?: string
+  className?: string
 }
 
 export function JobPhotoLink({
@@ -14,6 +15,7 @@ export function JobPhotoLink({
   href,
   label,
   metadata,
+  className,
 }: JobPhotoLinkProps) {
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault()
@@ -47,7 +49,7 @@ export function JobPhotoLink({
       target="_blank"
       rel="noopener noreferrer"
       onClick={handleClick}
-      className="text-blue-600 hover:underline"
+      className={className || "text-blue-600 hover:underline"}
     >
       {label}
     </a>
