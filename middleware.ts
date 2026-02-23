@@ -34,6 +34,7 @@ if (
   !pathname.startsWith('/jobs/') &&
   !pathname.startsWith('/portfolio/') &&
   !pathname.startsWith('/sitemap') &&
+  pathname !== '/robots.txt' &&
   !isPublicAssetPath
 ) {
   return NextResponse.redirect(new URL('/auth/signin', req.url))

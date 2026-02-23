@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { JobPhoneLink } from '@/components/JobPhoneLink'
 import { JobWebsiteLink } from '@/components/JobWebsiteLink'
 
@@ -304,10 +305,13 @@ export default function JobDetailClient({
                 aria-label="Open photo lightbox"
               >
                 <div className="relative" style={{ height: 'min(60vh, 500px)' }}>
-                  <img
+                  <Image
                     src={photos[featuredIndex]}
                     alt={`${doorType} installation in ${city}, ${state} - photo ${featuredIndex + 1}`}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 76rem"
+                    priority
                   />
                   {/* Hover overlay */}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center">
@@ -341,11 +345,12 @@ export default function JobDetailClient({
                       type="button"
                       aria-label={`View photo ${i + 1}`}
                     >
-                      <img
+                      <Image
                         src={url}
                         alt={`${doorType} installation in ${city}, ${state} - thumbnail ${i + 1}`}
+                        width={80}
+                        height={80}
                         className="w-full h-full object-cover"
-                        loading="lazy"
                       />
                     </button>
                   ))}
@@ -650,13 +655,14 @@ function RelatedJobCard({ job, index }: { job: RelatedJob; index: number }) {
         style={{ background: 'linear-gradient(to right, #e8a83a, #b87420, transparent)' }}
       />
 
-      <div className="aspect-[16/10] bg-surface-100 overflow-hidden">
+      <div className="aspect-[16/10] bg-surface-100 overflow-hidden relative">
         {job.thumbnail ? (
-          <img
+          <Image
             src={job.thumbnail}
             alt={`${job.doorType} in ${job.city}, ${job.state}`}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            loading="lazy"
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-100 to-primary-200">

@@ -28,13 +28,15 @@ export async function generateMetadata(
 
   const { doorType, city, state, seoTitle, seoDescription, photoUrls, organization } = checkIn
 
+  const article = doorType && /^[aeiou]/i.test(doorType) ? 'an' : 'a'
+
   const title = seoTitle ||
     (doorType && city && state ? `${doorType} in ${city}, ${state}` : 'Job Details')
 
   const description = seoDescription ||
     (doorType && city && state
-      ? `Installed a ${doorType} in ${city}, ${state}.`
-      : 'Job description is not available.')
+      ? `View ${article} ${doorType} installation completed in ${city}, ${state}${organization?.name ? ` by ${organization.name}` : ''}. See photos, details, and get a free estimate.`
+      : 'View completed job details, photos, and request a free estimate.')
 
   const photos = photoUrls
     ? photoUrls.split(',').map((url) => url.trim()).filter(Boolean)
@@ -46,6 +48,7 @@ export async function generateMetadata(
   return {
     title,
     description,
+    ...(pageUrl && { alternates: { canonical: pageUrl } }),
     openGraph: {
       title,
       description,
@@ -110,11 +113,12 @@ export default async function JobPage(
       ? `${doorType} in ${city}, ${state}`
       : 'Job Details')
 
+  const effectiveArticle = doorType && /^[aeiou]/i.test(doorType) ? 'an' : 'a'
   const effectiveDescription =
     seoDescription ||
     (doorType && city && state
-      ? `Installed a ${doorType} in ${city}, ${state}.`
-      : 'Job description is not available.')
+      ? `View ${effectiveArticle} ${doorType} installation completed in ${city}, ${state}${organization?.name ? ` by ${organization.name}` : ''}. See photos, details, and get a free estimate.`
+      : 'View completed job details, photos, and request a free estimate.')
 
   const photos = photoUrls
     ? photoUrls
@@ -205,6 +209,10 @@ export default async function JobPage(
     provider: localBusiness,
   }
   if (doorType) jsonLd.serviceType = doorType
+  if (checkIn.timestamp) {
+    jsonLd.datePublished = checkIn.timestamp.toISOString()
+    jsonLd.dateModified = checkIn.timestamp.toISOString()
+  }
   if (city || state) {
     jsonLd.areaServed = {
       '@type': 'Place',
@@ -214,7 +222,7 @@ export default async function JobPage(
   if (photos.length > 0) {
     jsonLd.image = photos.map((url, i) => ({
       '@type': 'ImageObject',
-      url,
+      url: url.startsWith('http') ? url : `${baseUrl}${url}`,
       name: [doorType, city, state].filter(Boolean).join(' - ') || `Job photo ${i + 1}`,
     }))
   }
