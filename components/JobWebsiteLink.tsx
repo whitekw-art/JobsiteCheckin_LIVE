@@ -6,9 +6,10 @@ interface JobWebsiteLinkProps {
   checkInId: string
   href: string
   label: string
+  className?: string
 }
 
-export function JobWebsiteLink({ checkInId, href, label }: JobWebsiteLinkProps) {
+export function JobWebsiteLink({ checkInId, href, label, className }: JobWebsiteLinkProps) {
   const handleClick = async (event: MouseEvent<HTMLAnchorElement>) => {
     try {
       await fetch('/api/checkins/events', {
@@ -31,7 +32,7 @@ export function JobWebsiteLink({ checkInId, href, label }: JobWebsiteLinkProps) 
       target="_blank"
       rel="noopener noreferrer"
       onClick={handleClick}
-      className="text-blue-600 hover:underline inline-flex items-center min-h-[44px] py-2"
+      className={className || "text-blue-600 hover:underline inline-flex items-center min-h-[44px] py-2"}
     >
       {label}
     </a>

@@ -1,17 +1,9 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
+import { slugify } from '@/lib/slugify'
 import { CheckInPageViewTracker } from '@/components/CheckInPageViewTracker'
-import { JobWebsiteLink } from '@/components/JobWebsiteLink'
-import { JobPhoneLink } from '@/components/JobPhoneLink'
-import { JobPhotoLink } from '@/components/JobPhotoLink'
-
-interface JobPageProps {
-  params: {
-    location: string
-    slug: string
-  }
-}
+import JobDetailClient from './JobDetailClient'
 
 export async function generateMetadata(
   { params }: { params: Promise<{ location: string; slug: string }> }
@@ -141,6 +133,44 @@ export default async function JobPage(
       ? `https://${businessWebsite}`
       : ''
 
+  // Compute orgSlug for portfolio link
+  const orgSlug = organization?.slug || null
+
+  // Fetch related jobs from same organization
+  const relatedCheckIns = organization
+    ? await prisma.checkIn.findMany({
+        where: {
+          organizationId: organization.id,
+          isPublic: true,
+          id: { not: checkInId },
+        },
+        orderBy: { timestamp: 'desc' },
+        take: 4,
+      })
+    : []
+
+  const relatedJobs = relatedCheckIns.map((job) => {
+    const jobPhotos = job.photoUrls
+      ? job.photoUrls.split(',').map((u) => u.trim()).filter(Boolean)
+      : []
+    const citySlug = slugify(job.city || '')
+    const stateSlug = slugify(job.state || '')
+    const doorTypeSlug = slugify(job.doorType || 'job')
+    const jobPath = `/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${doorTypeSlug}-${job.id}`
+
+    return {
+      id: job.id,
+      doorType: job.doorType || 'Job',
+      city: job.city || '',
+      state: job.state || '',
+      thumbnail: jobPhotos[0] || null,
+      jobPath,
+      timestamp: job.timestamp ? job.timestamp.toISOString() : null,
+    }
+  })
+
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
+
   // Build JSON-LD structured data
   const localBusiness: Record<string, any> = {
     '@type': 'LocalBusiness',
@@ -190,92 +220,30 @@ export default async function JobPage(
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-2 sm:p-4">
+    <main className="min-h-screen bg-surface-50">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <div className="max-w-3xl mx-auto bg-white rounded-lg shadow p-4 sm:p-6">
-        <CheckInPageViewTracker checkInId={checkInId} />
-        <h1 className="text-2xl font-bold mb-2">{effectiveTitle}</h1>
-        <p className="text-gray-700 mb-4">{effectiveDescription}</p>
-
-        <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-1">Location</h2>
-          <p className="text-gray-800">
-            {[city, state, zip].filter(Boolean).join(', ') || 'Location unavailable'}
-          </p>
-        </section>
-
-        <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-1">Door Type</h2>
-          <p className="text-gray-800">{doorType || 'Not specified'}</p>
-        </section>
-
-        <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-1">Business</h2>
-          <p className="text-gray-800">{businessName}</p>
-        </section>
-
-        <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-1">Contact</h2>
-          <div className="space-y-1 text-gray-800">
-            <p>
-              <span className="font-medium">Phone: </span>
-              {businessPhone ? (
-                <JobPhoneLink
-                  checkInId={checkInId}
-                  href={`tel:${businessPhone.replace(/[^0-9+]/g, '')}`}
-                  label={businessPhone}
-                />
-              ) : (
-                <span className="text-gray-500">Phone not provided</span>
-              )}
-            </p>
-            <p>
-              <span className="font-medium">Website: </span>
-              {businessWebsite ? (
-                <JobWebsiteLink
-                  checkInId={checkInId}
-                  href={normalizedWebsiteHref}
-                  label={businessWebsite}
-                />
-              ) : (
-                <span className="text-gray-500">Website not provided</span>
-              )}
-            </p>
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-lg font-semibold mb-2">Photos</h2>
-          {photos.length === 0 ? (
-            <p className="text-gray-500">No photos available.</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {photos.map((url, index) => (
-                <JobPhotoLink
-                  key={index}
-                  checkInId={checkInId}
-                  href={url}
-                  metadata={JSON.stringify({ photoIndex: index, photoUrl: url })}
-                  label={
-                    <img
-                      src={url}
-                      alt={
-                        [doorType, city && state ? `${city}, ${state}` : city || state]
-                          .filter(Boolean)
-                          .join(' in ') || `Job photo ${index + 1}`
-                      }
-                      className="w-full h-auto rounded cursor-pointer"
-                    />
-                  }
-                />
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
+      <CheckInPageViewTracker checkInId={checkInId} />
+      <JobDetailClient
+        checkInId={checkInId}
+        title={effectiveTitle}
+        description={effectiveDescription}
+        doorType={doorType || ''}
+        city={city || ''}
+        state={state || ''}
+        zip={zip || ''}
+        notes={checkIn.notes || null}
+        timestamp={checkIn.timestamp ? checkIn.timestamp.toISOString() : null}
+        photos={photos}
+        businessName={businessName}
+        businessPhone={businessPhone}
+        normalizedWebsite={normalizedWebsiteHref}
+        orgSlug={orgSlug}
+        relatedJobs={relatedJobs}
+        baseUrl={baseUrl}
+      />
     </main>
   )
 }
