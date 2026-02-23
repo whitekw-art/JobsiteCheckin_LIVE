@@ -30,10 +30,10 @@ export async function GET() {
     }
 
     return NextResponse.json({ organization })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error loading organization profile:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to load organization profile' },
+      { error: 'Failed to load organization profile' },
       { status: 500 }
     )
   }
@@ -76,12 +76,11 @@ export async function PATCH(request: NextRequest) {
     })
 
     return NextResponse.json({ organization: updated })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error updating organization profile:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to update organization profile' },
+      { error: 'Failed to update organization profile' },
       { status: 500 }
     )
   }
 }
-

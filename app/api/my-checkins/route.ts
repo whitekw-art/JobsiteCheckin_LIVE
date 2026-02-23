@@ -47,10 +47,10 @@ export async function GET() {
     }))
 
     return NextResponse.json({ checkIns })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching user check-ins:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch check-ins' },
+      { error: 'Failed to fetch check-ins' },
       { status: 500 }
     )
   }
