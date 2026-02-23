@@ -32,6 +32,8 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) return null
 
         if (credentials.isSignUp === 'true') {
+          if (credentials.password.length < 8) return null
+
           const existingUser = await prisma.user.findUnique({
             where: { email: credentials.email },
           })
