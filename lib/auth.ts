@@ -1,18 +1,18 @@
 import { getServerSession } from 'next-auth/next'
-import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { authOptions } from '@/lib/auth-config'
 import { Role } from '@prisma/client'
 
 export async function getCurrentUser() {
-  const session = await getServerSession()
-  
+  const session = await getServerSession(authOptions)
+
   if (!session?.user?.email) {
     return null
   }
 
   const user = await prisma.user.findUnique({
     where: { email: session.user.email },
-    include: { organization: true }
+    include: { organization: true },
   })
 
   return user
@@ -20,7 +20,7 @@ export async function getCurrentUser() {
 
 export async function requireRole(allowedRoles: Role[]) {
   const user = await getCurrentUser()
-  
+
   if (!user || !allowedRoles.includes(user.role)) {
     throw new Error('Unauthorized')
   }
@@ -31,7 +31,7 @@ export async function requireRole(allowedRoles: Role[]) {
 export async function getOrganizationIdForUser(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { organizationId: true }
+    select: { organizationId: true },
   })
 
   return user?.organizationId
