@@ -54,12 +54,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }))
 
   return [
-    {
-      url: baseUrl || 'https://localhost:3000',
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 1.0,
-    },
     ...jobEntries,
     ...portfolioEntries,
   ]

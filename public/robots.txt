@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /jobs/
+Allow: /portfolio/
+Allow: /sitemap.xml
+Disallow: /auth/
+Disallow: /dashboard/
+Disallow: /check-in/
+Disallow: /api/
+Disallow: /my-jobs/
+Disallow: /reporting/
+Disallow: /account/
+Disallow: /payments/
+Disallow: /onboarding/
+Disallow: /super-admin/
+
+Sitemap: https://jobsite-checkin-live-du7t.vercel.app/sitemap.xml

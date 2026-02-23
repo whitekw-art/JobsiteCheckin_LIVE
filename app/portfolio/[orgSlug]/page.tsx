@@ -32,22 +32,28 @@ export async function generateMetadata({ params }: PortfolioPageProps): Promise<
   const cities = [...new Set(org.checkIns.map((c) => c.city).filter(Boolean))]
   const doorTypes = [...new Set(org.checkIns.map((c) => c.doorType).filter(Boolean))]
 
+  const jobCount = org.checkIns.length
+  const jobWord = jobCount === 1 ? 'job' : 'jobs'
+
   const title = `${org.name} — Completed Jobs Portfolio`
   const description =
     doorTypes.length > 0 && cities.length > 0
-      ? `${org.name} has completed ${org.checkIns.length} jobs including ${doorTypes.slice(0, 3).join(', ')} in ${cities.slice(0, 3).join(', ')}.`
-      : `View ${org.name}'s portfolio of ${org.checkIns.length} completed jobs.`
+      ? `${org.name} has completed ${jobCount} ${jobWord} including ${doorTypes.slice(0, 3).join(', ')} in ${cities.slice(0, 3).join(', ')}. View photos, project details, and request a free estimate.`
+      : `View ${org.name}'s portfolio of ${jobCount} completed ${jobWord}. Browse project photos, service details, and get a free estimate.`
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
   const firstPhoto = org.checkIns.find((c) => c.photoUrls)?.photoUrls?.split(',')[0]?.trim()
 
+  const canonicalUrl = `${baseUrl}/portfolio/${orgSlug}`
+
   return {
     title,
     description,
+    alternates: { canonical: canonicalUrl },
     openGraph: {
       title,
       description,
-      url: `${baseUrl}/portfolio/${orgSlug}`,
+      url: canonicalUrl,
       type: 'website',
       ...(firstPhoto && { images: [{ url: firstPhoto, alt: `${org.name} completed work` }] }),
     },

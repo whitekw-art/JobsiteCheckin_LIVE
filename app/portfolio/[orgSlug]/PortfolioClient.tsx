@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 /* ═══════════════════════════════════════════
    TYPES
@@ -389,10 +390,13 @@ function HeroBand({
             transition: `opacity 1.2s ease-in-out, transform 6s ease-out`,
           }}
         >
-          <img
+          <Image
             src={photo}
             alt={`${orgName} project photo ${i + 1}`}
-            className="w-full h-full object-cover"
+            fill
+            className="object-cover"
+            sizes="100vw"
+            priority={i === 0}
           />
         </div>
       ))}
@@ -450,7 +454,7 @@ function HeroBand({
               <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838l-3.09 1.323 2.302.986a1 1 0 00.788 0l7-3a1 1 0 000-1.84l-7-3z" />
               <path d="M3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0z" />
             </svg>
-            <span className="font-display font-bold text-white">{jobCount}</span> jobs completed
+            <span className="font-display font-bold text-white">{jobCount}</span> {jobCount === 1 ? 'job' : 'jobs'} completed
           </span>
           <span
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[0.78rem] font-medium text-white/90"
@@ -640,12 +644,13 @@ function FeaturedCard({
 
       <div className="aspect-[16/10] bg-surface-100 overflow-hidden relative">
         {job.thumbnail ? (
-          <img
+          <Image
             data-parallax-img
             src={job.thumbnail}
             alt={`${job.doorType} in ${job.city}, ${job.state}`}
-            className="w-full h-full object-cover transition-transform duration-400"
-            loading="lazy"
+            fill
+            className="object-cover transition-transform duration-400"
+            sizes="(max-width: 640px) 85vw, (max-width: 1024px) 45vw, 30vw"
           />
         ) : (
           <div data-parallax-img className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-100 to-primary-200">
@@ -809,12 +814,13 @@ function MasonryCard({
     >
       <div className={`${aspectClass} bg-surface-100 overflow-hidden relative`}>
         {job.thumbnail ? (
-          <img
+          <Image
             data-parallax-img
             src={job.thumbnail}
             alt={`${job.doorType} in ${job.city}, ${job.state}`}
-            className="w-full h-full object-cover transition-transform duration-300"
-            loading="lazy"
+            fill
+            className="object-cover transition-transform duration-300"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
         ) : (
           <div data-parallax-img className="w-full h-full flex items-center justify-center">
