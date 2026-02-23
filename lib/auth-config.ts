@@ -91,7 +91,6 @@ export const authOptions: NextAuthOptions = {
         session.user.organizationId = token.organizationId as string
         session.user.orgSlug = token.orgSlug as string | null
         if (token.companyName) {
-          // @ts-expect-error - extended at runtime
           session.user.companyName = token.companyName as string
         }
       }
@@ -99,9 +98,9 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, user }) {
       if (user) {
-        token.id = (user as any).id
-        token.role = (user as any).role
-        token.organizationId = (user as any).organizationId
+        token.id = user.id
+        token.role = user.role
+        token.organizationId = user.organizationId
       }
 
       if (!token.email) return token
