@@ -129,8 +129,8 @@ export default function RegisterPage() {
       return
     }
 
-    if (trimmedPassword.length < 6) {
-      setFeedback({ type: 'error', text: 'Password should be at least 6 characters.' })
+    if (trimmedPassword.length < 8) {
+      setFeedback({ type: 'error', text: 'Password must be at least 8 characters.' })
       return
     }
 
