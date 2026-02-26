@@ -1,14 +1,85 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import convert from 'heic-convert'
+import { getCurrentUser } from '@/lib/auth'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
+
+/**
+ * Detects the actual image type by inspecting the file's magic bytes.
+ * Returns the MIME type string if recognised, or null if not a supported image.
+ * This is intentionally independent of the client-reported Content-Type.
+ */
+function detectImageMimeType(buffer: Buffer): string | null {
+  if (buffer.length < 4) return null
+
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return 'image/jpeg'
+  }
+
+  // PNG: 89 50 4E 47
+  if (
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47
+  ) {
+    return 'image/png'
+  }
+
+  // GIF: 47 49 46 38
+  if (
+    buffer[0] === 0x47 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x38
+  ) {
+    return 'image/gif'
+  }
+
+  // WebP: RIFF....WEBP (bytes 0-3 = RIFF, bytes 8-11 = WEBP)
+  if (
+    buffer.length >= 12 &&
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  ) {
+    return 'image/webp'
+  }
+
+  // HEIC/HEIF: ftyp box at offset 4 (bytes 4-7 = 66 74 79 70)
+  if (
+    buffer.length >= 12 &&
+    buffer[4] === 0x66 &&
+    buffer[5] === 0x74 &&
+    buffer[6] === 0x79 &&
+    buffer[7] === 0x70
+  ) {
+    return 'image/heic'
+  }
+
+  return null
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // 1. Require authentication
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const formData = await request.formData()
     const photo = formData.get('photo') as File
 
@@ -16,34 +87,50 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No photo provided' }, { status: 400 })
     }
 
-    const timestamp = Date.now()
-    const filename = `jobsite-${timestamp}.jpg`
+    // 2. Enforce file size limit before reading buffer
+    if (photo.size > MAX_FILE_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: 'File too large. Maximum size is 10 MB.' },
+        { status: 400 }
+      )
+    }
+
     const arrayBuffer = await photo.arrayBuffer()
     const inputBuffer = Buffer.from(arrayBuffer)
-    
+
+    // 3. Validate actual file type via magic bytes (ignore client-reported type)
+    const detectedMime = detectImageMimeType(inputBuffer)
+    if (!detectedMime) {
+      return NextResponse.json(
+        { error: 'Invalid file type. Only images are accepted.' },
+        { status: 400 }
+      )
+    }
+
+    const timestamp = Date.now()
+    const filename = `jobsite-${timestamp}.jpg`
+
     let outputBuffer: Buffer
-    
-    // Check if it's a HEIC file and convert to JPEG
-    if (photo.type === 'image/heic' || photo.type === 'image/heif' || photo.name.toLowerCase().includes('.heic')) {
+
+    // Convert HEIC to JPEG; pass all other formats through as-is
+    if (detectedMime === 'image/heic') {
       try {
-        outputBuffer = await convert({
+        outputBuffer = (await convert({
           buffer: inputBuffer,
           format: 'JPEG',
-          quality: 0.8
-        }) as Buffer
-      } catch (convertError) {
-        // If conversion fails, save as is
+          quality: 0.8,
+        })) as Buffer
+      } catch {
         outputBuffer = inputBuffer
       }
     } else {
-      // For other formats, save as is
       outputBuffer = inputBuffer
     }
-    
+
     const { error: uploadError } = await supabase.storage
       .from('checkin-photos')
       .upload(filename, outputBuffer, {
-        contentType: photo.type || 'image/jpeg',
+        contentType: 'image/jpeg',
         upsert: false,
       })
 
@@ -59,13 +146,11 @@ export async function POST(request: NextRequest) {
       .from('checkin-photos')
       .getPublicUrl(filename)
 
-    const photoUrl = data.publicUrl
-
-    return NextResponse.json({ photoUrl })
-  } catch (error: any) {
+    return NextResponse.json({ photoUrl: data.publicUrl })
+  } catch (error) {
     console.error('Error processing photo:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to process photo' },
+      { error: 'Failed to process photo' },
       { status: 500 }
     )
   }
