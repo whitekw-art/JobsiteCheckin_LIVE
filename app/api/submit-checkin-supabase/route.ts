@@ -82,10 +82,10 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Supabase check-in save failed:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to save check-in' },
+      { error: 'Failed to save check-in' },
       { status: 500 }
     )
   }

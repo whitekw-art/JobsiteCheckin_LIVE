@@ -17,7 +17,7 @@ export function JobWebsiteLink({ checkInId, href, label, className }: JobWebsite
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           checkInId,
-          eventType: 'WEBSITE_CLICK',
+          eventType: 'website_click',
         }),
         keepalive: true,
       })

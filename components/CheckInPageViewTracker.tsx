@@ -17,7 +17,7 @@ export function CheckInPageViewTracker({ checkInId }: CheckInPageViewTrackerProp
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             checkInId,
-            eventType: 'PAGE_VIEW',
+            eventType: 'page_view',
           }),
           keepalive: true,
         })

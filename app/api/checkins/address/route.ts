@@ -10,6 +10,10 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (!['OWNER', 'ADMIN'].includes(currentUser.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await request.json()
     const { id, street, city, state, zip, latitude, longitude } = body
 
@@ -78,10 +82,10 @@ export async function PATCH(request: NextRequest) {
     })
 
     return NextResponse.json({ checkIn: updated })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error updating check-in address:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to update address' },
+      { error: 'Failed to update address' },
       { status: 500 }
     )
   }

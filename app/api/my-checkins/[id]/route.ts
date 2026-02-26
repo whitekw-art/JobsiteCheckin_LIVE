@@ -49,7 +49,7 @@ export async function PATCH(
     const body = await request.json()
     const { street, city, state, zip, notes, doorType, latitude, longitude, addPhotoUrls, removePhotoUrl } = body
 
-    const updateData: Record<string, any> = {}
+    const updateData: Record<string, unknown> = {}
 
     // Address fields
     if (street !== undefined) updateData.street = street
@@ -119,10 +119,10 @@ export async function PATCH(
           : [],
       },
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error updating check-in:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to update check-in' },
+      { error: 'Failed to update check-in' },
       { status: 500 }
     )
   }

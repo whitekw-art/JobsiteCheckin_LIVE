@@ -17,7 +17,7 @@ export function JobPhoneLink({ checkInId, href, label, className }: JobPhoneLink
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           checkInId,
-          eventType: 'PHONE_CLICK',
+          eventType: 'phone_click',
         }),
         keepalive: true,
       })
