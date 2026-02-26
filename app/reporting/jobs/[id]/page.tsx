@@ -71,7 +71,7 @@ export default async function ReportingJobDetailPage({
     where: {
       checkInId: checkIn.id,
       eventType: {
-        in: ['PAGE_VIEW', 'PHOTO_CLICK', 'WEBSITE_CLICK', 'PHONE_CLICK'],
+        in: ['PAGE_VIEW', 'page_view', 'PHOTO_CLICK', 'photo_click', 'WEBSITE_CLICK', 'website_click', 'PHONE_CLICK', 'phone_click'],
       },
     },
     _count: {
@@ -80,9 +80,9 @@ export default async function ReportingJobDetailPage({
   })
 
   const counts = grouped.reduce<EventCounts>((acc, row) => {
-    const type = row.eventType as keyof EventCounts
+    const type = row.eventType.toUpperCase() as keyof EventCounts
     if (type in acc) {
-      acc[type] = row._count._all
+      acc[type] += row._count._all
     }
     return acc
   }, { ...emptyCounts })
@@ -90,7 +90,7 @@ export default async function ReportingJobDetailPage({
   const photoClickEvents = await prisma.checkInEvent.findMany({
     where: {
       checkInId: checkIn.id,
-      eventType: 'PHOTO_CLICK',
+      eventType: { in: ['PHOTO_CLICK', 'photo_click'] },
     },
   })
 

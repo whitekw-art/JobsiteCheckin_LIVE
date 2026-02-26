@@ -86,7 +86,7 @@ export default async function ReportingPage({
         organizationId: currentUser.organizationId,
       },
       eventType: {
-        in: ['PAGE_VIEW', 'PHOTO_CLICK', 'WEBSITE_CLICK', 'PHONE_CLICK'],
+        in: ['PAGE_VIEW', 'page_view', 'PHOTO_CLICK', 'photo_click', 'WEBSITE_CLICK', 'website_click', 'PHONE_CLICK', 'phone_click'],
       },
     },
     _count: {
@@ -107,10 +107,11 @@ export default async function ReportingPage({
       phoneClicks: 0,
     }
 
-    if (row.eventType === 'PAGE_VIEW') existing.pageViews = row._count._all
-    if (row.eventType === 'PHOTO_CLICK') existing.photoClicks = row._count._all
-    if (row.eventType === 'WEBSITE_CLICK') existing.websiteClicks = row._count._all
-    if (row.eventType === 'PHONE_CLICK') existing.phoneClicks = row._count._all
+    const et = row.eventType.toUpperCase()
+    if (et === 'PAGE_VIEW') existing.pageViews += row._count._all
+    if (et === 'PHOTO_CLICK') existing.photoClicks += row._count._all
+    if (et === 'WEBSITE_CLICK') existing.websiteClicks += row._count._all
+    if (et === 'PHONE_CLICK') existing.phoneClicks += row._count._all
 
     eventMap.set(row.checkInId, existing)
   }
@@ -179,7 +180,7 @@ export default async function ReportingPage({
 
   const photoEvents = await prisma.checkInEvent.findMany({
     where: {
-      eventType: 'PHOTO_CLICK',
+      eventType: { in: ['PHOTO_CLICK', 'photo_click'] },
       metadata: {
         not: null,
       },
