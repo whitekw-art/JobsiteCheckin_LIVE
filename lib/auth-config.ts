@@ -4,6 +4,7 @@ import EmailProvider from 'next-auth/providers/email'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcrypt'
+import { loginRatelimit } from '@/lib/rate-limit'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -30,6 +31,17 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
+
+        // Rate limit by email — 5 attempts per 15 minutes
+        // Fail open: if Upstash is unavailable, allow login rather than blocking all users
+        try {
+          const { success } = await loginRatelimit.limit(
+            `email:${credentials.email.toLowerCase()}`
+          )
+          if (!success) return null
+        } catch {
+          // Upstash unavailable — fail open, login proceeds normally
+        }
 
         if (credentials.isSignUp === 'true') {
           if (credentials.password.length < 8) return null
