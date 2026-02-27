@@ -25,6 +25,7 @@ export async function GET() {
         latitude: true,
         longitude: true,
         locationSource: true,
+        doorType: true,
         timestamp: true,
         isPublic: true,
         photoUrls: true,
