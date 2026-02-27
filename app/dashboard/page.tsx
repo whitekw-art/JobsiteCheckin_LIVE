@@ -23,6 +23,112 @@ interface CheckIn {
   photoUrls?: string[]
 }
 
+function validateForPublish(checkIn: CheckIn): {
+  hardBlocked: boolean
+  warnings: string[]
+} {
+  if (!checkIn.city || !checkIn.state) {
+    return { hardBlocked: true, warnings: [] }
+  }
+  const warnings: string[] = []
+  if ((checkIn.photoUrls?.length ?? 0) < 3) {
+    warnings.push('Add at least 3 photos for best results (before, during, and after)')
+  }
+  if (!checkIn.notes?.trim()) {
+    warnings.push('Add a job description — it helps your page rank better in Google')
+  }
+  if (checkIn.locationSource === 'DEVICE') {
+    warnings.push("Verify the address — location was captured from the installer's device")
+  }
+  if (!checkIn.doorType) {
+    warnings.push("The page title will show 'Job' instead of the door type")
+  }
+  return { hardBlocked: false, warnings }
+}
+
+function PublishModal({
+  checkIn,
+  warnings,
+  onConfirm,
+  onClose,
+  isPublishing,
+}: {
+  checkIn: CheckIn
+  warnings: string[]
+  onConfirm: () => void
+  onClose: () => void
+  isPublishing: boolean
+}) {
+  const jobLabel = [
+    checkIn.doorType,
+    [checkIn.city, checkIn.state].filter(Boolean).join(', '),
+  ]
+    .filter(Boolean)
+    .join(' \u2022 ')
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-semibold text-gray-900">
+          {warnings.length > 0 ? 'Before you publish\u2026' : 'Publish this job?'}
+        </h2>
+        {jobLabel && (
+          <p className="text-sm text-gray-500 mt-1">{jobLabel}</p>
+        )}
+
+        {warnings.length > 0 ? (
+          <>
+            <ul className="mt-4 space-y-2">
+              {warnings.map((w) => (
+                <li key={w} className="flex items-start gap-2 text-sm text-amber-700">
+                  <span className="mt-0.5 shrink-0">⚠</span>
+                  <span>{w}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-sm text-gray-600">
+              We recommend resolving these issues before publishing for the best results.
+            </p>
+          </>
+        ) : (
+          <p className="mt-3 text-sm text-gray-600">
+            This job will be publicly visible once published.
+          </p>
+        )}
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isPublishing}
+            className="px-4 py-2 rounded text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 min-h-[44px]"
+          >
+            {warnings.length > 0 ? 'Go Back' : 'Cancel'}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isPublishing}
+            className="px-4 py-2 rounded text-sm font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 min-h-[44px]"
+          >
+            {isPublishing
+              ? 'Publishing\u2026'
+              : warnings.length > 0
+              ? 'Publish Anyway'
+              : 'Publish'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const { data: session } = useSession()
   const [checkIns, setCheckIns] = useState<CheckIn[]>([])
@@ -30,7 +136,6 @@ export default function Dashboard() {
   const [copied, setCopied] = useState(false)
   const [downloadingRow, setDownloadingRow] = useState<number | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
-  const [publishWarnings, setPublishWarnings] = useState<Record<string, string>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [editAddress, setEditAddress] = useState({
@@ -39,10 +144,23 @@ export default function Dashboard() {
     state: '',
     zip: '',
   })
+  const [publishModal, setPublishModal] = useState<{
+    checkIn: CheckIn
+    warnings: string[]
+  } | null>(null)
 
   useEffect(() => {
     fetchCheckIns()
   }, [])
+
+  useEffect(() => {
+    if (!publishModal) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPublishModal(null)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [publishModal])
 
   const fetchCheckIns = async () => {
     try {
@@ -140,46 +258,31 @@ export default function Dashboard() {
 
       const data = await response.json()
       const newIsPublic = data.checkIn?.isPublic as boolean | undefined
-      const missingPhone = data.missingPhone as boolean | undefined
-      const missingWebsite = data.missingWebsite as boolean | undefined
 
       if (typeof newIsPublic === 'boolean') {
         setCheckIns((prev) =>
           prev.map((c) => (c.id === checkIn.id ? { ...c, isPublic: newIsPublic } : c))
         )
-
-        if (!checkIn.isPublic && newIsPublic) {
-          let message = ''
-          if (missingPhone && missingWebsite) {
-            message =
-              'Public page will not show company phone or website because they are not set in your business profile.'
-          } else if (missingPhone) {
-            message =
-              'Public page will not show a company phone number because it is not set in your business profile.'
-          } else if (missingWebsite) {
-            message =
-              'Public page will not show a business website because it is not set in your business profile.'
-          }
-
-          setPublishWarnings((prev) => {
-            if (!message) {
-              const { [checkIn.id]: _, ...rest } = prev
-              return rest
-            }
-            return { ...prev, [checkIn.id]: message }
-          })
-        } else {
-          setPublishWarnings((prev) => {
-            const { [checkIn.id]: _, ...rest } = prev
-            return rest
-          })
-        }
       }
+      return true
     } catch (error: any) {
       alert(error.message || 'Failed to update publish state')
+      return false
     } finally {
       setTogglingId(null)
     }
+  }
+
+  const handlePublishClick = (checkIn: CheckIn) => {
+    const { hardBlocked, warnings } = validateForPublish(checkIn)
+    if (hardBlocked) return
+    setPublishModal({ checkIn, warnings })
+  }
+
+  const handleConfirmPublish = async () => {
+    if (!publishModal) return
+    const success = await handleTogglePublish(publishModal.checkIn)
+    if (success) setPublishModal(null)
   }
 
   const handleEditStart = (checkIn: CheckIn) => {
@@ -342,6 +445,7 @@ export default function Dashboard() {
                     if (stateZip) parts.push(stateZip)
                     return parts.join(', ') || '-'
                   })()
+                  const { hardBlocked } = validateForPublish(checkIn)
 
                   return (
                     <div key={checkIn.id} className="p-4 space-y-3">
@@ -393,14 +497,30 @@ export default function Dashboard() {
                         >
                           Edit Address
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleTogglePublish(checkIn)}
-                          disabled={togglingId === checkIn.id}
-                          className="text-sm text-blue-600 hover:underline py-2 min-h-[44px] disabled:text-gray-400"
-                        >
-                          {togglingId === checkIn.id ? 'Saving...' : checkIn.isPublic ? 'Unpublish' : 'Publish'}
-                        </button>
+                        {checkIn.isPublic ? (
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePublish(checkIn)}
+                            disabled={togglingId === checkIn.id}
+                            className="bg-red-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
+                          >
+                            {togglingId === checkIn.id ? 'Saving\u2026' : 'Unpublish'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handlePublishClick(checkIn)}
+                            disabled={hardBlocked || togglingId === checkIn.id}
+                            title={hardBlocked ? 'Add city and state before publishing' : undefined}
+                            className={`px-4 py-2 rounded text-sm font-medium min-h-[44px] ${
+                              hardBlocked
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                : 'bg-green-600 text-white hover:bg-green-700'
+                            } disabled:opacity-75`}
+                          >
+                            Publish
+                          </button>
+                        )}
                         {checkIn.isPublic && (() => {
                           const citySlug = slugify(checkIn.city || '')
                           const stateSlug = slugify(checkIn.state || '')
@@ -425,10 +545,6 @@ export default function Dashboard() {
                           </button>
                         )}
                       </div>
-
-                      {publishWarnings[checkIn.id] && (
-                        <p className="text-xs text-amber-600">{publishWarnings[checkIn.id]}</p>
-                      )}
 
                       {/* Inline address edit */}
                       {editingId === checkIn.id && (
@@ -656,21 +772,17 @@ export default function Dashboard() {
                             </div>
                           ) : '-'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <button
-                            type="button"
-                            onClick={() => handleTogglePublish(checkIn)}
-                            disabled={togglingId === checkIn.id}
-                            className="text-xs text-blue-600 hover:underline disabled:text-gray-400"
-                          >
-                            {togglingId === checkIn.id
-                              ? 'Saving...'
-                              : checkIn.isPublic
-                              ? 'Unpublish'
-                              : 'Publish'}
-                          </button>
-                          {checkIn.isPublic && (
-                            <div className="mt-1 text-xs">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {checkIn.isPublic ? (
+                            <div className="flex flex-col gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePublish(checkIn)}
+                                disabled={togglingId === checkIn.id}
+                                className="bg-red-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
+                              >
+                                {togglingId === checkIn.id ? 'Saving\u2026' : 'Unpublish'}
+                              </button>
                               {(() => {
                                 const citySlug = slugify(checkIn.city || '')
                                 const stateSlug = slugify(checkIn.state || '')
@@ -684,18 +796,32 @@ export default function Dashboard() {
                                     href={href}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-blue-600 hover:underline"
+                                    className="text-xs text-blue-600 hover:underline"
                                   >
                                     Public URL
                                   </a>
                                 )
                               })()}
                             </div>
-                          )}
-                          {publishWarnings[checkIn.id] && (
-                            <div className="mt-1 text-xs text-amber-600">
-                              {publishWarnings[checkIn.id]}
-                            </div>
+                          ) : (
+                            (() => {
+                              const { hardBlocked } = validateForPublish(checkIn)
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => handlePublishClick(checkIn)}
+                                  disabled={hardBlocked || togglingId === checkIn.id}
+                                  title={hardBlocked ? 'Add city and state before publishing' : undefined}
+                                  className={`px-4 py-2 rounded text-sm font-medium min-h-[44px] ${
+                                    hardBlocked
+                                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                      : 'bg-green-600 text-white hover:bg-green-700'
+                                  } disabled:opacity-75`}
+                                >
+                                  Publish
+                                </button>
+                              )
+                            })()
                           )}
                         </td>
                       </tr>
@@ -707,6 +833,15 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      {publishModal && (
+        <PublishModal
+          checkIn={publishModal.checkIn}
+          warnings={publishModal.warnings}
+          onConfirm={handleConfirmPublish}
+          onClose={() => setPublishModal(null)}
+          isPublishing={togglingId === publishModal.checkIn.id}
+        />
+      )}
     </div>
   )
 }
