@@ -789,21 +789,17 @@ export default function Dashboard() {
                             </div>
                           ) : '-'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <button
-                            type="button"
-                            onClick={() => handleTogglePublish(checkIn)}
-                            disabled={togglingId === checkIn.id}
-                            className="text-xs text-blue-600 hover:underline disabled:text-gray-400"
-                          >
-                            {togglingId === checkIn.id
-                              ? 'Saving...'
-                              : checkIn.isPublic
-                              ? 'Unpublish'
-                              : 'Publish'}
-                          </button>
-                          {checkIn.isPublic && (
-                            <div className="mt-1 text-xs">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {checkIn.isPublic ? (
+                            <div className="flex flex-col gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePublish(checkIn)}
+                                disabled={togglingId === checkIn.id}
+                                className="bg-red-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
+                              >
+                                {togglingId === checkIn.id ? 'Saving\u2026' : 'Unpublish'}
+                              </button>
                               {(() => {
                                 const citySlug = slugify(checkIn.city || '')
                                 const stateSlug = slugify(checkIn.state || '')
@@ -817,18 +813,32 @@ export default function Dashboard() {
                                     href={href}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-blue-600 hover:underline"
+                                    className="text-xs text-blue-600 hover:underline"
                                   >
                                     Public URL
                                   </a>
                                 )
                               })()}
                             </div>
-                          )}
-                          {publishWarnings[checkIn.id] && (
-                            <div className="mt-1 text-xs text-amber-600">
-                              {publishWarnings[checkIn.id]}
-                            </div>
+                          ) : (
+                            (() => {
+                              const { hardBlocked } = validateForPublish(checkIn)
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => handlePublishClick(checkIn)}
+                                  disabled={hardBlocked || togglingId === checkIn.id}
+                                  title={hardBlocked ? 'Add city and state before publishing' : undefined}
+                                  className={`px-4 py-2 rounded text-sm font-medium min-h-[44px] ${
+                                    hardBlocked
+                                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                      : 'bg-green-600 text-white hover:bg-green-700'
+                                  } disabled:opacity-75`}
+                                >
+                                  Publish
+                                </button>
+                              )
+                            })()
                           )}
                         </td>
                       </tr>
