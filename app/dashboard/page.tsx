@@ -226,8 +226,12 @@ export default function Dashboard() {
 
   const handleConfirmPublish = async () => {
     if (!publishModal) return
+    const prevIsPublic = publishModal.checkIn.isPublic
     await handleTogglePublish(publishModal.checkIn)
-    setPublishModal(null)
+    const updated = checkIns.find((c) => c.id === publishModal.checkIn.id)
+    if (updated && updated.isPublic !== prevIsPublic) {
+      setPublishModal(null)
+    }
   }
 
   const handleEditStart = (checkIn: CheckIn) => {
