@@ -23,6 +23,29 @@ interface CheckIn {
   photoUrls?: string[]
 }
 
+function validateForPublish(checkIn: CheckIn): {
+  hardBlocked: boolean
+  warnings: string[]
+} {
+  if (!checkIn.city || !checkIn.state) {
+    return { hardBlocked: true, warnings: [] }
+  }
+  const warnings: string[] = []
+  if ((checkIn.photoUrls?.length ?? 0) < 3) {
+    warnings.push('Add at least 3 photos for best results (before, during, and after)')
+  }
+  if (!checkIn.notes?.trim()) {
+    warnings.push('Add a job description — it helps your page rank better in Google')
+  }
+  if (checkIn.locationSource === 'DEVICE') {
+    warnings.push("Verify the address — location was captured from the installer's device")
+  }
+  if (!checkIn.doorType) {
+    warnings.push("The page title will show 'Job' instead of the door type")
+  }
+  return { hardBlocked: false, warnings }
+}
+
 export default function Dashboard() {
   const { data: session } = useSession()
   const [checkIns, setCheckIns] = useState<CheckIn[]>([])
@@ -39,10 +62,23 @@ export default function Dashboard() {
     state: '',
     zip: '',
   })
+  const [publishModal, setPublishModal] = useState<{
+    checkIn: CheckIn
+    warnings: string[]
+  } | null>(null)
 
   useEffect(() => {
     fetchCheckIns()
   }, [])
+
+  useEffect(() => {
+    if (!publishModal) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPublishModal(null)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [publishModal])
 
   const fetchCheckIns = async () => {
     try {
@@ -180,6 +216,18 @@ export default function Dashboard() {
     } finally {
       setTogglingId(null)
     }
+  }
+
+  const handlePublishClick = (checkIn: CheckIn) => {
+    const { hardBlocked, warnings } = validateForPublish(checkIn)
+    if (hardBlocked) return
+    setPublishModal({ checkIn, warnings })
+  }
+
+  const handleConfirmPublish = async () => {
+    if (!publishModal) return
+    await handleTogglePublish(publishModal.checkIn)
+    setPublishModal(null)
   }
 
   const handleEditStart = (checkIn: CheckIn) => {
