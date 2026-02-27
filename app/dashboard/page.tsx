@@ -46,6 +46,89 @@ function validateForPublish(checkIn: CheckIn): {
   return { hardBlocked: false, warnings }
 }
 
+function PublishModal({
+  checkIn,
+  warnings,
+  onConfirm,
+  onClose,
+  isPublishing,
+}: {
+  checkIn: CheckIn
+  warnings: string[]
+  onConfirm: () => void
+  onClose: () => void
+  isPublishing: boolean
+}) {
+  const jobLabel = [
+    checkIn.doorType,
+    [checkIn.city, checkIn.state].filter(Boolean).join(', '),
+  ]
+    .filter(Boolean)
+    .join(' \u2022 ')
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-semibold text-gray-900">
+          {warnings.length > 0 ? 'Before you publish\u2026' : 'Publish this job?'}
+        </h2>
+        {jobLabel && (
+          <p className="text-sm text-gray-500 mt-1">{jobLabel}</p>
+        )}
+
+        {warnings.length > 0 ? (
+          <>
+            <ul className="mt-4 space-y-2">
+              {warnings.map((w) => (
+                <li key={w} className="flex items-start gap-2 text-sm text-amber-700">
+                  <span className="mt-0.5 shrink-0">\u26a0</span>
+                  <span>{w}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-sm text-gray-600">
+              We recommend resolving these issues before publishing for the best results.
+            </p>
+          </>
+        ) : (
+          <p className="mt-3 text-sm text-gray-600">
+            This job will be publicly visible once published.
+          </p>
+        )}
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isPublishing}
+            className="px-4 py-2 rounded text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 min-h-[44px]"
+          >
+            {warnings.length > 0 ? 'Go Back' : 'Cancel'}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isPublishing}
+            className="px-4 py-2 rounded text-sm font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 min-h-[44px]"
+          >
+            {isPublishing
+              ? 'Publishing\u2026'
+              : warnings.length > 0
+              ? 'Publish Anyway'
+              : 'Publish'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const { data: session } = useSession()
   const [checkIns, setCheckIns] = useState<CheckIn[]>([])
@@ -759,6 +842,15 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      {publishModal && (
+        <PublishModal
+          checkIn={publishModal.checkIn}
+          warnings={publishModal.warnings}
+          onConfirm={handleConfirmPublish}
+          onClose={() => setPublishModal(null)}
+          isPublishing={togglingId === publishModal.checkIn.id}
+        />
+      )}
     </div>
   )
 }
