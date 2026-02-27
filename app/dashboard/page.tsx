@@ -294,8 +294,10 @@ export default function Dashboard() {
           })
         }
       }
+      return true
     } catch (error: any) {
       alert(error.message || 'Failed to update publish state')
+      return false
     } finally {
       setTogglingId(null)
     }
@@ -309,12 +311,8 @@ export default function Dashboard() {
 
   const handleConfirmPublish = async () => {
     if (!publishModal) return
-    const prevIsPublic = publishModal.checkIn.isPublic
-    await handleTogglePublish(publishModal.checkIn)
-    const updated = checkIns.find((c) => c.id === publishModal.checkIn.id)
-    if (updated && updated.isPublic !== prevIsPublic) {
-      setPublishModal(null)
-    }
+    const success = await handleTogglePublish(publishModal.checkIn)
+    if (success) setPublishModal(null)
   }
 
   const handleEditStart = (checkIn: CheckIn) => {
