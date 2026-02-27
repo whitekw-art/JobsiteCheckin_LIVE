@@ -87,7 +87,7 @@ function PublishModal({
             <ul className="mt-4 space-y-2">
               {warnings.map((w) => (
                 <li key={w} className="flex items-start gap-2 text-sm text-amber-700">
-                  <span className="mt-0.5 shrink-0">\u26a0</span>
+                  <span className="mt-0.5 shrink-0">⚠</span>
                   <span>{w}</span>
                 </li>
               ))}
@@ -136,7 +136,6 @@ export default function Dashboard() {
   const [copied, setCopied] = useState(false)
   const [downloadingRow, setDownloadingRow] = useState<number | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
-  const [publishWarnings, setPublishWarnings] = useState<Record<string, string>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [editAddress, setEditAddress] = useState({
@@ -259,40 +258,11 @@ export default function Dashboard() {
 
       const data = await response.json()
       const newIsPublic = data.checkIn?.isPublic as boolean | undefined
-      const missingPhone = data.missingPhone as boolean | undefined
-      const missingWebsite = data.missingWebsite as boolean | undefined
 
       if (typeof newIsPublic === 'boolean') {
         setCheckIns((prev) =>
           prev.map((c) => (c.id === checkIn.id ? { ...c, isPublic: newIsPublic } : c))
         )
-
-        if (!checkIn.isPublic && newIsPublic) {
-          let message = ''
-          if (missingPhone && missingWebsite) {
-            message =
-              'Public page will not show company phone or website because they are not set in your business profile.'
-          } else if (missingPhone) {
-            message =
-              'Public page will not show a company phone number because it is not set in your business profile.'
-          } else if (missingWebsite) {
-            message =
-              'Public page will not show a business website because it is not set in your business profile.'
-          }
-
-          setPublishWarnings((prev) => {
-            if (!message) {
-              const { [checkIn.id]: _, ...rest } = prev
-              return rest
-            }
-            return { ...prev, [checkIn.id]: message }
-          })
-        } else {
-          setPublishWarnings((prev) => {
-            const { [checkIn.id]: _, ...rest } = prev
-            return rest
-          })
-        }
       }
       return true
     } catch (error: any) {
@@ -475,6 +445,7 @@ export default function Dashboard() {
                     if (stateZip) parts.push(stateZip)
                     return parts.join(', ') || '-'
                   })()
+                  const { hardBlocked } = validateForPublish(checkIn)
 
                   return (
                     <div key={checkIn.id} className="p-4 space-y-3">
@@ -526,14 +497,30 @@ export default function Dashboard() {
                         >
                           Edit Address
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleTogglePublish(checkIn)}
-                          disabled={togglingId === checkIn.id}
-                          className="text-sm text-blue-600 hover:underline py-2 min-h-[44px] disabled:text-gray-400"
-                        >
-                          {togglingId === checkIn.id ? 'Saving...' : checkIn.isPublic ? 'Unpublish' : 'Publish'}
-                        </button>
+                        {checkIn.isPublic ? (
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePublish(checkIn)}
+                            disabled={togglingId === checkIn.id}
+                            className="bg-red-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
+                          >
+                            {togglingId === checkIn.id ? 'Saving\u2026' : 'Unpublish'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handlePublishClick(checkIn)}
+                            disabled={hardBlocked || togglingId === checkIn.id}
+                            title={hardBlocked ? 'Add city and state before publishing' : undefined}
+                            className={`px-4 py-2 rounded text-sm font-medium min-h-[44px] ${
+                              hardBlocked
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                : 'bg-green-600 text-white hover:bg-green-700'
+                            } disabled:opacity-75`}
+                          >
+                            Publish
+                          </button>
+                        )}
                         {checkIn.isPublic && (() => {
                           const citySlug = slugify(checkIn.city || '')
                           const stateSlug = slugify(checkIn.state || '')
@@ -558,10 +545,6 @@ export default function Dashboard() {
                           </button>
                         )}
                       </div>
-
-                      {publishWarnings[checkIn.id] && (
-                        <p className="text-xs text-amber-600">{publishWarnings[checkIn.id]}</p>
-                      )}
 
                       {/* Inline address edit */}
                       {editingId === checkIn.id && (
