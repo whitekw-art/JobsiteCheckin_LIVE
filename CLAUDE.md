@@ -93,6 +93,34 @@ DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL, Supabase keys, Stripe keys, Google 
 - `npm run build` — `prisma generate && next build`
 - `npm run start` — Production server
 
+## Competitive Landscape
+Direct competitors in the "job check-in → auto SEO pages" space:
+- **Nearby Now** — $155-239/month. Check-ins + review requests + geo-tagged SEO pages. No CRM. Established brand. Our pricing ($49-99) undercuts them significantly.
+- **DataPins** — Nearly identical model: job-level pins with schema markup, geo-coordinates, AI-generated descriptions for contractors. Direct comp. Research their pricing and differentiation before first sales conversations.
+
+**Our differentiator:** Lower price point, cleaner UX, and a roadmap toward lightweight CRM + embeddable widget that neither competitor has.
+
+## Go-To-Market Strategy (Pre-Launch)
+Product is built and deployed. Zero paying customers as of 2026-02-27. Market validation has NOT been done yet.
+
+**Validated approach: Concierge MVP (do this before any paid ads)**
+1. **Discovery phase (weeks 1-2):** 10-15 conversations with door installers — ask only about how they get customers online. Do NOT pitch. Listen for pain around Google visibility.
+2. **Beta phase (weeks 3-6):** 3-5 contractors, free access, personal setup via screen share. Show them their first job pages on Google within 24 hours of check-in.
+3. **First paid customers (weeks 7-12):** Convert 2-3 beta users to $29-49/month. This is the first real market signal.
+4. **Smoke test (week 9+):** $200 Google Ads on "local SEO for contractors" terms to test cold traffic conversion.
+
+**Messaging that works:** Never say "SEO." Say "show up on Google" or "get found by people searching near you." Every job your crew completes shows up on Google — permanently, automatically.
+
+**The one-job close:** "If this gets you one extra job in 90 days that found you on Google — at $49/month, that's $147 investment. One residential door job pays for a year."
+
+**Where to find contractors:** Facebook groups for contractors (search "[trade] [city/state]"), Google Maps prospecting (businesses with 5-20 reviews = right profile), local Chamber of Commerce / BNI chapters, home shows.
+
+**PMF signals to watch:**
+- 40%+ say "very disappointed" if they lost access (Sean Ellis test at 30 days)
+- Field teams checking in on every job without reminders
+- A contractor refers you to another contractor unprompted
+- Month 3 churn below 5%
+
 ## Strategic Vision
 Local SEO automation platform for field service businesses. Every job completed through the app automatically generates SEO value in TWO places: the contractor's own website (via embeddable widget) AND our platform (via public job pages). The app does NOT require blogging or manual content — job data IS the content.
 
