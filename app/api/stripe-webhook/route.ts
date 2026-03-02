@@ -7,14 +7,17 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 })
 
 function getPlanTier(priceId: string): string {
-  const map: Record<string, string> = {
-    [process.env.STRIPE_PRICE_PRO_MONTHLY!]: 'pro',
-    [process.env.STRIPE_PRICE_PRO_ANNUAL!]: 'pro',
-    [process.env.STRIPE_PRICE_ELITE_MONTHLY!]: 'elite',
-    [process.env.STRIPE_PRICE_ELITE_ANNUAL!]: 'elite',
-    [process.env.STRIPE_PRICE_TITAN_MONTHLY!]: 'titan',
-    [process.env.STRIPE_PRICE_TITAN_ANNUAL!]: 'titan',
-  }
+  const entries: [string | undefined, string][] = [
+    [process.env.STRIPE_PRICE_PRO_MONTHLY, 'pro'],
+    [process.env.STRIPE_PRICE_PRO_ANNUAL, 'pro'],
+    [process.env.STRIPE_PRICE_ELITE_MONTHLY, 'elite'],
+    [process.env.STRIPE_PRICE_ELITE_ANNUAL, 'elite'],
+    [process.env.STRIPE_PRICE_TITAN_MONTHLY, 'titan'],
+    [process.env.STRIPE_PRICE_TITAN_ANNUAL, 'titan'],
+  ]
+  const map = Object.fromEntries(
+    entries.filter((e): e is [string, string] => typeof e[0] === 'string')
+  )
   return map[priceId] ?? 'free'
 }
 
@@ -64,7 +67,7 @@ export async function POST(request: NextRequest) {
         await prisma.organization.update({
           where: { id: user.organizationId },
           data: {
-            stripeCustomerId: session.customer as string,
+            stripeCustomerId: typeof session.customer === 'string' ? session.customer : (session.customer as Stripe.Customer)?.id ?? '',
             stripeSubscriptionId: subscription.id,
             stripePriceId: priceId,
             subscriptionStatus: subscription.status,
