@@ -14,8 +14,8 @@ model Organization {
   createdAt   DateTime      @default(now())
   phone       String?
   website              String?
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?  @unique
   stripePriceId        String?
   subscriptionStatus   String?
   planTier             String?
