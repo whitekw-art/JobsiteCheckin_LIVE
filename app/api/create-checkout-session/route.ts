@@ -61,12 +61,12 @@ export async function POST(request: NextRequest) {
     }
 
     const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
+      mode: 'subscription',
       line_items: lineItems,
       customer_email: customerEmail,
       metadata,
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/payments/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/payments/cancel`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
     })
 
     if (!session.url) {
