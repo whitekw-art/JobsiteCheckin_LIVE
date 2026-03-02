@@ -185,7 +185,7 @@ Goal: Complete the SEO infrastructure on our domain so pages get indexed and ran
 ### SEO Audit Fixes (CURRENT PRIORITY — Do Before City Pages)
 Full audit report: `.claude/skills/seo-audit/FULL-AUDIT-REPORT.md`
 Action plan: `.claude/skills/seo-audit/ACTION-PLAN.md`
-**Audit date:** 2026-02-23 | **Score:** 52/100 | **Production URL:** https://jobsite-checkin-live-du7t.vercel.app
+**Audit date:** 2026-02-23 | **Score:** 52/100 | **Production URL:** https://projectcheckin.com
 
 **Why this comes first:** The audit found that Google may not be able to properly crawl or index the pages we've already built and deployed. Fixing these issues before building city pages ensures all existing AND future pages benefit.
 
@@ -336,12 +336,24 @@ Objective: Eliminate real abuse and trust risks. Based on actual agent audits.
 
 ### Build Phase H — Monetization
 Goal: Convert validated value into repeatable revenue.
-- [ ] **Stripe subscription tiers** — Free/Pro/Growth/Premium with feature gating
-- [ ] **Activate Stripe Live** — Move from sandbox to production payments
-- [ ] **Repeatable onboarding flow** — Reduce friction for new signups
+
+**Tier names (FINAL):** Free → Pro ($99/mo, $990/yr) → Elite ($149/mo, $1,490/yr) → Titan ($299/mo, $2,990/yr)
+**Founding Members coupon:** 50% off forever, max 20 redemptions. Code: to be set during onboarding.
+**Checkout strategy:** Stripe Pricing Table (hosted by Stripe) embedded after registration. No custom pricing UI needed at this stage.
+
+- [x] **Determine and buy domain** — Purchased `projectcheckin.com` via Cloudflare Registrar. DNS configured (A record + CNAME) pointing to Vercel. Environment variables updated (`NEXTAUTH_URL`, `APP_URL`, `NEXT_PUBLIC_APP_URL`). Deployed to production.
+- [x] **Stripe Live account activated** — Products (Pro/Elite/Titan), prices (monthly + annual), Founding Members coupon, and webhook endpoint (`https://projectcheckin.com/api/stripe-webhook`) all configured. Live API keys and webhook secret updated in Vercel production env vars.
+- [ ] **Create Stripe Pricing Table** — ✅ Created in both Live and Test mode in Stripe dashboard. Still needs: embed on `/pricing` page in app, update registration flow to redirect to `/pricing` after account creation instead of current hardcoded $199/$299 one-time checkout.
+- [ ] **Add subscription tracking to database** — Prisma schema has NO subscription fields. Add `stripeCustomerId`, `stripeSubscriptionId`, `stripePriceId`, `subscriptionStatus`, `planTier` to Organization model. Run migration.
+- [ ] **Fix checkout API** — `app/api/create-checkout-session/route.ts` line 64: change `mode: 'payment'` → `mode: 'subscription'`. Remove hardcoded amount fallback.
+- [ ] **Fix registration flow** — `app/auth/register/page.tsx` lines 183–208: replace hardcoded $199/$299 checkout call with redirect to `/pricing` (Stripe Pricing Table page).
+- [ ] **Update stripe-webhook handler** — Map incoming price IDs to tier names, store subscription data in Organization record. Currently no subscription data is saved on payment.
+- [ ] **Add live price IDs to env vars** — Add `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_ANNUAL`, `STRIPE_PRICE_ELITE_MONTHLY`, `STRIPE_PRICE_ELITE_ANNUAL`, `STRIPE_PRICE_TITAN_MONTHLY`, `STRIPE_PRICE_TITAN_ANNUAL` to Vercel production env vars.
+- [ ] **Feature gating** — Pro features are currently available to ALL users for free (no gating exists). Need middleware/API checks against `planTier` on Organization. Pro gates: unlimited public pages, portfolio. Elite gates: GBP automation, reviews. Titan gates: geo-grid, CRM, white-label.
+- [ ] **Stripe subscription tiers** — Free/Pro/Elite/Titan with feature gating (see above tasks)
+- [ ] **Repeatable onboarding flow** — Reduce friction for new signups. Current registration collects unnecessary fields (fax, individual/business split, username). Simplify after Stripe Pricing Table is live.
 - [ ] **Convert pilot to paid** — Use Tom as first case study
-- [ ] **Determine and buy domain** — Production domain for the platform
-- [ ] **Enable real email sending** — Via Resend (production-ready)
+- [ ] **Enable real email sending** — Via Resend (production-ready). Requires domain email setup first (support@projectcheckin.com).
 
 ### Unscheduled Ideas
 - [ ] **PWA Basics** — manifest.json + service worker for home screen install
@@ -392,7 +404,7 @@ This section maps every SEO-driving element in the app — what's built, what's 
 | Opportunity | Benefits Who? | Impact | Effort | Notes |
 |-------------|--------------|--------|--------|-------|
 | **Keyword strategy / targeting** | Both | VERY HIGH | Low | Zero intentional keyword targeting currently. Need a keyword map: job pages → `{doorType} installation {city} {state}`, city pages → `door installer {city}`, portfolio pages → `{businessName} reviews/portfolio`. |
-| **App/brand name & domain** | Platform | HIGH | Low | "Jobsite Check-In" — is this the final name? Domain choice matters enormously. `.com` preferred. Needs a dedicated naming session before buying production domain. |
+| **App/brand name & domain** | Platform | HIGH | Low | ~~"Jobsite Check-In" — is this the final name?~~ **RESOLVED:** Domain `projectcheckin.com` purchased and live. Brand name: Project Check-In. |
 | **Domain authority building** | Platform | VERY HIGH | Ongoing | New domain = low trust. Strategies: backlinks from contractor websites (widget does this), business directory submissions, trade publication mentions. Widget (Phase B) is the biggest DA play. |
 | **Google Search Console optimization** | Both | HIGH | Low | GSC is connected but data isn't being used yet. Should check: which queries trigger impressions, indexed pages, crawl errors, mobile usability issues. Free intelligence. |
 | **Image SEO beyond alt text** | Both | MEDIUM | Low | Image filenames (currently UUIDs from Supabase), dedicated image sitemap, image compression/WebP format, image dimensions in markup. Google Images is a major traffic source for visual trades. |
@@ -459,6 +471,6 @@ These pages are for platform-level SEO, NOT part of the customer-facing app expe
 
 ## Environments
 - **Local**: `npm run dev` on port 3000
-- **Staging**: Vercel (separate Supabase instance)
-- **Production**: Vercel (separate Supabase instance)
+- **Staging**: Vercel → https://jobsite-checkin-staging-6rg1sr1zo-whitekw92-9686s-projects.vercel.app (Stripe test mode, test webhook configured)
+- **Production**: Vercel → https://projectcheckin.com (custom domain via Cloudflare DNS)
 - **Rule**: NEVER push to staging or production without explicit user confirmation
