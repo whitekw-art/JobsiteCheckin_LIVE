@@ -13,7 +13,12 @@ model Organization {
   slug        String?       @unique
   createdAt   DateTime      @default(now())
   phone       String?
-  website     String?
+  website              String?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  stripePriceId        String?
+  subscriptionStatus   String?
+  planTier             String?
   Invitations Invitations[]
   users       User[]
   checkIns    CheckIn[]
