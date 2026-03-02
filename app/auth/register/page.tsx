@@ -46,8 +46,6 @@ const initialFormState: RegistrationFormState = {
   fax: '',
 }
 
-const INDIVIDUAL_PRICE_DOLLARS = 199
-const BUSINESS_PRICE_DOLLARS = 299
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -177,35 +175,9 @@ export default function RegisterPage() {
         throw new Error(data?.error || 'Registration failed. Please try again.')
       }
 
-      setFeedback({ type: 'success', text: 'Registration complete! Redirecting to payment...' })
+      setFeedback({ type: 'success', text: 'Registration complete! Redirecting to pricing...' })
       setRegisterForm((prev) => ({ ...initialFormState, registrationType: prev.registrationType }))
-
-      const sessionResponse = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerEmail: normalizedEmail,
-          amount:
-            registerForm.registrationType === 'business'
-              ? BUSINESS_PRICE_DOLLARS
-              : INDIVIDUAL_PRICE_DOLLARS,
-          currency: 'usd',
-          metadata: {
-            registrationType,
-            firstName: trimmedFirst,
-            lastName: trimmedLast,
-            phone: trimmedPhone,
-          },
-        }),
-      })
-
-      const sessionData = await sessionResponse.json().catch(() => null)
-
-      if (!sessionResponse.ok || !sessionData?.url) {
-        throw new Error(sessionData?.error || 'Failed to create checkout session')
-      }
-
-      window.location.href = sessionData.url
+      router.push(`/pricing?email=${encodeURIComponent(normalizedEmail)}`)
       return
     } catch (error: any) {
       setFeedback({ type: 'error', text: error.message || 'Registration failed. Please try again.' })
