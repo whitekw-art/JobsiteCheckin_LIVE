@@ -343,13 +343,14 @@ Goal: Convert validated value into repeatable revenue.
 
 - [x] **Determine and buy domain** — Purchased `projectcheckin.com` via Cloudflare Registrar. DNS configured (A record + CNAME) pointing to Vercel. Environment variables updated (`NEXTAUTH_URL`, `APP_URL`, `NEXT_PUBLIC_APP_URL`). Deployed to production.
 - [x] **Stripe Live account activated** — Products (Pro/Elite/Titan), prices (monthly + annual), Founding Members coupon, and webhook endpoint (`https://projectcheckin.com/api/stripe-webhook`) all configured. Live API keys and webhook secret updated in Vercel production env vars.
-- [ ] **Create Stripe Pricing Table** — ✅ Created in both Live and Test mode in Stripe dashboard. Still needs: embed on `/pricing` page in app, update registration flow to redirect to `/pricing` after account creation instead of current hardcoded $199/$299 one-time checkout.
-- [ ] **Add subscription tracking to database** — Prisma schema has NO subscription fields. Add `stripeCustomerId`, `stripeSubscriptionId`, `stripePriceId`, `subscriptionStatus`, `planTier` to Organization model. Run migration.
-- [ ] **Fix checkout API** — `app/api/create-checkout-session/route.ts` line 64: change `mode: 'payment'` → `mode: 'subscription'`. Remove hardcoded amount fallback.
-- [ ] **Fix registration flow** — `app/auth/register/page.tsx` lines 183–208: replace hardcoded $199/$299 checkout call with redirect to `/pricing` (Stripe Pricing Table page).
-- [ ] **Update stripe-webhook handler** — Map incoming price IDs to tier names, store subscription data in Organization record. Currently no subscription data is saved on payment.
-- [ ] **Add live price IDs to env vars** — Add `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_ANNUAL`, `STRIPE_PRICE_ELITE_MONTHLY`, `STRIPE_PRICE_ELITE_ANNUAL`, `STRIPE_PRICE_TITAN_MONTHLY`, `STRIPE_PRICE_TITAN_ANNUAL` to Vercel production env vars.
-- [ ] **Feature gating** — Pro features are currently available to ALL users for free (no gating exists). Need middleware/API checks against `planTier` on Organization. Pro gates: unlimited public pages, portfolio. Elite gates: GBP automation, reviews. Titan gates: geo-grid, CRM, white-label.
+- [x] **Create Stripe Pricing Table** — Created in both Live and Test mode. Embedded at `/app/pricing/page.tsx` using `StripePricingTable` client component. Registration flow redirects to `/pricing` after account creation. (Branch: `feature/2026-03-01-phase-h-monetization`, commit `53a4c77`)
+- [x] **Add subscription tracking to database** — Added `stripeCustomerId` (@unique), `stripeSubscriptionId` (@unique), `stripePriceId`, `subscriptionStatus`, `planTier` to Organization model. Migrations applied locally and to staging DB. (commits `62f67af`, `df261f7`)
+- [x] **Fix checkout API** — `app/api/create-checkout-session/route.ts`: `mode: 'subscription'`, `cancel_url` → `/pricing`. (commit `84da076`)
+- [x] **Fix registration flow** — `app/auth/register/page.tsx`: removed hardcoded $199/$299 checkout, replaced with `router.push('/pricing?email=...')`. (commit `ed72744`)
+- [x] **Update stripe-webhook handler** — Handles `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`. Maps price IDs to tier names via env vars. Saves all subscription fields to Organization. (commits `d40ec2c`, `ef2bf35`)
+- [x] **Add live price IDs to env vars** — All 6 price IDs (test + live) and both Pricing Table IDs added to Vercel staging, Vercel production, and local `.env.local`.
+- [ ] **Post-payment welcome & onboarding flow** — After a customer pays and returns to the app, they need a welcome/congratulations page confirming what they purchased and a guided walkthrough of the app. Industry standard SaaS pattern (seen in Jobber, HCP, CompanyCam). **Sequence: build this BEFORE feature gating** — a new paid customer hitting the dashboard cold with no guidance is a churn risk. Page should include: plan name, key features unlocked, 3-4 "first steps" CTAs (submit your first check-in, invite a team member, view your portfolio link), and a link to a help/docs resource. Current Stripe Pricing Table limitation: no clean redirect after payment — interim fix is a custom message on Stripe's confirmation page. Proper fix requires a `/welcome` page and configuring a return URL. Requires design pass (Phase A2 patterns apply).
+- [ ] **Feature gating** — Pro features are currently available to ALL users for free (no gating exists). Need middleware/API checks against `planTier` on Organization. Pro gates: unlimited public pages, portfolio. Elite gates: GBP automation, reviews. Titan gates: geo-grid, CRM, white-label. **Sequence: build AFTER welcome/onboarding flow is in place.**
 - [ ] **Stripe subscription tiers** — Free/Pro/Elite/Titan with feature gating (see above tasks)
 - [ ] **Repeatable onboarding flow** — Reduce friction for new signups. Current registration collects unnecessary fields (fax, individual/business split, username). Simplify after Stripe Pricing Table is live.
 - [ ] **Convert pilot to paid** — Use Tom as first case study
@@ -468,6 +469,9 @@ These pages are for platform-level SEO, NOT part of the customer-facing app expe
 - Revenue model connection — how city pages tie into paid tiers (e.g., premium placement, featured contractor in a city)
 
 **Build dependency:** Design the city page layout during Phase A2 Step 3 before implementing, so they launch looking polished. Do not build with placeholder styling.
+
+## Pending Security Actions
+- [ ] **Rotate Supabase database passwords** — staging and production Supabase project passwords were exposed in a chat session on 2026-03-01. Reset via Supabase dashboard and update DATABASE_URL in Vercel staging + production env vars.
 
 ## Environments
 - **Local**: `npm run dev` on port 3000
