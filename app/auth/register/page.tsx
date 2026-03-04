@@ -63,6 +63,14 @@ export default function RegisterPage() {
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
   }
 
+  const normalizeWebsite = (value: string): string => {
+    const v = value.trim()
+    if (!v) return ''
+    if (v.startsWith('http://') || v.startsWith('https://')) return v
+    if (v.startsWith('www.')) return `https://${v}`
+    return `https://www.${v}`
+  }
+
   const handleRegistrationTypeChange = (type: RegistrationType) => {
     setFeedback(null)
     setRegisterForm((prev) => ({
@@ -108,7 +116,7 @@ export default function RegisterPage() {
     const trimmedFirst = firstName.trim()
     const trimmedLast = lastName.trim()
     const trimmedPhone = phone.trim()
-    const trimmedWebsite = website.trim()
+    const trimmedWebsite = normalizeWebsite(website)
     const normalizedEmail = email.trim().toLowerCase()
     const trimmedIndustry = industry.trim()
     const trimmedTitle = title.trim()
@@ -177,7 +185,7 @@ export default function RegisterPage() {
 
       setFeedback({ type: 'success', text: 'Registration complete! Redirecting to pricing...' })
       setRegisterForm((prev) => ({ ...initialFormState, registrationType: prev.registrationType }))
-      router.push(`/pricing?email=${encodeURIComponent(normalizedEmail)}`)
+      window.location.href = `/pricing?email=${encodeURIComponent(normalizedEmail)}`
       return
     } catch (error: any) {
       setFeedback({ type: 'error', text: error.message || 'Registration failed. Please try again.' })
@@ -377,7 +385,7 @@ export default function RegisterPage() {
                   </label>
                   <input
                     id="website"
-                    type="url"
+                    type="text"
                     value={registerForm.website}
                     onChange={(e) =>
                       setRegisterForm((prev) => ({
@@ -385,8 +393,14 @@ export default function RegisterPage() {
                         website: e.target.value,
                       }))
                     }
+                    onBlur={(e) =>
+                      setRegisterForm((prev) => ({
+                        ...prev,
+                        website: normalizeWebsite(e.target.value),
+                      }))
+                    }
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="https://example.com"
+                    placeholder="www.example.com"
                   />
                 </div>
                 <div>

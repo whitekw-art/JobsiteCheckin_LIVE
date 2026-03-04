@@ -20,7 +20,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Choose Your Plan</h1>
           <p className="text-gray-600">Start free. Upgrade anytime.</p>
         </div>
-        <StripePricingTable email={email} />
+        <StripePricingTable key={email} email={email} />
       </div>
     </div>
   )
