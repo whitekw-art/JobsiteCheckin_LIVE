@@ -1,7 +1,7 @@
 'use client'
 
 import Script from 'next/script'
-import { useEffect } from 'react'
+import { useLayoutEffect } from 'react'
 
 declare module 'react' {
   namespace JSX {
@@ -19,16 +19,22 @@ declare module 'react' {
 }
 
 export default function StripePricingTable({ email }: { email?: string }) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     try {
-      for (let i = sessionStorage.length - 1; i >= 0; i--) {
-        const key = sessionStorage.key(i)
-        if (key && key.toLowerCase().includes('stripe')) sessionStorage.removeItem(key)
-      }
+      // Clear all sessionStorage — tab-scoped, safe to clear entirely
+      sessionStorage.clear()
+      // Clear Stripe-related localStorage entries
+      const keysToRemove: string[] = []
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i)
-        if (key && key.toLowerCase().includes('stripe')) localStorage.removeItem(key)
+        if (key) {
+          const lower = key.toLowerCase()
+          if (lower.includes('stripe') || lower.includes('checkout') || lower.includes('pricing')) {
+            keysToRemove.push(key)
+          }
+        }
       }
+      keysToRemove.forEach((k) => localStorage.removeItem(k))
     } catch {
       // storage API unavailable (private browsing, etc.)
     }

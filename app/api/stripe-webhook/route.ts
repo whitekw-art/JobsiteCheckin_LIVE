@@ -48,19 +48,29 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
+        console.info('[webhook] checkout.session.completed', { sessionId: session.id, mode: session.mode })
 
-        if (session.mode !== 'subscription') break
+        if (session.mode !== 'subscription') {
+          console.info('[webhook] skipping: not subscription mode')
+          break
+        }
 
         const email = session.customer_details?.email ?? session.customer_email
-        if (!email || !session.subscription) break
+        console.info('[webhook] customer email resolved', { hasEmail: !!email, hasSubscription: !!session.subscription })
+        if (!email || !session.subscription) {
+          console.warn('[webhook] missing email or subscription id — cannot link org')
+          break
+        }
 
         const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
         const priceId = subscription.items.data[0]?.price.id ?? ''
         const planTier = getPlanTier(priceId)
+        console.info('[webhook] subscription retrieved', { subscriptionId: subscription.id, priceId, planTier, status: subscription.status })
 
         const user = await prisma.user.findUnique({ where: { email } })
+        console.info('[webhook] user lookup', { found: !!user, hasOrgId: !!user?.organizationId })
         if (!user?.organizationId) {
-          console.warn('Webhook: no organization found for email:', email)
+          console.warn('[webhook] no org found for email — org may not have been created at registration')
           break
         }
 
@@ -75,7 +85,7 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        console.info('Webhook: subscription linked', { email, planTier, status: subscription.status })
+        console.info('[webhook] organization updated successfully', { orgId: user.organizationId, planTier, status: subscription.status })
         break
       }
 

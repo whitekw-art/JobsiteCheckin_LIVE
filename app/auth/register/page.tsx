@@ -183,6 +183,26 @@ export default function RegisterPage() {
         throw new Error(data?.error || 'Registration failed. Please try again.')
       }
 
+      // Clear Stripe checkout session cache BEFORE navigating — the web component
+      // initializes synchronously when the DOM element is created on the next page,
+      // so clearing after arrival is too late.
+      try {
+        sessionStorage.clear()
+        const stripeKeys: string[] = []
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i)
+          if (k) {
+            const lower = k.toLowerCase()
+            if (lower.includes('stripe') || lower.includes('checkout') || lower.includes('pricing')) {
+              stripeKeys.push(k)
+            }
+          }
+        }
+        stripeKeys.forEach((k) => localStorage.removeItem(k))
+      } catch {
+        // storage API unavailable (private browsing, etc.)
+      }
+
       setFeedback({ type: 'success', text: 'Registration complete! Redirecting to pricing...' })
       setRegisterForm((prev) => ({ ...initialFormState, registrationType: prev.registrationType }))
       window.location.href = `/pricing?email=${encodeURIComponent(normalizedEmail)}`
@@ -386,6 +406,7 @@ export default function RegisterPage() {
                   <input
                     id="website"
                     type="text"
+                    autoComplete="url"
                     value={registerForm.website}
                     onChange={(e) =>
                       setRegisterForm((prev) => ({

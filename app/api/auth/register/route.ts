@@ -62,26 +62,24 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12)
 
-    let organization = null
-
-    if (registrationType === 'business') {
-      let baseSlug = slugify(companyName)
-      let slug = baseSlug
-      let suffix = 2
-      while (await prisma.organization.findUnique({ where: { slug } })) {
-        slug = `${baseSlug}-${suffix}`
-        suffix++
-      }
-
-      organization = await prisma.organization.create({
-        data: {
-          name: companyName,
-          slug,
-          phone,
-          website,
-        },
-      })
+    // Always create an Organization — individual users use their full name as org name
+    const orgName = registrationType === 'business' ? companyName : `${firstName} ${lastName}`.trim()
+    let baseSlug = slugify(orgName)
+    let slug = baseSlug
+    let suffix = 2
+    while (await prisma.organization.findUnique({ where: { slug } })) {
+      slug = `${baseSlug}-${suffix}`
+      suffix++
     }
+
+    const organization = await prisma.organization.create({
+      data: {
+        name: orgName,
+        slug,
+        phone,
+        ...(registrationType === 'business' && website ? { website } : {}),
+      },
+    })
 
     const user = await prisma.user.create({
       data: {
@@ -89,7 +87,7 @@ export async function POST(request: NextRequest) {
         name: `${firstName} ${lastName}`.trim(),
         password: hashedPassword,
         role: 'OWNER',
-        organizationId: organization?.id ?? null,
+        organizationId: organization.id,
       },
     })
 
