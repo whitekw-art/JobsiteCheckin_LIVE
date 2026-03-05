@@ -24,13 +24,14 @@ function getPlanTier(priceId: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[webhook-v3] handler invoked')
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim()
 
   if (!webhookSecret) {
     return NextResponse.json({ error: 'Missing STRIPE_WEBHOOK_SECRET' }, { status: 500 })
   }
 
-  const rawBody = await request.text()
+  const rawBody = Buffer.from(await request.arrayBuffer()).toString('utf-8')
   const signature = request.headers.get('stripe-signature')
 
   if (!signature) {
