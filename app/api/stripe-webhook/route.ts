@@ -24,15 +24,30 @@ function getPlanTier(priceId: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('[webhook-v3] handler invoked')
+  console.log('[webhook-v4] handler invoked')
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim()
 
   if (!webhookSecret) {
     return NextResponse.json({ error: 'Missing STRIPE_WEBHOOK_SECRET' }, { status: 500 })
   }
 
-  const rawBody = Buffer.from(await request.arrayBuffer()).toString('utf-8')
+  const rawBodyBuffer = await request.arrayBuffer()
+  const rawBody = Buffer.from(rawBodyBuffer).toString('utf-8')
   const signature = request.headers.get('stripe-signature')
+
+  // Temporary diagnostic: if x-diag header present, return body info
+  if (request.headers.get('x-diag') === 'true') {
+    const crypto = require('crypto')
+    const bodyHash = crypto.createHash('sha256').update(Buffer.from(rawBodyBuffer)).digest('hex')
+    const secretHash = crypto.createHash('sha256').update(webhookSecret).digest('hex')
+    return NextResponse.json({
+      bodyLength: rawBody.length,
+      bodyHash,
+      secretLength: webhookSecret.length,
+      secretHash,
+      secretPrefix: webhookSecret.substring(0, 12),
+    })
+  }
 
   if (!signature) {
     return NextResponse.json({ error: 'Missing Stripe signature' }, { status: 400 })
