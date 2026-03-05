@@ -1,3 +1,5 @@
+export const runtime = 'nodejs'
+
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
@@ -22,7 +24,7 @@ function getPlanTier(priceId: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim()
 
   if (!webhookSecret) {
     return NextResponse.json({ error: 'Missing STRIPE_WEBHOOK_SECRET' }, { status: 500 })
@@ -40,7 +42,15 @@ export async function POST(request: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret)
   } catch (error: any) {
-    console.error('Webhook signature verification failed:', error)
+    // Diagnostics — do NOT log full secret, only metadata
+    console.error('[webhook-diag] signature verification failed')
+    console.error('[webhook-diag] rawBody length:', rawBody.length)
+    console.error('[webhook-diag] rawBody has CRLF:', rawBody.includes('\r\n'))
+    console.error('[webhook-diag] webhookSecret length:', webhookSecret.length)
+    console.error('[webhook-diag] webhookSecret has leading space:', webhookSecret[0] === ' ')
+    console.error('[webhook-diag] webhookSecret has trailing space:', webhookSecret[webhookSecret.length - 1] === ' ')
+    console.error('[webhook-diag] stripe-signature header present:', !!signature)
+    console.error('[webhook-diag] error message:', error.message)
     return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 400 })
   }
 
