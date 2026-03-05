@@ -24,30 +24,14 @@ function getPlanTier(priceId: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('[webhook-v4] handler invoked')
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim()
 
   if (!webhookSecret) {
     return NextResponse.json({ error: 'Missing STRIPE_WEBHOOK_SECRET' }, { status: 500 })
   }
 
-  const rawBodyBuffer = await request.arrayBuffer()
-  const rawBody = Buffer.from(rawBodyBuffer).toString('utf-8')
+  const rawBody = Buffer.from(await request.arrayBuffer()).toString('utf-8')
   const signature = request.headers.get('stripe-signature')
-
-  // Temporary diagnostic: if x-diag header present, return body info
-  if (request.headers.get('x-diag') === 'true') {
-    const crypto = require('crypto')
-    const bodyHash = crypto.createHash('sha256').update(Buffer.from(rawBodyBuffer)).digest('hex')
-    const secretHash = crypto.createHash('sha256').update(webhookSecret).digest('hex')
-    return NextResponse.json({
-      bodyLength: rawBody.length,
-      bodyHash,
-      secretLength: webhookSecret.length,
-      secretHash,
-      secretPrefix: webhookSecret.substring(0, 12),
-    })
-  }
 
   if (!signature) {
     return NextResponse.json({ error: 'Missing Stripe signature' }, { status: 400 })
@@ -58,15 +42,7 @@ export async function POST(request: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret)
   } catch (error: any) {
-    // Diagnostics — do NOT log full secret, only metadata
-    console.error('[webhook-diag] signature verification failed')
-    console.error('[webhook-diag] rawBody length:', rawBody.length)
-    console.error('[webhook-diag] rawBody has CRLF:', rawBody.includes('\r\n'))
-    console.error('[webhook-diag] webhookSecret length:', webhookSecret.length)
-    console.error('[webhook-diag] webhookSecret has leading space:', webhookSecret[0] === ' ')
-    console.error('[webhook-diag] webhookSecret has trailing space:', webhookSecret[webhookSecret.length - 1] === ' ')
-    console.error('[webhook-diag] stripe-signature header present:', !!signature)
-    console.error('[webhook-diag] error message:', error.message)
+    console.error('Stripe webhook signature verification failed:', error.message)
     return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 400 })
   }
 
@@ -74,31 +50,18 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
-        console.info('[webhook] checkout.session.completed', { sessionId: session.id, mode: session.mode })
 
-        if (session.mode !== 'subscription') {
-          console.info('[webhook] skipping: not subscription mode')
-          break
-        }
+        if (session.mode !== 'subscription') break
 
         const email = session.customer_details?.email ?? session.customer_email
-        console.info('[webhook] customer email resolved', { hasEmail: !!email, hasSubscription: !!session.subscription })
-        if (!email || !session.subscription) {
-          console.warn('[webhook] missing email or subscription id — cannot link org')
-          break
-        }
+        if (!email || !session.subscription) break
 
         const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
         const priceId = subscription.items.data[0]?.price.id ?? ''
         const planTier = getPlanTier(priceId)
-        console.info('[webhook] subscription retrieved', { subscriptionId: subscription.id, priceId, planTier, status: subscription.status })
 
         const user = await prisma.user.findUnique({ where: { email } })
-        console.info('[webhook] user lookup', { found: !!user, hasOrgId: !!user?.organizationId })
-        if (!user?.organizationId) {
-          console.warn('[webhook] no org found for email — org may not have been created at registration')
-          break
-        }
+        if (!user?.organizationId) break
 
         await prisma.organization.update({
           where: { id: user.organizationId },
@@ -111,7 +74,7 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        console.info('[webhook] organization updated successfully', { orgId: user.organizationId, planTier, status: subscription.status })
+        console.info('Webhook: organization updated', { orgId: user.organizationId, planTier, status: subscription.status })
         break
       }
 
@@ -124,10 +87,7 @@ export async function POST(request: NextRequest) {
           where: { stripeCustomerId: subscription.customer as string },
         })
 
-        if (!org) {
-          console.warn('Webhook: no org for Stripe customer:', subscription.customer)
-          break
-        }
+        if (!org) break
 
         await prisma.organization.update({
           where: { id: org.id },
@@ -138,8 +98,6 @@ export async function POST(request: NextRequest) {
             planTier,
           },
         })
-
-        console.info('Webhook: subscription updated', { orgId: org.id, planTier, status: subscription.status })
         break
       }
 
@@ -150,10 +108,7 @@ export async function POST(request: NextRequest) {
           where: { stripeCustomerId: subscription.customer as string },
         })
 
-        if (!org) {
-          console.warn('Webhook: no org for Stripe customer:', subscription.customer)
-          break
-        }
+        if (!org) break
 
         await prisma.organization.update({
           where: { id: org.id },
@@ -162,8 +117,6 @@ export async function POST(request: NextRequest) {
             planTier: 'free',
           },
         })
-
-        console.info('Webhook: subscription canceled', { orgId: org.id })
         break
       }
 
