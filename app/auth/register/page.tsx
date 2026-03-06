@@ -46,8 +46,6 @@ const initialFormState: RegistrationFormState = {
   fax: '',
 }
 
-const INDIVIDUAL_PRICE_DOLLARS = 199
-const BUSINESS_PRICE_DOLLARS = 299
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -63,6 +61,14 @@ export default function RegisterPage() {
     if (len < 4) return `(${digits}`
     if (len < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+  }
+
+  const normalizeWebsite = (value: string): string => {
+    const v = value.trim()
+    if (!v) return ''
+    if (v.startsWith('http://') || v.startsWith('https://')) return v
+    if (v.startsWith('www.')) return `https://${v}`
+    return `https://www.${v}`
   }
 
   const handleRegistrationTypeChange = (type: RegistrationType) => {
@@ -110,7 +116,7 @@ export default function RegisterPage() {
     const trimmedFirst = firstName.trim()
     const trimmedLast = lastName.trim()
     const trimmedPhone = phone.trim()
-    const trimmedWebsite = website.trim()
+    const trimmedWebsite = normalizeWebsite(website)
     const normalizedEmail = email.trim().toLowerCase()
     const trimmedIndustry = industry.trim()
     const trimmedTitle = title.trim()
@@ -177,35 +183,29 @@ export default function RegisterPage() {
         throw new Error(data?.error || 'Registration failed. Please try again.')
       }
 
-      setFeedback({ type: 'success', text: 'Registration complete! Redirecting to payment...' })
-      setRegisterForm((prev) => ({ ...initialFormState, registrationType: prev.registrationType }))
-
-      const sessionResponse = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerEmail: normalizedEmail,
-          amount:
-            registerForm.registrationType === 'business'
-              ? BUSINESS_PRICE_DOLLARS
-              : INDIVIDUAL_PRICE_DOLLARS,
-          currency: 'usd',
-          metadata: {
-            registrationType,
-            firstName: trimmedFirst,
-            lastName: trimmedLast,
-            phone: trimmedPhone,
-          },
-        }),
-      })
-
-      const sessionData = await sessionResponse.json().catch(() => null)
-
-      if (!sessionResponse.ok || !sessionData?.url) {
-        throw new Error(sessionData?.error || 'Failed to create checkout session')
+      // Clear Stripe checkout session cache BEFORE navigating — the web component
+      // initializes synchronously when the DOM element is created on the next page,
+      // so clearing after arrival is too late.
+      try {
+        sessionStorage.clear()
+        const stripeKeys: string[] = []
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i)
+          if (k) {
+            const lower = k.toLowerCase()
+            if (lower.includes('stripe') || lower.includes('checkout') || lower.includes('pricing')) {
+              stripeKeys.push(k)
+            }
+          }
+        }
+        stripeKeys.forEach((k) => localStorage.removeItem(k))
+      } catch {
+        // storage API unavailable (private browsing, etc.)
       }
 
-      window.location.href = sessionData.url
+      setFeedback({ type: 'success', text: 'Registration complete! Redirecting to pricing...' })
+      setRegisterForm((prev) => ({ ...initialFormState, registrationType: prev.registrationType }))
+      window.location.href = `/pricing?email=${encodeURIComponent(normalizedEmail)}`
       return
     } catch (error: any) {
       setFeedback({ type: 'error', text: error.message || 'Registration failed. Please try again.' })
@@ -405,7 +405,8 @@ export default function RegisterPage() {
                   </label>
                   <input
                     id="website"
-                    type="url"
+                    type="text"
+                    autoComplete="url"
                     value={registerForm.website}
                     onChange={(e) =>
                       setRegisterForm((prev) => ({
@@ -413,8 +414,14 @@ export default function RegisterPage() {
                         website: e.target.value,
                       }))
                     }
+                    onBlur={(e) =>
+                      setRegisterForm((prev) => ({
+                        ...prev,
+                        website: normalizeWebsite(e.target.value),
+                      }))
+                    }
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="https://example.com"
+                    placeholder="www.example.com"
                   />
                 </div>
                 <div>
