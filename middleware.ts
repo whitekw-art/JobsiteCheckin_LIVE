@@ -36,6 +36,8 @@ if (
   !pathname.startsWith('/sitemap') &&
   pathname !== '/robots.txt' &&
   pathname !== '/pricing' &&
+  pathname !== '/' &&
+  !pathname.startsWith('/api/waitlist') &&
   !isPublicAssetPath
 ) {
   return NextResponse.redirect(new URL('/auth/signin', req.url))
