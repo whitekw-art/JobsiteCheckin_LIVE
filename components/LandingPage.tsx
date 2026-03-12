@@ -1274,75 +1274,10 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* ADMIN TOGGLE PANEL */}
-      <div
-        id="admin-panel"
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          zIndex: 9999,
-          fontFamily: "ui-monospace, 'Cascadia Code', monospace",
-        }}
-      >
-        <div
-          style={{
-            background: '#0f172a',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '12px',
-            padding: '14px 16px',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-            minWidth: '210px',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '10px',
-              fontWeight: 700,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: '#64748b',
-              marginBottom: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14" />
-            </svg>
-            Page Flags (mockup only)
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-            <span style={{ fontSize: '12px', color: '#cbd5e1' }}>
-              {showTestimonials ? 'Testimonials: Visible' : 'Testimonials: Hidden'}
-            </span>
-            <button
-              onClick={toggleTestimonials}
-              style={{
-                padding: '3px 10px',
-                borderRadius: '5px',
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontSize: '11px',
-                fontWeight: 700,
-                color: '#ffffff',
-                background: showTestimonials ? '#059669' : '#dc2626',
-                transition: 'background 150ms',
-                letterSpacing: '0.05em',
-              }}
-            >
-              {showTestimonials ? 'ON' : 'OFF'}
-            </button>
-          </div>
-          <div style={{ fontSize: '10px', color: '#475569', marginTop: '10px', lineHeight: 1.5 }}>
-            State saved in localStorage.<br />
-            In Next.js: use env var instead.
-          </div>
-        </div>
-      </div>
+      {/* ADMIN TOGGLE PANEL — hidden until super-admin page is built.
+          When building the super-admin page, move testimonials toggle control there.
+          The toggleTestimonials() function and showTestimonials state are still wired up
+          and ready — just need a UI surface to call them from. */}
     </>
   )
 }
