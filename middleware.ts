@@ -24,6 +24,16 @@ export default withAuth(
     ]
     const isPublicAssetPath = pathname.startsWith('/temp-photos/')
 
+    // Registration gating — redirect /auth/register to homepage when registration is closed.
+    // Invite links (/auth/invite/...) always bypass this gate.
+    // Toggle via REGISTRATION_OPEN env var in Vercel (set to 'true' to open registration).
+    if (
+      pathname === '/auth/register' &&
+      process.env.REGISTRATION_OPEN !== 'true'
+    ) {
+      return NextResponse.redirect(new URL('/', req.url))
+    }
+
     // Always allow auth routes
 if (pathname.startsWith('/auth/')) {
   return NextResponse.next()
