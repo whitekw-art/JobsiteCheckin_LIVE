@@ -197,10 +197,14 @@ model PasswordResetToken {
 }
 
 model WaitlistEntry {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  source    String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  businessName String?
+  trade        String?
+  planInterest String?
+  source       String?
+  createdAt    DateTime @default(now())
 }
 
 enum Role {

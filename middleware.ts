@@ -37,6 +37,7 @@ if (
   pathname !== '/robots.txt' &&
   pathname !== '/pricing' &&
   pathname !== '/' &&
+  pathname !== '' &&
   !pathname.startsWith('/api/waitlist') &&
   !isPublicAssetPath
 ) {
@@ -46,6 +47,11 @@ if (
     // Role-based access control
     if (token) {
       const userRole = token.role
+
+      // SUPER_ADMIN routes — only SUPER_ADMIN can access /admin
+      if (pathname.startsWith('/admin') && userRole !== 'SUPER_ADMIN') {
+        return NextResponse.redirect(new URL('/dashboard', req.url))
+      }
 
       // USER role can only access check-in
       if (userRole === 'USER' && (pathname.startsWith('/dashboard') || pathname.startsWith('/team'))) {
