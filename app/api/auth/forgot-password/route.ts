@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
       const resetUrl = `${appUrl.replace(/\/$/, '')}/auth/reset-password?token=${token}`
 
-      const from = 'Jobsite Check-In (Staging) <no-reply@resend.dev>'
+      const from = 'ProjectCheckin <no-reply@projectcheckin.com>'
       const resendApiKey = process.env.RESEND_API_KEY
 
       if (from && resendApiKey) {
@@ -52,11 +52,20 @@ export async function POST(request: Request) {
           body: JSON.stringify({
             from,
             to: user.email,
-            subject: 'Reset your Jobsite Check-In password',
+            subject: 'Reset your ProjectCheckin password',
             html: `
-              <p>You requested a password reset for Jobsite Check-In.</p>
-              <p><a href="${resetUrl}">Reset your password</a></p>
-              <p>This link expires in 1 hour.</p>
+              <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+                <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 16px;">Reset your password</h2>
+                <p style="font-size: 15px; color: #444; line-height: 1.6; margin-bottom: 24px;">
+                  You requested a password reset for your ProjectCheckin account. Click the button below to choose a new password.
+                </p>
+                <a href="${resetUrl}" style="display: inline-block; background: #0EA5E9; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+                  Reset password
+                </a>
+                <p style="font-size: 13px; color: #888; margin-top: 24px;">
+                  This link expires in 1 hour. If you didn't request this, you can ignore this email.
+                </p>
+              </div>
             `,
           }),
         })

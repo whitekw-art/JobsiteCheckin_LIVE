@@ -11,7 +11,7 @@ export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Hide nav on public-facing pages
-  const isPublicPage = pathname?.startsWith('/portfolio/') || pathname?.startsWith('/jobs/')
+  const isPublicPage = pathname?.startsWith('/portfolio/') || pathname?.startsWith('/jobs/') || pathname === '/privacy' || pathname === '/terms'
   if (!session || isPublicPage) return null
 
   const userRole = session.user?.role
