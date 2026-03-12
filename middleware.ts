@@ -24,6 +24,16 @@ export default withAuth(
     ]
     const isPublicAssetPath = pathname.startsWith('/temp-photos/')
 
+    // Registration gating — redirect /auth/register to homepage when registration is closed.
+    // Invite links (/auth/invite/...) always bypass this gate.
+    // Toggle via REGISTRATION_OPEN env var in Vercel (set to 'true' to open registration).
+    if (
+      pathname === '/auth/register' &&
+      process.env.REGISTRATION_OPEN !== 'true'
+    ) {
+      return NextResponse.redirect(new URL('/auth/register-closed', req.url))
+    }
+
     // Always allow auth routes
 if (pathname.startsWith('/auth/')) {
   return NextResponse.next()
@@ -36,6 +46,9 @@ if (
   !pathname.startsWith('/sitemap') &&
   pathname !== '/robots.txt' &&
   pathname !== '/pricing' &&
+  pathname !== '/' &&
+  pathname !== '' &&
+  !pathname.startsWith('/api/waitlist') &&
   !isPublicAssetPath
 ) {
   return NextResponse.redirect(new URL('/auth/signin', req.url))
@@ -44,6 +57,11 @@ if (
     // Role-based access control
     if (token) {
       const userRole = token.role
+
+      // SUPER_ADMIN routes — only SUPER_ADMIN can access /admin
+      if (pathname.startsWith('/admin') && userRole !== 'SUPER_ADMIN') {
+        return NextResponse.redirect(new URL('/dashboard', req.url))
+      }
 
       // USER role can only access check-in
       if (userRole === 'USER' && (pathname.startsWith('/dashboard') || pathname.startsWith('/team'))) {
