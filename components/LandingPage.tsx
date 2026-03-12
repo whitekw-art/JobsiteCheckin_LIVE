@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import '@/styles/landing.css'
 
 // ── Testimonial data ──────────────────────────────────────────────────────────
@@ -98,6 +99,14 @@ export default function LandingPage() {
   // Modal state
   const [modalOpen, setModalOpen] = useState(false)
   const [modalEmail, setModalEmail] = useState('')
+  const searchParams = useSearchParams()
+
+  // Auto-open modal when ?modal=waitlist is in the URL (e.g. redirected from register-closed page)
+  useEffect(() => {
+    if (searchParams.get('modal') === 'waitlist') {
+      setModalOpen(true)
+    }
+  }, [searchParams])
 
   // Form state
   const [formName, setFormName] = useState('')
