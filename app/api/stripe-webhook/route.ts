@@ -3,6 +3,7 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
+import { CURRENT_PLAN_VERSION } from '@/lib/planVersions'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-11-17.clover',
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
             stripePriceId: priceId,
             subscriptionStatus: subscription.status,
             planTier,
+            planVersion: CURRENT_PLAN_VERSION,
           },
         })
 
