@@ -31,7 +31,7 @@ export default withAuth(
       pathname === '/auth/register' &&
       process.env.REGISTRATION_OPEN !== 'true'
     ) {
-      return NextResponse.redirect(new URL('/', req.url))
+      return NextResponse.redirect(new URL('/auth/register-closed', req.url))
     }
 
     // Always allow auth routes
