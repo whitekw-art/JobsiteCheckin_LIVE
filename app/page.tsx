@@ -17,9 +17,10 @@ export const metadata: Metadata = {
 }
 
 export default function HomePage() {
+  const registrationOpen = process.env.REGISTRATION_OPEN === 'true'
   return (
     <Suspense>
-      <LandingPage />
+      <LandingPage registrationOpen={registrationOpen} />
     </Suspense>
   )
 }
