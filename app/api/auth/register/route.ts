@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
       state,
       zip,
       fax,
+      plan,
     } = await request.json()
 
     if (!firstName || !lastName || !phone || !email || !username || !password) {
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest) {
         slug,
         phone,
         ...(registrationType === 'business' && website ? { website } : {}),
+        ...(plan === 'free' ? { planTier: 'free', planVersion: 1 } : {}),
       },
     })
 

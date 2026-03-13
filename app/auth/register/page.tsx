@@ -1,7 +1,8 @@
 'use client'
 
 import { FormEvent, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 
 type RegistrationType = 'individual' | 'business'
@@ -49,6 +50,8 @@ const initialFormState: RegistrationFormState = {
 
 export default function RegisterPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const plan = searchParams.get('plan') ?? ''
   const [registerForm, setRegisterForm] = useState(initialFormState)
   const [isRegistering, setIsRegistering] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -166,6 +169,7 @@ export default function RegisterPage() {
       state: trimmedState,
       zip: trimmedZip,
       fax: trimmedFax,
+      plan,
     }
 
     setIsRegistering(true)
@@ -183,29 +187,44 @@ export default function RegisterPage() {
         throw new Error(data?.error || 'Registration failed. Please try again.')
       }
 
-      // Clear Stripe checkout session cache BEFORE navigating — the web component
-      // initializes synchronously when the DOM element is created on the next page,
-      // so clearing after arrival is too late.
-      try {
-        sessionStorage.clear()
-        const stripeKeys: string[] = []
-        for (let i = localStorage.length - 1; i >= 0; i--) {
-          const k = localStorage.key(i)
-          if (k) {
-            const lower = k.toLowerCase()
-            if (lower.includes('stripe') || lower.includes('checkout') || lower.includes('pricing')) {
-              stripeKeys.push(k)
+      setRegisterForm((prev) => ({ ...initialFormState, registrationType: prev.registrationType }))
+
+      if (plan === 'free') {
+        setFeedback({ type: 'success', text: 'Registration complete! Signing you in...' })
+        const result = await signIn('credentials', {
+          email: normalizedEmail,
+          password: trimmedPassword,
+          redirect: false,
+        })
+        if (result?.ok) {
+          window.location.href = '/dashboard'
+        } else {
+          // Account created — fall back to manual sign in
+          window.location.href = `/auth/signin?email=${encodeURIComponent(normalizedEmail)}`
+        }
+      } else {
+        setFeedback({ type: 'success', text: 'Registration complete! Redirecting to pricing...' })
+        // Clear Stripe checkout session cache BEFORE navigating — the web component
+        // initializes synchronously when the DOM element is created on the next page,
+        // so clearing after arrival is too late.
+        try {
+          sessionStorage.clear()
+          const stripeKeys: string[] = []
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i)
+            if (k) {
+              const lower = k.toLowerCase()
+              if (lower.includes('stripe') || lower.includes('checkout') || lower.includes('pricing')) {
+                stripeKeys.push(k)
+              }
             }
           }
+          stripeKeys.forEach((k) => localStorage.removeItem(k))
+        } catch {
+          // storage API unavailable (private browsing, etc.)
         }
-        stripeKeys.forEach((k) => localStorage.removeItem(k))
-      } catch {
-        // storage API unavailable (private browsing, etc.)
+        window.location.href = `/pricing?email=${encodeURIComponent(normalizedEmail)}`
       }
-
-      setFeedback({ type: 'success', text: 'Registration complete! Redirecting to pricing...' })
-      setRegisterForm((prev) => ({ ...initialFormState, registrationType: prev.registrationType }))
-      window.location.href = `/pricing?email=${encodeURIComponent(normalizedEmail)}`
       return
     } catch (error: any) {
       setFeedback({ type: 'error', text: error.message || 'Registration failed. Please try again.' })
@@ -220,7 +239,9 @@ export default function RegisterPage() {
         <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
           <h1 className="text-3xl font-bold text-gray-900 text-center">Create Your Account</h1>
           <p className="text-center text-gray-600 mt-2">
-            Provide your details below, then continue to payment to finish onboarding.
+            {plan === 'free'
+              ? 'Provide your details below to get started with the free plan.'
+              : 'Provide your details below, then continue to payment to finish onboarding.'}
           </p>
 
           <form onSubmit={handleRegister} className="space-y-4 mt-6">
