@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { hasFeature } from '@/lib/planVersions'
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,6 +35,22 @@ export async function POST(request: NextRequest) {
         { error: 'Installer, street, city, and state are required' },
         { status: 400 }
       )
+    }
+
+    // Enforce photo limit for free tier
+    if (Array.isArray(photoUrls) && photoUrls.length > 0) {
+      const org = await prisma.organization.findUnique({
+        where: { id: currentUser.organizationId },
+        select: { planTier: true, planVersion: true },
+      })
+      if (!hasFeature(org?.planTier, org?.planVersion, 'photos_unlimited')) {
+        if (photoUrls.length > 5) {
+          return NextResponse.json(
+            { error: 'Free plan limit: maximum 5 photos per job. Upgrade to add unlimited photos.' },
+            { status: 403 }
+          )
+        }
+      }
     }
 
     const timestamp = new Date().toISOString()

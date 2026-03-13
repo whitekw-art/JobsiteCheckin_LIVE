@@ -3,9 +3,37 @@
 ## What This Is
 A mobile-friendly Next.js SaaS app for field service businesses (door installers). Field workers submit job completion check-ins with photos and GPS data; business owners monitor work from an admin dashboard. Published check-ins become SEO-optimized public portfolio pages for local marketing.
 
+## Key Reference Docs
+- **Marketing plan:** `docs/marketing-plan.md` — target customer, messaging, GTM phases, email sequences, competitive positioning
+- **Marketing site design:** `docs/plans/2026-03-06-marketing-site-design.md` — homepage spec, copy, waitlist backend
+
+## Knowledge Base (`knowledge/`)
+Strategic reference files. Read before making product, pricing, or messaging decisions.
+- **`knowledge/product-positioning.md`** — Core category ("Proof-of-Work Marketing Software"), positioning vs FSM/CRM/photo apps, messaging pillars, anti-positioning
+- **`knowledge/brand-voice.md`** — Writing voice (simple, direct, practical, results-focused), words to avoid, headline/tagline examples, AI writing principles
+- **`knowledge/gtm-notes.md`** — Go-to-market strategy: outbound sales, LinkedIn founder marketing, homepage messaging guidance, market observations
+- **`knowledge/pricing-intelligence.md`** — Value-based pricing framework, customer value hypotheses (ranked), feature evaluation criteria, metrics to track, packaging logic
+- **`knowledge/feature-value-framework.md`** — 8-dimension feature evaluation matrix (revenue, lead gen, trust, time savings, ops, marketing visibility, emotional value, frequency)
+- **`knowledge/competitors.md`** — 27-competitor database with pricing, messaging, strengths/weaknesses; 7 market gaps; 5 strategic positioning directions
+
 ## Rules
 - NEVER expose personal PII (full customer names, phone numbers, emails, SSNs) in public URLs or metadata. Job addresses (street, city, state) are public data and OK to display on pages and in structured data — they improve local SEO. URLs should use city/state/service-type, not full street addresses.
 - Test locally first. NEVER push to staging or production without explicit user confirmation.
+- **UI/UX:** Avoid overused fonts (Inter, Roboto) and avoid "purple-on-white" color schemes. Favor distinctive, purposeful typography and color choices.
+
+## Instruction Standards
+- **Before giving any environment variable or configuration instruction**, identify WHICH tool reads it and verify the correct file for that tool:
+  - `.env.local` — Next.js app runtime only (not read by Prisma CLI or other Node tools)
+  - `.env` — Prisma CLI, general Node.js tools, also read by Next.js as fallback
+  - Vercel env vars — production/staging runtime only, never used by local CLI tools
+  - `DIRECT_URL` — local `.env` only, never needed in Vercel
+- **Never state configuration instructions as fact without a confirmed source.** If uncertain, say so explicitly before the user executes anything.
+- **Before suggesting any code change**, consider upstream and downstream implications:
+  - What other files, routes, components, or API calls depend on what is being changed?
+  - What does the changed code depend on upstream that could be affected?
+  - Will the change break any existing behavior, middleware, auth flows, database queries, or deployed environments?
+  - If the change touches shared utilities (prisma.ts, auth.ts, middleware.ts), audit all callers before recommending the change.
+- **Never give partial instructions.** If a change requires updates in multiple places (schema + env + migration + Vercel), list all of them upfront before the user starts executing.
 
 ## Tech Stack
 - **Framework**: Next.js 16 (App Router) + React 19 + TypeScript
@@ -163,6 +191,7 @@ Every CTA on public pages (portfolio, job pages, widget) must be instrumented:
 - **Pro (~$49/mo)** — Unlimited public pages w/ full SEO, embeddable website widget, city/ZIP pages, portfolio page, basic analytics, remove branding option
 - **Growth (~$99/mo)** — Auto-formatted GBP posts (AI-drafted), set-and-forget GBP cadence, post-job review requests (SMS/email), review tracking, before/after tagging, customer contact storage, KPI dashboard
 - **Premium (~$199-299/mo)** — Geo-grid rank tracking (heatmap), NAP sync & listing health, CRM/QuickBooks integration, bulk photo management w/ AI captions, white-label widget, multi-location support, priority support
+- **Operator (future, low priority)** — Invite-only, setup fee + monthly retainer. White-glove consulting + AI feature implementation. Candidates: AI job descriptions (SEO/AEO), photo quality scoring/ranking, photo enhancement, GBP auto-posting, personalized review request SMS, voice-to-text check-in, geo-grid heatmap, GSC API integration, QuickBooks/CRM/Zapier integrations, AI chatbot on portfolio page, custom subdomain, white-label widget, dedicated account manager, monthly strategy call, team training. Marketing angle: "The Money Room." Do not build until app is live, concept is proven, and revenue is established.
 
 ## Completed Features
 - [x] **Installer History/Gallery** — `/my-jobs` route, card gallery, inline editing, 7-day edit window (DEPLOYED)
@@ -344,17 +373,158 @@ Goal: Convert validated value into repeatable revenue.
 - [x] **Determine and buy domain** — Purchased `projectcheckin.com` via Cloudflare Registrar. DNS configured (A record + CNAME) pointing to Vercel. Environment variables updated (`NEXTAUTH_URL`, `APP_URL`, `NEXT_PUBLIC_APP_URL`). Deployed to production.
 - [x] **Stripe Live account activated** — Products (Pro/Elite/Titan), prices (monthly + annual), Founding Members coupon, and webhook endpoint (`https://projectcheckin.com/api/stripe-webhook`) all configured. Live API keys and webhook secret updated in Vercel production env vars.
 - [x] **Create Stripe Pricing Table** — Created in both Live and Test mode. Embedded at `/app/pricing/page.tsx` using `StripePricingTable` client component. Registration flow redirects to `/pricing` after account creation. (Branch: `feature/2026-03-01-phase-h-monetization`, commit `53a4c77`)
-- [x] **Add subscription tracking to database** — Added `stripeCustomerId` (@unique), `stripeSubscriptionId` (@unique), `stripePriceId`, `subscriptionStatus`, `planTier` to Organization model. Migrations applied locally and to staging DB. (commits `62f67af`, `df261f7`)
+- [x] **Add subscription tracking to database** — Added `stripeCustomerId` (@unique), `stripeSubscriptionId` (@unique), `stripePriceId`, `subscriptionStatus`, `planTier` to Organization model. Migrations applied locally, staging DB, and production DB. (commits `62f67af`, `df261f7`)
 - [x] **Fix checkout API** — `app/api/create-checkout-session/route.ts`: `mode: 'subscription'`, `cancel_url` → `/pricing`. (commit `84da076`)
 - [x] **Fix registration flow** — `app/auth/register/page.tsx`: removed hardcoded $199/$299 checkout, replaced with `router.push('/pricing?email=...')`. (commit `ed72744`)
 - [x] **Update stripe-webhook handler** — Handles `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`. Maps price IDs to tier names via env vars. Saves all subscription fields to Organization. (commits `d40ec2c`, `ef2bf35`)
 - [x] **Add live price IDs to env vars** — All 6 price IDs (test + live) and both Pricing Table IDs added to Vercel staging, Vercel production, and local `.env.local`.
+- [x] **Photo upload 413 fix** — Added `browser-image-compression` (maxSizeMB: 3, maxWidthOrHeight: 1920, useWebWorker: true) client-side before upload to stay under Vercel's 4.5MB Route Handler limit. (commit `28744aa`, 2026-03-12)
+- [x] **DB indexes** — B-tree indexes added on `CheckIn.organizationId` and `User.organizationId` in staging + production via Supabase SQL editor. `@@index([organizationId])` added to both models in `prisma/schema.prisma`. (2026-03-12)
+- [x] **DB cascade rules** — `onDelete: Cascade` (CheckIn → Organization) and `onDelete: SetNull` (User → Organization) FK constraints applied to staging + production via Supabase SQL editor. `prisma/schema.prisma` updated to match. (2026-03-12)
+- [x] **Staging DATABASE_URL pgbouncer fix** — Added `?pgbouncer=true` to staging Vercel `DATABASE_URL` (port 6543 transaction pooler requires this). Resolves `42P05` prepared statement error. Production uses port 5432 direct connection — no pgbouncer flag needed there. (2026-03-12)
+- [x] **Stripe Pricing Table staging return URL** — Fixed: was pointing to frozen `6rg1sr1zo` alias, updated to `https://jobsite-checkin-staging.vercel.app/dashboard`. (2026-03-12)
+- [x] **E2E checkout test** — Verified on staging (2026-03-12): registration → Stripe checkout with test card → all 5 Organization columns populated (`stripeCustomerId`, `stripeSubscriptionId`, `stripePriceId`, `subscriptionStatus`, `planTier`).
 - [ ] **Post-payment welcome & onboarding flow** — After a customer pays and returns to the app, they need a welcome/congratulations page confirming what they purchased and a guided walkthrough of the app. Industry standard SaaS pattern (seen in Jobber, HCP, CompanyCam). **Sequence: build this BEFORE feature gating** — a new paid customer hitting the dashboard cold with no guidance is a churn risk. Page should include: plan name, key features unlocked, 3-4 "first steps" CTAs (submit your first check-in, invite a team member, view your portfolio link), and a link to a help/docs resource. Current Stripe Pricing Table limitation: no clean redirect after payment — interim fix is a custom message on Stripe's confirmation page. Proper fix requires a `/welcome` page and configuring a return URL. Requires design pass (Phase A2 patterns apply).
-- [ ] **Feature gating** — Pro features are currently available to ALL users for free (no gating exists). Need middleware/API checks against `planTier` on Organization. Pro gates: unlimited public pages, portfolio. Elite gates: GBP automation, reviews. Titan gates: geo-grid, CRM, white-label. **Sequence: build AFTER welcome/onboarding flow is in place.**
-- [ ] **Stripe subscription tiers** — Free/Pro/Elite/Titan with feature gating (see above tasks)
+- [x] **Registration gating** — `REGISTRATION_OPEN` env var in middleware. When false, redirects `/auth/register` → `/auth/register-closed`. Invite links always bypass. `register-closed` page has 25s countdown → redirects to `/?modal=waitlist`. DEPLOYED to staging + production (2026-03-12).
+- [ ] **Feature gating** — No gating exists. All tiers get identical functionality. Build BEFORE welcome/onboarding flow (registration is gated so no churn risk from paid users hitting cold dashboard). Use `hasFeature(org.planTier, org.planVersion, 'feature_name')` pattern from design doc. See `docs/plans/2026-03-11-registration-gating-design.md`.
+- [ ] **Plan versioning / grandfathering** — Add `planVersion Int @default(1)` to Organization schema. Create `lib/planVersions.ts` with `CURRENT_PLAN_VERSION`, `PLAN_FEATURES` map, and `hasFeature()` helper. Webhook writes `planVersion` on checkout. NEVER edit existing version rows — only add new ones. See design doc for full protocol.
+- [ ] **Stripe subscription tiers** — Free/Pro/Elite/Titan. Tier packaging is a hypothesis at launch — validate with real usage data. Use `knowledge/feature-value-framework.md` to score each feature before assigning to a tier. Score highest on revenue impact + lead gen = highest tier.
 - [ ] **Repeatable onboarding flow** — Reduce friction for new signups. Current registration collects unnecessary fields (fax, individual/business split, username). Simplify after Stripe Pricing Table is live.
 - [ ] **Convert pilot to paid** — Use Tom as first case study
-- [ ] **Enable real email sending** — Via Resend (production-ready). Requires domain email setup first (support@projectcheckin.com).
+- [x] **Enable real email sending** — Resend domain `projectcheckin.com` verified. All `from` addresses updated to `ProjectCheckin <no-reply@projectcheckin.com>` in waitlist, forgot-password, and team invite routes. (2026-03-12)
+
+### Build Phase I — Marketing Site & Go-To-Market
+Goal: Replace the current login redirect at `projectcheckin.com/` with a full marketing homepage that converts cold traffic into waitlist signups, then paying customers.
+
+#### Landing Page — Current State (as of 2026-03-10)
+The active working mockup is `docs/mockups/final-draft-lp.html` — a self-contained HTML file. Open directly in a browser (no server needed). This is the source of truth for design decisions; `app/page.tsx` will be synced from it once the user signs off on the mockup. **Do not edit `app/page.tsx` until the user explicitly approves the mockup.**
+
+**Sections in order:**
+1. Nav — sticky, scroll-aware blur. "Join the Waitlist" button opens modal (not anchor scroll).
+2. Hero — descriptor line + H1 + sub + 3 bullets + "Join the Waitlist" button opens modal
+3. Social proof strip — "Built for field service teams in [cities]"
+4. Stats — 3 verified stats (81% BrightLocal, 76% Google, 54% Angi) with count-up animation
+5. Results Preview — projected dashboard mockup, Month 3 metrics
+6. Testimonials — **hidden by default** (see Feature Flags below)
+7. How It Works — 3 steps + phone mockup
+8. Guarantee — 90-day refund guarantee + dashboard mockup
+9. **FAQ** — 6-question accordion (added 2026-03-10)
+10. Pricing — comparison table (Free / Pro / Elite / Titan with Founder50 rates). All "Join Waitlist" buttons open modal.
+11. CTA Band — email input pre-populates modal on submit
+12. Footer — includes Privacy Policy, Terms of Service, Contact links (pages not yet built)
+
+**Hero copy — LOCKED IN (approved 2026-03-10):**
+- Descriptor: "The job-tracking app that markets your business automatically." (italic, small, above H1)
+- H1: "Turn your job history into a lead machine."
+- Sub: "Every job your team completes automatically shows up on Google, builds your reputation online, and brings in calls — without you writing a word or running a single ad."
+- Bullets: "No agency retainers." / "No writing. No content work." / "Just do the work — we turn it into leads."
+- NOTE: "automatically shows up on Google" is a deliberate word choice by the owner — flagged as a soft legal risk but kept intentionally.
+
+**Other copy locked in:**
+- Guarantee: 90-day / 3 check-ins/week / refund last 2 months / verified via activity data / email process
+- ROI footnote: "At founding member rates, one extra job in 90 days pays for the whole year."
+- All CTAs are waitlist-mode (no live app access yet)
+- "Contractors" replaced with "field service teams/businesses" throughout
+
+#### Landing Page Audit — Status (as of 2026-03-10)
+
+Full audit was conducted against `final-draft-lp.html`. Items marked [x] are complete.
+
+**Critical:**
+- [x] CTA Band email input now pre-populates modal and opens it
+- [x] All 8 pricing table "Join Waitlist" buttons (4 header + 4 CTA row) now open modal
+- [x] Modal success copy fixed — no longer falsely claims "You're one of the first 20"
+- [x] Privacy Policy link added to modal form disclaimer
+
+**High:**
+- [x] Footer now has Privacy Policy, Terms of Service, and Contact links
+- [x] Reveal animations are now fire-once (don't re-hide on scroll-up)
+- [x] Nav "Join the Waitlist" button opens modal
+- [x] FAQ section added (6 questions, accordion)
+- [x] **Pricing table mobile** — horizontal scroll, sticky feature-names column, "Swipe to compare" hint, right-edge fade gradient. Gradient fix: wrapper div `.pricing-table-outer` (non-scrolling, `position: relative`) contains `.pricing-table-wrap` (scrollable); `::after` is on `.pricing-table-outer` so `right:0` anchors to visible viewport edge, not scrollable content. Tier columns: `min-width: 130px` for consistent Free/Pro/Elite/Titan sizing. Complete as of 2026-03-10.
+**Deferred (low priority — do not work on without explicit user instruction):**
+- [ ] Founder/company credibility signal — small inline section on page (founder name, background, one-sentence why-I-built-this). User does not want to publicize identity yet. Skip until user provides copy.
+- [ ] Results Preview disclaimer size — verify it's readable (not buried)
+- [ ] Social media links in footer — none added yet
+- [ ] Form validation custom error states — using native browser validation only
+- [ ] Pricing table feature name jargon — "Full SEO optimization per page" and "Geo-grid rank tracking heatmap" still use technical language
+- [ ] Guarantee section — dollar amount not named explicitly ("up to $X back")
+- [ ] Organization JSON-LD not added to page head
+- [ ] Testimonial carousel JS timer runs even when testimonials hidden (minor cleanup)
+- [x] Privacy Policy and Terms of Service pages — `app/privacy/page.tsx` and `app/terms/page.tsx` built and DEPLOYED (2026-03-12). Navigation.tsx updated to suppress app nav on these pages.
+
+**Next priority action for a new agent:** All high/medium audit items are resolved. All remaining items are explicitly deferred — do not work on them without user instruction. Await user direction on what to tackle next (e.g. syncing mockup to app/page.tsx, post-payment flow, feature gating, or production deploy).
+
+**Pricing table (comparison table layout, not cards):**
+- 4 tiers: Free / Pro ($49.50 Founder50) / Elite ($74.50 Founder50) / Titan ($149.50 Founder50)
+- Full-price: Pro $99 / Elite $149 / Titan $299
+- Founder50: 50% off forever, max 20 spots
+- Features grouped: Core Platform / Visibility & SEO / Growth (Elite+) / Scale (Titan)
+- NOTE: Feature-to-tier assignments may shift as the product develops. Validate before launch.
+
+#### Feature Flags & Content Toggles (Landing Page)
+
+**SHOW_TESTIMONIALS** — Controls visibility of the testimonials section.
+
+**Why it exists:** The testimonials section contains placeholder quotes (fake names/results). FTC guidelines require testimonials to be genuine. The section must stay hidden until replaced with real verified beta user quotes.
+
+**How to toggle:**
+
+| Environment | How to toggle |
+|---|---|
+| HTML mockup (`final-draft-lp.html`) | Use the floating admin panel (bottom-right corner of the page). Click the OFF/ON button. State saves in `localStorage` key `pc_show_testimonials` — persists across refreshes. To reset: DevTools → Application → Local Storage → delete `pc_show_testimonials`. |
+| Fallback default in HTML | Change `var SHOW_TESTIMONIALS = false;` at the top of the `<script>` block in `final-draft-lp.html`. This is the default if localStorage has no stored value. |
+| Next.js (`app/page.tsx`) | Add `NEXT_PUBLIC_SHOW_TESTIMONIALS=true` to Vercel environment variables (Settings → Environment Variables). Read in code as `process.env.NEXT_PUBLIC_SHOW_TESTIMONIALS === 'true'`. When `false` or unset, the testimonials section renders with `display: none`. |
+
+**When to turn it on:** Only after replacing placeholder quotes with real verified beta user quotes from actual users. Even one genuine quote is sufficient to enable it.
+
+**Results Preview section** (replaces testimonials visually while hidden):
+- Shows a projected Month 3 dashboard mockup: 312 page views, 14 phone taps, 27 website clicks, 39 pages indexed
+- Three outcome cards explaining what each metric means
+- Disclaimer: "Projected based on 3 check-ins/week for 90 days. Actual results vary."
+- This section stays visible permanently alongside testimonials once testimonials are enabled
+
+#### Planned: SUPER_ADMIN Dashboard (`/admin`)
+A private admin panel visible only to the site owner (SUPER_ADMIN role), accessible at `projectcheckin.com/admin`. Agreed direction — not yet built.
+
+**Planned features:**
+- Feature flag toggles (including SHOW_TESTIMONIALS and future flags) — no code deploys needed
+- Waitlist signup list, counts, and conversion metrics
+- Site traffic overview (page views, signups, conversion rate)
+
+**SUPER-ADMIN TODO — Testimonials toggle:** The floating testimonials toggle panel was removed from the public landing page (`components/LandingPage.tsx`) before production launch. The `toggleTestimonials()` function and `showTestimonials` state are still wired and ready in the component. When building the super-admin page, add the testimonials ON/OFF control there. Do not re-add a public-facing toggle to the landing page.
+- User/org overview (total accounts, paid vs free, churn)
+- Content management (future: edit copy, swap images)
+
+**Architecture:**
+- Protected by middleware checking `session.user.role === 'SUPER_ADMIN'`
+- `SUPER_ADMIN` role already exists in Prisma schema (`Role` enum) — no migration needed
+- Route: `app/admin/page.tsx` (server component, session-gated)
+- Build this after first paying customers are onboarded — not before
+
+**Why this matters:** Third-party tools (Google Search Console, Vercel Analytics, Stripe Dashboard) cover external traffic and revenue. The `/admin` panel covers internal app health — the data only your database has. Neither replaces the other.
+
+**Marketing plan:** `docs/marketing-plan.md` — covers target customer, messaging framework, verified stats, go-to-market phases, email sequences, content agent plan, competitive positioning.
+**Design doc:** `docs/plans/2026-03-06-marketing-site-design.md` — full page spec, copy, architecture, waitlist backend.
+
+**Architecture decisions:**
+- Marketing site lives inside the existing Next.js app — one domain, all SEO authority compounds
+- `projectcheckin.com/` becomes the homepage (currently redirects to login)
+- Sign In link moves to nav bar
+- Waitlist email capture → `WaitlistEntry` Prisma model → Resend confirmation email
+- Niche landing pages (`/door-installers`, `/roofing-contractors`, etc.) added as follow-on
+- One domain handles: marketing pages + app + SEO job pages + portfolio pages
+
+**Core copy strategy:** Data-led, direct, factual. Opens with verified stats (84% of homeowners search Google before hiring). Treats readers as intelligent business owners. Never cheesy, never condescending. See `docs/marketing-plan.md`.
+
+- [x] **Homepage** — `app/page.tsx` synced from mockup. `components/LandingPage.tsx` (full page JSX, `'use client'`) + `styles/landing.css` extracted. Wrapped in `<Suspense>` for `useSearchParams`. DEPLOYED to staging + production (2026-03-12).
+- [x] **Waitlist backend** — `POST /api/waitlist` route updated (accepts name, businessName, trade, planInterest, source). `WaitlistEntry` schema updated, migration applied via Supabase SQL editor. Resend confirmation email personalized with first name + 72hr launch window. `resend` npm package installed.
+- [x] **Middleware update** — `/` and `/api/waitlist` now accessible without auth. Bug fixed: trailing-slash stripping caused `/` → `""` which bypassed the public-path check.
+- [x] **Production DB migration** — `WaitlistEntry` table created in production Supabase via SQL editor (2026-03-12). All 7 columns confirmed: id, email, name, businessName, trade, planInterest, source, createdAt.
+- [ ] **Niche landing pages** — `/door-installers` first, then per trade. Each passes `?trade=` param to registration for source tracking.
+- [ ] **Content agent setup** — Separate Claude project for marketing content generation (email sequences, ad copy, social posts). Owner reviews all output before use. See `docs/marketing-plan.md` Section 8.
+- [~] **Email welcome sequence** — Waitlist confirmation email exists (see Email Infrastructure). Full 5-email drip sequence not yet written. Content to be generated by content agent and reviewed by owner before sending.
+- [~] **`support@projectcheckin.com` email** — Resend domain setup IN PROGRESS (owner adding DNS records in Cloudflare). See Email Infrastructure section for full plan.
 
 ### Unscheduled Ideas
 - [ ] **PWA Basics** — manifest.json + service worker for home screen install
@@ -470,11 +640,96 @@ These pages are for platform-level SEO, NOT part of the customer-facing app expe
 
 **Build dependency:** Design the city page layout during Phase A2 Step 3 before implementing, so they launch looking polished. Do not build with placeholder styling.
 
+## Email Infrastructure
+
+### Provider
+- **Resend** (`resend` npm package, installed). Used for all transactional email.
+- **NextAuth EmailProvider** — also configured in `lib/auth-config.ts` via SMTP (`EMAIL_SERVER_HOST/PORT/USER/PASSWORD` env vars). Used only for NextAuth magic link auth flow. Should be migrated to Resend SMTP relay for consistency (Resend provides SMTP credentials).
+- All Resend calls currently use sandbox `from` addresses (`onboarding@resend.dev`, `no-reply@resend.dev`). These only reliably deliver to verified email addresses. Must update to `support@projectcheckin.com` once domain is verified.
+
+### Domain Setup — `projectcheckin.com` in Resend (VERIFIED 2026-03-10)
+Owner is adding DNS records to Cloudflare.
+1. Go to [resend.com/domains](https://resend.com/domains) → Add domain → `projectcheckin.com`
+2. Resend provides DKIM, SPF, DMARC DNS records → add in Cloudflare
+3. Click Verify in Resend
+4. To also receive replies at `support@`: set up Cloudflare Email Routing → forward to personal inbox
+5. After verification: update all `from` addresses in code (see table below)
+
+### Email Touchpoints — Current Status
+
+| Touchpoint | File | Status | Notes |
+|---|---|---|---|
+| Waitlist confirmation | `app/api/waitlist/route.ts` | BROKEN (sandbox) | Sends from `onboarding@resend.dev`. Needs domain + personalization (name) + launch window mention |
+| Password reset | `app/api/auth/forgot-password/route.ts` | BROKEN (sandbox + wrong brand) | Sends from `no-reply@resend.dev`, subject says "Jobsite Check-In (Staging)". Needs domain + brand fix |
+| Team invitation | `app/api/team/invite/route.ts` | NOT IMPLEMENTED | Route creates DB record + returns `inviteUrl` but **never sends email**. Invitee receives nothing. Needs Resend call added. |
+| NextAuth magic links | `lib/auth-config.ts` EmailProvider | UNKNOWN | Uses `EMAIL_SERVER_*` SMTP env vars. Migrate to Resend SMTP relay. |
+| Post-payment onboarding | (not built) | NOT BUILT | Phase H — build after welcome/onboarding flow exists |
+
+### WaitlistEntry Schema — Required Updates (2026-03-10)
+Current model only has `email`, `source`, `createdAt`. Missing fields captured in modal:
+
+```prisma
+model WaitlistEntry {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  businessName String?
+  trade        String?
+  planInterest String?
+  source       String?
+  createdAt    DateTime @default(now())
+}
+```
+
+Migration status:
+- [x] Local/staging migration applied — columns added via Supabase SQL editor (port 5432 direct connection unreachable locally; `db push` with pgbouncer applied the changes). Verified via `information_schema.columns`.
+- [x] Production migration — full table created via Supabase SQL editor (2026-03-12). All columns verified.
+
+### API — `/api/waitlist` Required Updates
+After schema migration, update route to accept: `name`, `businessName`, `trade`, `planInterest`. Update confirmation email to personalize with name and mention 72-hour launch window.
+
+### Viewing Waitlist Signups
+- **Now**: Supabase dashboard → Table Editor → `WaitlistEntry` → sort by `createdAt ASC`. This gives Founder50 priority order.
+- **Planned**: Read-only `/admin/waitlist` page (SUPER_ADMIN only) — 1st 20 highlighted, name/email/business/trade/plan/date columns, CSV export button. Build as first feature of the `/admin` dashboard.
+
+### Waitlist Email Sequence (5 emails, manual Resend Broadcasts)
+Resend Audiences: add each signup as a contact in a "Waitlist" audience via API. Send broadcasts from Resend dashboard — no code needed for sends.
+
+| # | Trigger | Subject (draft) | Content |
+|---|---|---|---|
+| 1 | Immediate (auto, transactional) | "You're on the list." | Confirm spot, mention 72-hr launch window, what the app does in 1 sentence |
+| 2 | Day 3 (manual broadcast) | "Here's what happens when your crew checks in" | Screenshot of a real job page, explain the automation |
+| 3 | Day 7 (manual broadcast) | "Why I built this" | Founder story, the problem this solves for real trades |
+| 4 | Day 14 (manual broadcast) | "X of 20 founding spots still open" | Scarcity update, re-share the waitlist link |
+| 5 | Launch day (manual broadcast) | "We're live — your code expires in 72 hours" | Founder50 coupon code, direct link to sign up |
+
+Content for emails 2–5: generate via content agent (separate Claude project), owner reviews before sending.
+
+### Pending Email Tasks (as of 2026-03-10)
+- [x] **Domain setup** — Resend domain verified for `projectcheckin.com` (2026-03-10).
+- [x] **Update all `from` addresses** — All three files updated to `ProjectCheckin <no-reply@projectcheckin.com>`: `app/api/waitlist/route.ts`, `app/api/auth/forgot-password/route.ts`, `app/api/team/invite/route.ts`.
+- [x] **WaitlistEntry schema updated** — Added `name`, `businessName`, `trade`, `planInterest` to `prisma/schema.prisma`. Prisma client regenerated. Migration pending (local DB unreachable — run `npx prisma migrate dev --name add_waitlist_fields` once DB connection restored).
+- [x] **Update `/api/waitlist` route** — Now accepts + stores `name`, `businessName`, `trade`, `planInterest`. Adds contact to Resend Audience if `RESEND_WAITLIST_AUDIENCE_ID` env var is set. Confirmation email personalized with first name + 72-hr launch window note.
+- [x] **Fix password reset branding** — Updated `app/api/auth/forgot-password/route.ts`: "Jobsite Check-In (Staging)" → "ProjectCheckin", improved HTML email template with button and styled layout.
+- [x] **Add team invite email** — `app/api/team/invite/route.ts` now sends invitation email via Resend with org name, inviter name, and styled accept button. Fire-and-forget (doesn't fail the request if email fails).
+- [x] **Update waitlist confirmation email** — Personalized with first name, includes 72-hr launch window notice.
+- [x] **Build `/admin/waitlist` page** — `app/admin/waitlist/page.tsx` (SUPER_ADMIN server component). Shows total signups, founder spots claimed/remaining, plan interest breakdown, full chronological table with Founder50 highlighting (first 20 rows green). Middleware updated to block non-SUPER_ADMIN from `/admin/*`.
+- [ ] **Create Resend Audience** — Go to resend.com/audiences → Create "Waitlist" audience → copy ID → add `RESEND_WAITLIST_AUDIENCE_ID` to Vercel env vars + `.env.local`. This enables broadcast emails to all waitlist signups.
+- [ ] **Migrate NextAuth EmailProvider to Resend SMTP** — Replace `EMAIL_SERVER_*` env vars with Resend SMTP credentials
+- [ ] **Write email sequence content** — Emails 2–5 via content agent, owner review
+- [ ] **Run pending DB migrations** — `npx prisma migrate dev --name add_waitlist_fields` (local), then push to staging + production once DB connection is working
+- [ ] **ACTION REQUIRED (manual, ~5 min): Set up Cloudflare Email Routing for `support@projectcheckin.com`** — Go to Cloudflare dashboard → your domain → Email → Email Routing → add route: `support@projectcheckin.com` → forward to your personal inbox. This address is now published on the Privacy Policy and Terms of Service pages. Until this is done, contact emails sent to that address will bounce.
+
 ## Pending Security Actions
-- [ ] **Rotate Supabase database passwords** — staging and production Supabase project passwords were exposed in a chat session on 2026-03-01. Reset via Supabase dashboard and update DATABASE_URL in Vercel staging + production env vars.
+- [x] **Rotate Supabase staging database password** — reset via Supabase Connect → Transaction pooler, updated DATABASE_URL in Vercel staging. Production was never exposed and was not touched.
+- [x] **Rotate Stripe test secret key** — rolled in Stripe dashboard (test/sandbox mode only). Updated in Vercel staging and local .env.local. Production live key was never exposed and was not touched.
+- [x] **Rotate Resend API key** — deleted old key, created new "Projectcheckin Staging" key with full access. Updated in Vercel staging and local .env.local. Production was not touched.
+- [x] **Disable Google service account** — `jobsite-service@job-site-check-in.iam.gserviceaccount.com` disabled in Google Cloud Console. Google Sheets/Drive integration not used by app. Removed credentials from .env.local and Vercel staging.
+- [ ] **Permanently delete Google service account** — disabled on 2026-03-06. Wait a few days to confirm nothing breaks, then delete `jobsite-service@job-site-check-in.iam.gserviceaccount.com` permanently from Google Cloud Console (`job-site-check-in` project → IAM & Admin → Service Accounts).
 
 ## Environments
 - **Local**: `npm run dev` on port 3000
-- **Staging**: Vercel → https://jobsite-checkin-staging-6rg1sr1zo-whitekw92-9686s-projects.vercel.app (Stripe test mode, test webhook configured)
+- **Staging**: Vercel → https://jobsite-checkin-staging.vercel.app (Stripe test mode, test webhook configured)
+  - NOTE: The URL `https://jobsite-checkin-staging-6rg1sr1zo-whitekw92-9686s-projects.vercel.app` is a FROZEN stale alias — never use it, it always serves old code
 - **Production**: Vercel → https://projectcheckin.com (custom domain via Cloudflare DNS)
 - **Rule**: NEVER push to staging or production without explicit user confirmation
