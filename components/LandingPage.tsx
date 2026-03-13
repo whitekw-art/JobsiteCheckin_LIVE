@@ -935,7 +935,7 @@ export default function LandingPage() {
                   </tr>
                   <tr className="pricing-feature-row">
                     <td className="pricing-feature-name">Photos per job</td>
-                    <td className="cell-free"><span className="ptext" style={{ color: '#4A7FA0' }}>3</span></td>
+                    <td className="cell-free"><span className="ptext" style={{ color: '#4A7FA0' }}>5</span></td>
                     <td className="cell-pro"><span className="ptext">Unlimited</span></td>
                     <td className="cell-elite"><span className="ptext" style={{ color: 'var(--navy)' }}>Unlimited</span></td>
                     <td className="cell-titan"><span className="ptext" style={{ color: '#92400E' }}>Unlimited</span></td>
