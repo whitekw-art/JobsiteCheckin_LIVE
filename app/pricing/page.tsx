@@ -21,6 +21,11 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
           <p className="text-gray-600">Start free. Upgrade anytime.</p>
         </div>
         <StripePricingTable key={email} email={email} />
+        <div className="text-center mt-8">
+          <a href="/auth/register?plan=free" className="text-sm text-gray-500 hover:text-gray-700 underline">
+            Continue with free plan
+          </a>
+        </div>
       </div>
     </div>
   )
