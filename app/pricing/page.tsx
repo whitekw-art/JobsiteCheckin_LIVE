@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import StripePricingTable from './StripePricingTable'
+import FreePlanButton from './FreePlanButton'
 
 export const metadata: Metadata = {
   title: 'Choose Your Plan | Project Check-In',
@@ -22,9 +23,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
         </div>
         <StripePricingTable key={email} email={email} />
         <div className="text-center mt-8">
-          <a href="/auth/register?plan=free" className="text-sm text-gray-500 hover:text-gray-700 underline">
-            Continue with free plan
-          </a>
+          <FreePlanButton />
         </div>
       </div>
     </div>
