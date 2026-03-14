@@ -54,6 +54,39 @@ if (
   return NextResponse.redirect(new URL('/auth/signin', req.url))
 }
 
+    // Plan selection gate — OWNER who signed in without ever choosing a plan
+    // gets sent to /pricing regardless of how they arrived (e.g. direct sign-in)
+    if (
+      token &&
+      !token.planTier &&
+      token.onboardingComplete === false &&
+      token.role === 'OWNER' &&
+      !pathname.startsWith('/pricing') &&
+      !pathname.startsWith('/payments') &&
+      !pathname.startsWith('/auth/') &&
+      pathname !== '/' &&
+      pathname !== ''
+    ) {
+      return NextResponse.redirect(new URL('/pricing', req.url))
+    }
+
+    // Onboarding gate — if the owner/admin hasn't completed onboarding,
+    // keep them on /dashboard (where the modal lives). Allow API calls through
+    // so the onboarding PATCH can complete.
+    if (
+      token &&
+      token.onboardingComplete === false &&
+      token.role !== 'SUPER_ADMIN' &&
+      !pathname.startsWith('/dashboard') &&
+      !pathname.startsWith('/pricing') &&
+      !pathname.startsWith('/payments') &&
+      !pathname.startsWith('/auth/') &&
+      pathname !== '/' &&
+      pathname !== ''
+    ) {
+      return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
+
     // Role-based access control
     if (token) {
       const userRole = token.role

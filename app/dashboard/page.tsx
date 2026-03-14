@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { geocodeJobAddress } from '@/lib/geocode'
 import { slugify } from '@/lib/slugify'
+import OnboardingModal from '@/components/OnboardingModal'
 
 interface CheckIn {
   id: string
@@ -49,12 +50,14 @@ function validateForPublish(checkIn: CheckIn): {
 function PublishModal({
   checkIn,
   warnings,
+  blockingError,
   onConfirm,
   onClose,
   isPublishing,
 }: {
   checkIn: CheckIn
   warnings: string[]
+  blockingError?: string
   onConfirm: () => void
   onClose: () => void
   isPublishing: boolean
@@ -80,6 +83,12 @@ function PublishModal({
         </h2>
         {jobLabel && (
           <p className="text-sm text-gray-500 mt-1">{jobLabel}</p>
+        )}
+
+        {blockingError && (
+          <div className="mt-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            {blockingError}
+          </div>
         )}
 
         {warnings.length > 0 ? (
@@ -114,7 +123,7 @@ function PublishModal({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={isPublishing}
+            disabled={isPublishing || !!blockingError}
             className="px-4 py-2 rounded text-sm font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 min-h-[44px]"
           >
             {isPublishing
@@ -147,6 +156,7 @@ export default function Dashboard() {
   const [publishModal, setPublishModal] = useState<{
     checkIn: CheckIn
     warnings: string[]
+    blockingError?: string
   } | null>(null)
 
   useEffect(() => {
@@ -266,7 +276,12 @@ export default function Dashboard() {
       }
       return true
     } catch (error: any) {
-      alert(error.message || 'Failed to update publish state')
+      const msg = error.message || 'Failed to update publish state'
+      if (publishModal) {
+        setPublishModal((prev) => prev ? { ...prev, blockingError: msg } : prev)
+      } else {
+        alert(msg)
+      }
       return false
     } finally {
       setTogglingId(null)
@@ -351,7 +366,16 @@ export default function Dashboard() {
     }
   }
 
+  const needsOnboarding = session?.user?.onboardingComplete === false
+
   return (
+    <>
+      {needsOnboarding && (
+        <OnboardingModal
+          planTier={session?.user ? (session.user as any).planTier : undefined}
+          orgSlug={session?.user?.orgSlug ?? undefined}
+        />
+      )}
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-8">
@@ -837,11 +861,13 @@ export default function Dashboard() {
         <PublishModal
           checkIn={publishModal.checkIn}
           warnings={publishModal.warnings}
+          blockingError={publishModal.blockingError}
           onConfirm={handleConfirmPublish}
           onClose={() => setPublishModal(null)}
           isPublishing={togglingId === publishModal.checkIn.id}
         />
       )}
     </div>
+    </>
   )
 }

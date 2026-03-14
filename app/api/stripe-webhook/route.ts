@@ -3,6 +3,7 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
+import { CURRENT_PLAN_VERSION } from '@/lib/planVersions'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-11-17.clover',
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
             stripePriceId: priceId,
             subscriptionStatus: subscription.status,
             planTier,
+            planVersion: CURRENT_PLAN_VERSION,
           },
         })
 
@@ -117,6 +119,28 @@ export async function POST(request: NextRequest) {
             planTier: 'free',
           },
         })
+
+        // Downgrade enforcement: free tier allows max 5 published job pages.
+        // Keep the 5 most recently timestamped published pages; unpublish the rest.
+        // Data is preserved in full — pages are restored automatically if customer resubscribes.
+        const publishedPages = await prisma.checkIn.findMany({
+          where: { organizationId: org.id, isPublic: true },
+          orderBy: { timestamp: 'desc' },
+          select: { id: true },
+        })
+
+        if (publishedPages.length > 5) {
+          const toUnpublish = publishedPages.slice(5).map(c => c.id)
+          await prisma.checkIn.updateMany({
+            where: { id: { in: toUnpublish } },
+            data: { isPublic: false },
+          })
+          console.info('Webhook: unpublished overage pages on downgrade to free', {
+            orgId: org.id,
+            unpublishedCount: toUnpublish.length,
+          })
+        }
+
         break
       }
 

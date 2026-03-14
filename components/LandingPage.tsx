@@ -95,7 +95,7 @@ function PDash() {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function LandingPage() {
+export default function LandingPage({ registrationOpen = false }: { registrationOpen?: boolean }) {
   // Modal state
   const [modalOpen, setModalOpen] = useState(false)
   const [modalEmail, setModalEmail] = useState('')
@@ -326,16 +326,18 @@ export default function LandingPage() {
           <ul className="nav-links">
             <li><a href="#how">How It Works</a></li>
             <li><a href="#pricing">Pricing</a></li>
-            <li><a href="/auth/signin">Sign In</a></li>
-            <li>
-              <a
-                href="#"
-                className="btn-nav"
-                onClick={(e) => { e.preventDefault(); openWaitlistModal() }}
-              >
-                Join the Waitlist
-              </a>
-            </li>
+            <li><a href="/auth/signin">{registrationOpen ? 'Sign In / Register' : 'Sign In'}</a></li>
+            {!registrationOpen && (
+              <li>
+                <a
+                  href="#"
+                  className="btn-nav"
+                  onClick={(e) => { e.preventDefault(); openWaitlistModal() }}
+                >
+                  Join the Waitlist
+                </a>
+              </li>
+            )}
           </ul>
         </div>
       </nav>
@@ -358,14 +360,23 @@ export default function LandingPage() {
               <li>Just do the work &mdash; we turn it into leads.</li>
             </ul>
 
-            {/* Waitlist CTA */}
+            {/* Primary CTA */}
             <div id="waitlist" className="hero-form-wrap reveal">
-              <button className="btn-waitlist-hero" onClick={() => openWaitlistModal()}>
-                Join the Waitlist
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
+              {registrationOpen ? (
+                <a href="/auth/register" className="btn-waitlist-hero">
+                  Get Started
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </a>
+              ) : (
+                <button className="btn-waitlist-hero" onClick={() => openWaitlistModal()}>
+                  Join the Waitlist
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
             </div>
 
             <div className="trust-row reveal">
@@ -879,7 +890,10 @@ export default function LandingPage() {
                       <span className="th-price-amount" style={{ color: 'var(--navy)' }}>$0</span>
                       <span className="th-price-sub">/forever</span>
                       <span className="th-founder-note">&nbsp;</span>
-                      <button onClick={() => openWaitlistModal()} className="btn-ghost" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', width: '100%' }}>Join Waitlist</button>
+                      {registrationOpen
+                        ? <a href="/auth/register" className="btn-ghost" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>Get Started</a>
+                        : <button onClick={() => openWaitlistModal()} className="btn-ghost" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', width: '100%' }}>Join Waitlist</button>
+                      }
                     </th>
                     {/* PRO */}
                     <th className="pricing-th pricing-th-pro" scope="col">
@@ -889,7 +903,10 @@ export default function LandingPage() {
                       <span className="th-price-amount" style={{ color: '#0EA5E9' }}>$49.50<span style={{ fontSize: '16px', fontWeight: 500 }}>/mo</span></span>
                       <span className="th-price-sub">founding member rate</span>
                       <span className="th-founder-note" style={{ color: '#0EA5E9' }}>locked in for life</span>
-                      <button onClick={() => openWaitlistModal()} className="btn-primary-full" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
+                      {registrationOpen
+                        ? <a href="/auth/register" className="btn-primary-full" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', width: '100%' }}>Get Started</a>
+                        : <button onClick={() => openWaitlistModal()} className="btn-primary-full" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
+                      }
                     </th>
                     {/* ELITE */}
                     <th className="pricing-th pricing-th-elite" scope="col">
@@ -899,7 +916,10 @@ export default function LandingPage() {
                       <span className="th-price-amount" style={{ color: '#0C4A6E' }}>$74.50<span style={{ fontSize: '16px', fontWeight: 500 }}>/mo</span></span>
                       <span className="th-price-sub">founding member rate</span>
                       <span className="th-founder-note" style={{ color: '#0C4A6E' }}>locked in for life</span>
-                      <button onClick={() => openWaitlistModal()} className="btn-ghost-navy" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
+                      {registrationOpen
+                        ? <a href="/auth/register" className="btn-ghost-navy" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', width: '100%' }}>Get Started</a>
+                        : <button onClick={() => openWaitlistModal()} className="btn-ghost-navy" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
+                      }
                     </th>
                     {/* TITAN */}
                     <th className="pricing-th pricing-th-titan" scope="col">
@@ -909,7 +929,10 @@ export default function LandingPage() {
                       <span className="th-price-amount" style={{ color: '#F59E0B' }}>$149.50<span style={{ fontSize: '16px', fontWeight: 500 }}>/mo</span></span>
                       <span className="th-price-sub">founding member rate</span>
                       <span className="th-founder-note" style={{ color: '#92400E' }}>locked in for life</span>
-                      <button onClick={() => openWaitlistModal()} className="btn-ghost-amber" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
+                      {registrationOpen
+                        ? <a href="/auth/register" className="btn-ghost-amber" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', width: '100%' }}>Get Started</a>
+                        : <button onClick={() => openWaitlistModal()} className="btn-ghost-amber" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
+                      }
                     </th>
                   </tr>
                 </thead>
@@ -935,7 +958,7 @@ export default function LandingPage() {
                   </tr>
                   <tr className="pricing-feature-row">
                     <td className="pricing-feature-name">Photos per job</td>
-                    <td className="cell-free"><span className="ptext" style={{ color: '#4A7FA0' }}>3</span></td>
+                    <td className="cell-free"><span className="ptext" style={{ color: '#4A7FA0' }}>5</span></td>
                     <td className="cell-pro"><span className="ptext">Unlimited</span></td>
                     <td className="cell-elite"><span className="ptext" style={{ color: 'var(--navy)' }}>Unlimited</span></td>
                     <td className="cell-titan"><span className="ptext" style={{ color: '#92400E' }}>Unlimited</span></td>
@@ -1054,16 +1077,28 @@ export default function LandingPage() {
                   <tr className="pricing-cta-row">
                     <td className="pricing-feature-name"></td>
                     <td className="cell-free">
-                      <button onClick={() => openWaitlistModal()} className="btn-ghost" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', width: '100%' }}>Join Waitlist</button>
+                      {registrationOpen
+                        ? <a href="/auth/register" className="btn-ghost" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>Get Started</a>
+                        : <button onClick={() => openWaitlistModal()} className="btn-ghost" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', width: '100%' }}>Join Waitlist</button>
+                      }
                     </td>
                     <td className="cell-pro">
-                      <button onClick={() => openWaitlistModal()} className="btn-primary-full" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
+                      {registrationOpen
+                        ? <a href="/auth/register" className="btn-primary-full" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', width: '100%' }}>Get Started</a>
+                        : <button onClick={() => openWaitlistModal()} className="btn-primary-full" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
+                      }
                     </td>
                     <td className="cell-elite">
-                      <button onClick={() => openWaitlistModal()} className="btn-ghost-navy" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
+                      {registrationOpen
+                        ? <a href="/auth/register" className="btn-ghost-navy" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', width: '100%' }}>Get Started</a>
+                        : <button onClick={() => openWaitlistModal()} className="btn-ghost-navy" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
+                      }
                     </td>
                     <td className="cell-titan">
-                      <button onClick={() => openWaitlistModal()} className="btn-ghost-amber" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
+                      {registrationOpen
+                        ? <a href="/auth/register" className="btn-ghost-amber" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', width: '100%' }}>Get Started</a>
+                        : <button onClick={() => openWaitlistModal()} className="btn-ghost-amber" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
+                      }
                     </td>
                   </tr>
                 </tbody>
@@ -1121,9 +1156,15 @@ export default function LandingPage() {
             <button
               type="button"
               className="btn-cta-orange"
-              onClick={() => openWaitlistModal(ctaEmail)}
+              onClick={() => {
+                if (registrationOpen) {
+                  window.location.href = `/auth/register${ctaEmail ? `?email=${encodeURIComponent(ctaEmail)}` : ''}`
+                } else {
+                  openWaitlistModal(ctaEmail)
+                }
+              }}
             >
-              Join the Waitlist
+              {registrationOpen ? 'Get Started' : 'Join the Waitlist'}
             </button>
           </div>
         </div>
@@ -1145,8 +1186,8 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      {/* WAITLIST MODAL */}
-      <div
+      {/* WAITLIST MODAL — only rendered when registration is closed */}
+      {!registrationOpen && <div
         className={`modal-overlay${modalOpen ? ' open' : ''}`}
         id="waitlist-modal"
         role="dialog"
@@ -1272,7 +1313,7 @@ export default function LandingPage() {
             </div>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* ADMIN TOGGLE PANEL — hidden until super-admin page is built.
           When building the super-admin page, move testimonials toggle control there.

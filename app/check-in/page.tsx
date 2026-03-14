@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { geocodeJobAddress } from '@/lib/geocode'
+import imageCompression from 'browser-image-compression'
 
 export default function CheckInPage() {
   const { data: session } = useSession()
@@ -278,8 +279,14 @@ export default function CheckInPage() {
       const uploadedUrls: string[] = []
 
       for (const file of photos) {
+        const compressed = await imageCompression(file, {
+          maxSizeMB: 3,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+        })
+
         const formData = new FormData()
-        formData.append('photo', file)
+        formData.append('photo', compressed)
 
         const uploadResponse = await fetch('/api/upload-photo', {
           method: 'POST',

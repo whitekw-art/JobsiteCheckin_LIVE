@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, FormEvent } from 'react'
+import { useSession } from 'next-auth/react'
 
 interface OrganizationProfile {
   name: string
@@ -8,7 +9,19 @@ interface OrganizationProfile {
   website: string | null
 }
 
+const PLAN_LABELS: Record<string, string> = {
+  free:  'Free Starter',
+  pro:   'Pro',
+  elite: 'Elite',
+  titan: 'Titan',
+}
+
 export default function AccountPage() {
+  const { data: session } = useSession()
+  const planTier = (session?.user as any)?.planTier as string | null | undefined
+  const [portalLoading, setPortalLoading] = useState(false)
+  const [portalError, setPortalError] = useState<string | null>(null)
+  const [showDowngradeWarning, setShowDowngradeWarning] = useState(false)
   const [profile, setProfile] = useState<OrganizationProfile | null>(null)
   const [phone, setPhone] = useState('')
   const [website, setWebsite] = useState('')
@@ -41,6 +54,23 @@ export default function AccountPage() {
 
     loadProfile()
   }, [])
+
+  const handleManageSubscription = async () => {
+    setPortalLoading(true)
+    setPortalError(null)
+    try {
+      const res = await fetch('/api/billing/portal', { method: 'POST' })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        // No active Stripe subscription (e.g. canceled, webhook delay) — send to pricing
+        window.location.href = '/pricing'
+        return
+      }
+      window.location.href = data.url
+    } catch {
+      window.location.href = '/pricing'
+    }
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -150,6 +180,113 @@ export default function AccountPage() {
           </form>
         )}
       </div>
+      {/* Subscription section — only shown when planTier is known */}
+      {planTier && (
+        <div className="max-w-xl mx-auto bg-white rounded-lg shadow p-6 mt-6">
+          <h2 className="text-lg font-bold mb-1">Subscription</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Current plan: <span className="font-semibold text-gray-800">{PLAN_LABELS[planTier] ?? planTier}</span>
+          </p>
+
+          {portalError && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2 mb-3">
+              {portalError}
+            </div>
+          )}
+
+          {showDowngradeWarning && (
+            <div style={{
+              position: 'fixed', inset: 0, background: 'rgba(12,74,110,0.5)',
+              backdropFilter: 'blur(3px)', zIndex: 9999,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+            }}>
+              <div style={{
+                background: '#fff', borderRadius: '16px', maxWidth: '460px', width: '100%',
+                padding: '32px 28px', boxShadow: '0 20px 60px rgba(12,74,110,0.2)',
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+              }}>
+                <div style={{
+                  width: '48px', height: '48px', borderRadius: '12px',
+                  background: '#FFF7ED', border: '1px solid #FED7AA',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px',
+                }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                </div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0C4A6E', marginBottom: '10px' }}>
+                  Before you continue
+                </h3>
+                <p style={{ fontSize: '14px', color: '#4B7A94', lineHeight: 1.6, marginBottom: '12px' }}>
+                  If you <strong>cancel your subscription</strong> or downgrade to the free plan:
+                </p>
+                <ul style={{ fontSize: '13px', color: '#4B7A94', lineHeight: 1.7, paddingLeft: '18px', marginBottom: '16px' }}>
+                  <li>All published job pages beyond your plan limit will be automatically unpublished</li>
+                  <li>Higher-tier features (geo-grid tracking, advanced analytics, etc.) will be turned off</li>
+                  <li>Your data is fully preserved — resubscribing restores everything instantly</li>
+                </ul>
+                <p style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '24px', fontStyle: 'italic' }}>
+                  If you switch to a lower paid plan, any features above your new tier will be turned off and their associated data will be frozen until you resubscribe to a qualifying plan.
+                </p>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={() => { setShowDowngradeWarning(false); handleManageSubscription() }}
+                    disabled={portalLoading}
+                    style={{
+                      flex: 1, height: '44px', background: '#0EA5E9', color: '#fff',
+                      border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700,
+                      cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    }}
+                  >
+                    {portalLoading ? 'Opening…' : 'Continue to billing portal'}
+                  </button>
+                  <button
+                    onClick={() => setShowDowngradeWarning(false)}
+                    style={{
+                      flex: 1, height: '44px', background: '#F1F5F9', color: '#0C4A6E',
+                      border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 600,
+                      cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    }}
+                  >
+                    Keep my plan
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {planTier === 'free' ? (
+            <a
+              href="/pricing"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-sky-500 text-white text-sm font-semibold hover:bg-sky-600 transition-colors"
+            >
+              Upgrade Plan
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+              </svg>
+            </a>
+          ) : (
+            <button
+              onClick={() => setShowDowngradeWarning(true)}
+              disabled={portalLoading}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-sky-500 text-white text-sm font-semibold hover:bg-sky-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {portalLoading ? 'Opening…' : 'Manage Subscription'}
+              {!portalLoading && (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                </svg>
+              )}
+            </button>
+          )}
+          <p className="text-xs text-gray-400 mt-3">
+            {planTier === 'free'
+              ? 'Upgrade anytime. No contracts.'
+              : 'Change or cancel your plan anytime through the billing portal.'}
+          </p>
+        </div>
+      )}
     </main>
   )
 }
