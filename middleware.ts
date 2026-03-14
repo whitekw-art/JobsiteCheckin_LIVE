@@ -62,6 +62,7 @@ if (
       token.onboardingComplete === false &&
       token.role === 'OWNER' &&
       !pathname.startsWith('/pricing') &&
+      !pathname.startsWith('/payments') &&
       !pathname.startsWith('/auth/') &&
       pathname !== '/' &&
       pathname !== ''
@@ -78,6 +79,7 @@ if (
       token.role !== 'SUPER_ADMIN' &&
       !pathname.startsWith('/dashboard') &&
       !pathname.startsWith('/pricing') &&
+      !pathname.startsWith('/payments') &&
       !pathname.startsWith('/auth/') &&
       pathname !== '/' &&
       pathname !== ''
