@@ -1,40 +1,51 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 
-const MAX_ATTEMPTS = 12 // ~18 seconds total
+const POLL_INTERVAL_MS = 2000
+const MAX_ATTEMPTS = 10 // ~20 seconds
 
 export default function PaymentSuccessPage() {
-  const { data: session, update } = useSession()
-  const [attempts, setAttempts] = useState(0)
+  const { update } = useSession()
+  const attempts = useRef(0)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Kick off first refresh immediately on mount
   useEffect(() => {
-    update()
+    async function checkPlanTier() {
+      try {
+        const res = await fetch('/api/billing/plan-status')
+        const data = await res.json()
+
+        if (data.planTier) {
+          // planTier confirmed in DB — refresh JWT then navigate
+          await update()
+          window.location.href = '/dashboard'
+          return
+        }
+      } catch {
+        // ignore fetch errors, keep polling
+      }
+
+      attempts.current += 1
+
+      if (attempts.current >= MAX_ATTEMPTS) {
+        // Give up waiting — go anyway, middleware will re-evaluate
+        await update()
+        window.location.href = '/dashboard'
+        return
+      }
+
+      timerRef.current = setTimeout(checkPlanTier, POLL_INTERVAL_MS)
+    }
+
+    // Start first check after a short delay to give webhook time to fire
+    timerRef.current = setTimeout(checkPlanTier, 1000)
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const planTier = (session?.user as any)?.planTier
-
-    if (planTier) {
-      window.location.href = '/dashboard'
-      return
-    }
-
-    if (attempts >= MAX_ATTEMPTS) {
-      // Webhook too slow — go to dashboard anyway; onboarding modal handles the rest
-      window.location.href = '/dashboard'
-      return
-    }
-
-    const timer = setTimeout(async () => {
-      await update()
-      setAttempts(prev => prev + 1)
-    }, 1500)
-
-    return () => clearTimeout(timer)
-  }, [session, attempts]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <main style={{
