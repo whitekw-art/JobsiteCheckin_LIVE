@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { geocodeJobAddress } from '@/lib/geocode'
 import { slugify } from '@/lib/slugify'
+import OnboardingModal from '@/components/OnboardingModal'
 
 interface CheckIn {
   id: string
@@ -365,7 +366,16 @@ export default function Dashboard() {
     }
   }
 
+  const needsOnboarding = session?.user?.onboardingComplete === false
+
   return (
+    <>
+      {needsOnboarding && (
+        <OnboardingModal
+          planTier={session?.user ? (session.user as any).planTier : undefined}
+          orgSlug={session?.user?.orgSlug ?? undefined}
+        />
+      )}
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-8">
@@ -858,5 +868,6 @@ export default function Dashboard() {
         />
       )}
     </div>
+    </>
   )
 }

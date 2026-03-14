@@ -10,6 +10,8 @@ declare module 'next-auth' {
       organizationId?: string | null
       orgSlug?: string | null
       companyName?: string
+      onboardingComplete?: boolean
+      planTier?: string | null
     }
   }
 
@@ -29,5 +31,7 @@ declare module 'next-auth/jwt' {
     organizationId?: string | null
     orgSlug?: string | null
     companyName?: string
+    onboardingComplete?: boolean
+    planTier?: string | null
   }
 }

@@ -6,29 +6,11 @@ import { slugify } from '@/lib/slugify'
 
 export async function POST(request: NextRequest) {
   try {
-    const {
-      registrationType,
-      firstName,
-      lastName,
-      industry,
-      title,
-      phone,
-      website,
-      email,
-      heardAboutUs,
-      username,
-      password,
-      companyName,
-      street,
-      city,
-      state,
-      zip,
-      fax,
-    } = await request.json()
+    const { firstName, lastName, email, password, phone } = await request.json()
 
-    if (!firstName || !lastName || !phone || !email || !username || !password) {
+    if (!firstName || !lastName || !email || !password) {
       return NextResponse.json(
-        { error: 'Missing required personal details. Please fill out all required fields.' },
+        { error: 'First name, last name, email, and password are required.' },
         { status: 400 }
       )
     }
@@ -40,17 +22,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (registrationType === 'business') {
-      if (!companyName || !street || !city || !state || !zip) {
-        return NextResponse.json(
-          { error: 'Business registrations must include company name and full address.' },
-          { status: 400 }
-        )
-      }
-    }
+    const normalizedEmail = email.trim().toLowerCase()
 
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     })
 
     if (existingUser) {
@@ -62,8 +37,9 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12)
 
-    // Always create an Organization — individual users use their full name as org name
-    const orgName = registrationType === 'business' ? companyName : `${firstName} ${lastName}`.trim()
+    // Placeholder org name — real business name captured during onboarding modal
+    const displayName = `${firstName.trim()} ${lastName.trim()}`
+    const orgName = `${displayName}'s Business`
     let baseSlug = slugify(orgName)
     let slug = baseSlug
     let suffix = 2
@@ -76,40 +52,21 @@ export async function POST(request: NextRequest) {
       data: {
         name: orgName,
         slug,
-        phone,
-        ...(registrationType === 'business' && website ? { website } : {}),
+        // onboardingComplete defaults to false per schema
       },
     })
 
     const user = await prisma.user.create({
       data: {
-        email,
-        name: `${firstName} ${lastName}`.trim(),
+        email: normalizedEmail,
+        name: displayName,
         password: hashedPassword,
         role: 'OWNER',
         organizationId: organization.id,
       },
     })
 
-    console.info('Received registration', {
-      userId: user.id,
-      registrationType,
-      firstName,
-      lastName,
-      industry,
-      title,
-      phone,
-      email,
-      heardAboutUs,
-      username,
-      passwordLength: password.length,
-      companyName,
-      street,
-      city,
-      state,
-      zip,
-      fax,
-    })
+    console.info('New registration', { userId: user.id, email: normalizedEmail })
 
     return NextResponse.json({ success: true })
   } catch (error) {
