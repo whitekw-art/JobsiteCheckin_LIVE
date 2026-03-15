@@ -37,7 +37,7 @@ export default function Navigation() {
           {/* Brand */}
           <div className="flex flex-col min-w-0">
             <Link href="/" className="text-xl font-bold text-gray-900 truncate">
-              Jobsite Check-In
+              ProjectCheckin
             </Link>
             {(session.user as any)?.companyName && (
               <div className="text-xs text-gray-600 truncate">

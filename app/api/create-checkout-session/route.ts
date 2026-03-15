@@ -8,7 +8,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 const DEFAULT_AMOUNT_DOLLARS = Number(process.env.STRIPE_REGISTRATION_AMOUNT || '199')
 const DEFAULT_CURRENCY = process.env.STRIPE_REGISTRATION_CURRENCY || 'usd'
 const DEFAULT_PRODUCT_NAME =
-  process.env.STRIPE_REGISTRATION_PRODUCT_NAME || 'Jobsite Check-In Registration'
+  process.env.STRIPE_REGISTRATION_PRODUCT_NAME || 'ProjectCheckin Registration'
 
 export async function POST(request: NextRequest) {
   try {

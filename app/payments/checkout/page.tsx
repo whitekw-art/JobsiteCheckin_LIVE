@@ -30,7 +30,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
         <div>
           <h1 className="text-2xl font-bold text-gray-900 text-center">Complete Your Subscription</h1>
           <p className="text-center text-gray-600 mt-2">
-            Finish payment through Stripe to unlock the Jobsite Check-In dashboard.
+            Finish payment through Stripe to unlock your ProjectCheckin dashboard.
           </p>
         </div>
 
