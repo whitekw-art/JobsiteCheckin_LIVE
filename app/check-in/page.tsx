@@ -515,7 +515,7 @@ export default function CheckInPage() {
 
           <button
             disabled={isSubmitting}
-            className="w-full bg-blue-600 text-white p-3 rounded-lg"
+            className="w-full bg-blue-600 text-white p-3 rounded-lg min-h-[44px]"
           >
             {isSubmitting ? 'Submitting...' : 'Submit'}
           </button>
