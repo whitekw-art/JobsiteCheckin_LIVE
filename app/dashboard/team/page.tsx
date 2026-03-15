@@ -102,19 +102,19 @@ export default function TeamPage() {
 
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Invite New Member</h2>
-          <form onSubmit={handleInvite} className="flex gap-4">
+          <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3">
             <input
               type="email"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               placeholder="Email address"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md min-h-[44px]"
               required
             />
             <select
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md"
+              className="px-3 py-2 border border-gray-300 rounded-md min-h-[44px] sm:w-auto w-full"
             >
               <option value="USER">User</option>
               <option value="ADMIN">Admin</option>
@@ -122,7 +122,7 @@ export default function TeamPage() {
             </select>
             <button
               type="submit"
-              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 min-h-[44px] w-full sm:w-auto"
             >
               Invite
             </button>
@@ -200,7 +200,7 @@ export default function TeamPage() {
                         {isOwner && member.id !== session?.user?.id && (
                           <button
                             onClick={() => handleRemoveMember(member.id)}
-                            className="text-red-600 hover:text-red-800"
+                            className="text-red-600 hover:text-red-800 min-h-[44px] px-2"
                           >
                             Remove
                           </button>
