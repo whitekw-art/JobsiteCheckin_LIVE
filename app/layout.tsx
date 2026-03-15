@@ -5,8 +5,8 @@ import Providers from '@/components/Providers'
 import Navigation from '@/components/Navigation'
 
 export const metadata: Metadata = {
-  title: 'Jobsite Check-In',
-  description: 'Mobile-friendly jobsite check-in application',
+  title: 'ProjectCheckin',
+  description: 'Automatic job pages and local SEO for field service businesses.',
    verification: {
     google: 'XqifA49nAacc21QeSSWjavqCfJM1v_l-1vj8vibmR2k',
   },

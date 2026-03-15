@@ -341,7 +341,7 @@ export default function CheckInPage() {
   return (
     <main className="min-h-screen bg-white p-4">
       <div className="max-w-md mx-auto">
-        <h1 className="text-xl font-bold text-center mb-4">Jobsite Check-In</h1>
+        <h1 className="text-xl font-bold text-center mb-4">ProjectCheckin</h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Installer */}

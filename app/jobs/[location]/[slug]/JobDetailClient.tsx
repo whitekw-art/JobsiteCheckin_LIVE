@@ -410,7 +410,7 @@ export default function JobDetailClient({
             href={baseUrl || '/'}
             className="font-medium text-primary-600 hover:text-primary-700 hover:underline transition-colors"
           >
-            Jobsite Check-In
+            ProjectCheckin
           </a>
         </p>
         <p className="text-[0.68rem] text-surface-400 mt-0.5">
