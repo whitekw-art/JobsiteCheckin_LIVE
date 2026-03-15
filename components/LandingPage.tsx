@@ -123,6 +123,7 @@ export default function LandingPage({ registrationOpen = false }: { registration
 
   // Nav scroll
   const [navScrolled, setNavScrolled] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
 
   // FAQ accordion
   const [openFaq, setOpenFaq] = useState<number | null>(null)
@@ -166,6 +167,17 @@ export default function LandingPage({ registrationOpen = false }: { registration
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  // Close mobile nav on outside click
+  useEffect(() => {
+    if (!navOpen) return
+    const onClick = (e: MouseEvent) => {
+      const nav = document.getElementById('nav')
+      if (nav && !nav.contains(e.target as Node)) setNavOpen(false)
+    }
+    document.addEventListener('click', onClick)
+    return () => document.removeEventListener('click', onClick)
+  }, [navOpen])
 
   // Reveal animations (IntersectionObserver)
   useEffect(() => {
@@ -323,22 +335,33 @@ export default function LandingPage({ registrationOpen = false }: { registration
       <nav id="nav" className={navScrolled ? 'scrolled' : ''}>
         <div className="nav-inner">
           <a href="#" className="nav-logo">ProjectCheckin</a>
-          <ul className="nav-links">
-            <li><a href="#how">How It Works</a></li>
-            <li><a href="#pricing">Pricing</a></li>
-            <li><a href="/auth/signin">{registrationOpen ? 'Sign In / Register' : 'Sign In'}</a></li>
+          <ul className={`nav-links${navOpen ? ' open' : ''}`}>
+            <li><a href="#how" onClick={() => setNavOpen(false)}>How It Works</a></li>
+            <li><a href="#pricing" onClick={() => setNavOpen(false)}>Pricing</a></li>
+            <li><a href="/auth/signin" onClick={() => setNavOpen(false)}>{registrationOpen ? 'Sign In / Register' : 'Sign In'}</a></li>
             {!registrationOpen && (
               <li>
                 <a
                   href="#"
                   className="btn-nav"
-                  onClick={(e) => { e.preventDefault(); openWaitlistModal() }}
+                  onClick={(e) => { e.preventDefault(); setNavOpen(false); openWaitlistModal() }}
                 >
                   Join the Waitlist
                 </a>
               </li>
             )}
           </ul>
+          <button
+            className={`nav-hamburger${navOpen ? ' open' : ''}`}
+            aria-label={navOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={navOpen}
+            aria-controls="nav-links"
+            onClick={() => setNavOpen(o => !o)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
         </div>
       </nav>
 

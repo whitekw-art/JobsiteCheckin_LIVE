@@ -167,6 +167,30 @@ nav.scrolled {
 .btn-nav:hover { background: var(--cta-hover); }
 .nav-links a.btn-nav { color: #ffffff; }
 
+/* Hamburger button — hidden on desktop */
+.nav-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 28px;
+  height: 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+.nav-hamburger span {
+  display: block;
+  height: 2px;
+  background: var(--navy);
+  border-radius: 2px;
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+.nav-hamburger.open span:nth-child(1) { transform: translateY(9px) rotate(45deg); }
+.nav-hamburger.open span:nth-child(2) { opacity: 0; }
+.nav-hamburger.open span:nth-child(3) { transform: translateY(-9px) rotate(-45deg); }
+
 /* =============================================
    HERO
 ============================================= */
@@ -1977,4 +2001,132 @@ footer {
 }
 @media (min-width: 769px) {
   .carousel-dots { display: none; }
+}
+
+/* =============================================
+   MOBILE — 640px and below (hamburger nav)
+============================================= */
+@media (max-width: 640px) {
+  .nav-hamburger {
+    display: flex;
+  }
+  .nav-links {
+    display: none;
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    background: var(--white);
+    flex-direction: column;
+    gap: 0;
+    padding: 8px 0 20px;
+    box-shadow: 0 8px 32px rgba(14,165,233,0.13);
+    z-index: 99;
+    list-style: none;
+  }
+  .nav-links.open {
+    display: flex;
+  }
+  .nav-links li {
+    width: 100%;
+  }
+  .nav-links a {
+    display: block;
+    padding: 13px 24px;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .nav-links a.btn-nav {
+    display: block;
+    margin: 8px 16px 0;
+    padding: 13px 20px;
+    height: auto;
+    min-height: 48px;
+    text-align: center;
+    color: #ffffff;
+    border-radius: var(--radius-btn);
+    font-size: 15px;
+  }
+}
+
+/* =============================================
+   MOBILE — 480px and below (layout fixes)
+============================================= */
+@media (max-width: 480px) {
+  :root { --px: 16px; }
+
+  body { font-size: 16px; }
+
+  .hero {
+    padding-top: calc(64px + 24px);
+    padding-bottom: 56px;
+  }
+  .hero-mockup-wrap {
+    display: none;
+  }
+  .hero-sub {
+    font-size: 16px;
+  }
+  .hero-bullets {
+    font-size: 15px;
+  }
+  .btn-waitlist-hero {
+    width: 100%;
+    justify-content: center;
+  }
+  .trust-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .proof-strip-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .proof-strip { padding: 32px 0; }
+  .urgency-bar {
+    display: block;
+    text-align: center;
+    font-size: 13px;
+    padding: 10px 16px;
+  }
+  .cta-sub { font-size: 17px; }
+  .cta-form {
+    flex-direction: column;
+    align-items: stretch;
+    max-width: 100%;
+  }
+  .cta-input {
+    min-width: 0;
+    width: 100%;
+  }
+  .btn-cta-orange {
+    width: 100%;
+    justify-content: center;
+  }
+  .faq-section { padding: 48px 16px; }
+  .faq-q {
+    min-height: 52px;
+    padding: 14px 0;
+    font-size: 15px;
+  }
+  .footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .modal-overlay {
+    padding: 12px;
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+  .modal-card {
+    padding: 28px 20px;
+    border-radius: 12px;
+  }
+  .pricing-feature-name {
+    font-size: 12px;
+  }
 }
