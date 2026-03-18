@@ -46,6 +46,8 @@ if (
   !pathname.startsWith('/sitemap') &&
   pathname !== '/robots.txt' &&
   pathname !== '/pricing' &&
+  pathname !== '/privacy' &&
+  pathname !== '/terms' &&
   pathname !== '/' &&
   pathname !== '' &&
   !pathname.startsWith('/api/waitlist') &&
@@ -80,6 +82,7 @@ if (
       !pathname.startsWith('/dashboard') &&
       !pathname.startsWith('/pricing') &&
       !pathname.startsWith('/payments') &&
+      !pathname.startsWith('/welcome') &&
       !pathname.startsWith('/auth/') &&
       pathname !== '/' &&
       pathname !== ''

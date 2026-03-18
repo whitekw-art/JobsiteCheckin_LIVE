@@ -20,7 +20,7 @@ export default function PaymentSuccessPage() {
         if (data.planTier) {
           // planTier confirmed in DB — refresh JWT then navigate
           await update()
-          window.location.href = '/dashboard'
+          window.location.href = '/welcome'
           return
         }
       } catch {
@@ -32,7 +32,7 @@ export default function PaymentSuccessPage() {
       if (attempts.current >= MAX_ATTEMPTS) {
         // Give up waiting — go anyway, middleware will re-evaluate
         await update()
-        window.location.href = '/dashboard'
+        window.location.href = '/welcome'
         return
       }
 
