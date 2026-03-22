@@ -14,6 +14,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (password.length < 8) {
+      return NextResponse.json(
+        { error: 'Password must be at least 8 characters.' },
+        { status: 400 }
+      )
+    }
+
     const rows = await prisma.$queryRaw<
       { id: string; email: string; organizationId: string | null; role: string | null }[]
     >(Prisma.sql`
