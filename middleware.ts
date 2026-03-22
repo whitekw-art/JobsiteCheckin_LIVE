@@ -82,7 +82,7 @@ if (
       !pathname.startsWith('/dashboard') &&
       !pathname.startsWith('/pricing') &&
       !pathname.startsWith('/payments') &&
-      !pathname.startsWith('/welcome') &&
+
       !pathname.startsWith('/auth/') &&
       pathname !== '/' &&
       pathname !== ''
