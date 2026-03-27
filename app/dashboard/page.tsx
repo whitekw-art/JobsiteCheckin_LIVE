@@ -140,6 +140,7 @@ function PublishModal({
 
 export default function Dashboard() {
   const { data: session } = useSession()
+  const canPublish = session?.user?.role === 'OWNER' || session?.user?.role === 'ADMIN'
   const [checkIns, setCheckIns] = useState<CheckIn[]>([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
@@ -521,7 +522,7 @@ export default function Dashboard() {
                         >
                           Edit Address
                         </button>
-                        {checkIn.isPublic ? (
+                        {canPublish && checkIn.isPublic ? (
                           <button
                             type="button"
                             onClick={() => handleTogglePublish(checkIn)}
@@ -530,7 +531,7 @@ export default function Dashboard() {
                           >
                             {togglingId === checkIn.id ? 'Saving\u2026' : 'Unpublish'}
                           </button>
-                        ) : (
+                        ) : canPublish ? (
                           <button
                             type="button"
                             onClick={() => handlePublishClick(checkIn)}
@@ -544,7 +545,7 @@ export default function Dashboard() {
                           >
                             Publish
                           </button>
-                        )}
+                        ) : null}
                         {checkIn.isPublic && (() => {
                           const citySlug = slugify(checkIn.city || '')
                           const stateSlug = slugify(checkIn.state || '')
@@ -799,14 +800,16 @@ export default function Dashboard() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {checkIn.isPublic ? (
                             <div className="flex flex-col gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleTogglePublish(checkIn)}
-                                disabled={togglingId === checkIn.id}
-                                className="bg-red-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
-                              >
-                                {togglingId === checkIn.id ? 'Saving\u2026' : 'Unpublish'}
-                              </button>
+                              {canPublish && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePublish(checkIn)}
+                                  disabled={togglingId === checkIn.id}
+                                  className="bg-red-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
+                                >
+                                  {togglingId === checkIn.id ? 'Saving\u2026' : 'Unpublish'}
+                                </button>
+                              )}
                               {(() => {
                                 const citySlug = slugify(checkIn.city || '')
                                 const stateSlug = slugify(checkIn.state || '')
@@ -827,7 +830,7 @@ export default function Dashboard() {
                                 )
                               })()}
                             </div>
-                          ) : (
+                          ) : canPublish ? (
                             (() => {
                               const { hardBlocked } = validateForPublish(checkIn)
                               return (
@@ -846,6 +849,8 @@ export default function Dashboard() {
                                 </button>
                               )
                             })()
+                          ) : (
+                            <span className="text-xs text-gray-400">Draft</span>
                           )}
                         </td>
                       </tr>
