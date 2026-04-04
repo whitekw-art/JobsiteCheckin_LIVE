@@ -566,7 +566,7 @@ export default function Dashboard() {
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
   const portfolioUrl = orgSlug ? `${baseUrl}/portfolio/${orgSlug}` : null
 
-  const needsOnboarding = session?.user?.onboardingComplete === false
+  const needsOnboarding = (session?.user as any)?.onboardingComplete === false
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
