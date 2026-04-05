@@ -281,6 +281,14 @@ export default function Dashboard() {
   const [editAddresses, setEditAddresses] = useState<Record<string, EditAddr>>({})
   const [savingId, setSavingId] = useState<string | null>(null)
 
+  // Notes editing (keyed by checkIn.id)
+  const [editNotes, setEditNotes] = useState<Record<string, string>>({})
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [savingNoteId, setSavingNoteId] = useState<string | null>(null)
+
+  // Photo delete
+  const [deletingPhotoKey, setDeletingPhotoKey] = useState<string | null>(null)
+
   // Publish
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [publishModal, setPublishModal] = useState<{
@@ -381,7 +389,7 @@ export default function Dashboard() {
       next.delete(checkIn.id)
     } else {
       next.add(checkIn.id)
-      // Seed address edit fields from current data
+      // Seed address and notes edit fields from current data
       setEditAddresses((prev) => ({
         ...prev,
         [checkIn.id]: {
@@ -391,6 +399,7 @@ export default function Dashboard() {
           zip: checkIn.zip || '',
         },
       }))
+      setEditNotes((prev) => ({ ...prev, [checkIn.id]: checkIn.notes || '' }))
     }
     setExpandedIds(next)
   }
@@ -542,6 +551,57 @@ export default function Dashboard() {
       alert(err.message || 'Failed to download photos')
     } finally {
       setDownloadingId(null)
+    }
+  }
+
+  // ── Notes save ────────────────────────────────────────────────────────────
+
+  const handleNoteSave = async (checkIn: CheckIn) => {
+    const notes = editNotes[checkIn.id] ?? ''
+    setSavingNoteId(checkIn.id)
+    try {
+      const res = await fetch('/api/checkins/notes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkIn.id, notes }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed to update notes')
+      setCheckIns((prev) =>
+        prev.map((c) =>
+          c.id === checkIn.id ? { ...c, notes: data.checkIn?.notes ?? notes } : c
+        )
+      )
+      setEditingNoteId(null)
+    } catch (err: any) {
+      alert(err.message || 'Failed to update notes')
+    } finally {
+      setSavingNoteId(null)
+    }
+  }
+
+  // ── Photo delete ───────────────────────────────────────────────────────────
+
+  const handlePhotoDelete = async (checkIn: CheckIn, url: string) => {
+    const key = `${checkIn.id}:${url}`
+    setDeletingPhotoKey(key)
+    try {
+      const res = await fetch('/api/checkins/photos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkIn.id, url }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed to delete photo')
+      setCheckIns((prev) =>
+        prev.map((c) =>
+          c.id === checkIn.id ? { ...c, photoUrls: data.photoUrls ?? [] } : c
+        )
+      )
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete photo')
+    } finally {
+      setDeletingPhotoKey(null)
     }
   }
 
@@ -942,12 +1002,59 @@ export default function Dashboard() {
                               <span className="db-installer-name">{checkIn.installer}</span>
                             </div>
 
-                            {checkIn.notes && (
-                              <div style={{ marginTop: 12 }}>
-                                <div className="db-d-label">Notes</div>
-                                <div className="db-d-val">{checkIn.notes}</div>
+                            <div style={{ marginTop: 12 }}>
+                              <div className="db-notes-header">
+                                <span className="db-d-label">Notes</span>
+                                {editingNoteId !== checkIn.id && (
+                                  <button
+                                    className="db-btn-note-edit"
+                                    onClick={() => setEditingNoteId(checkIn.id)}
+                                  >
+                                    Edit
+                                  </button>
+                                )}
                               </div>
-                            )}
+                              {editingNoteId === checkIn.id ? (
+                                <>
+                                  <textarea
+                                    className="db-notes-textarea"
+                                    value={editNotes[checkIn.id] ?? ''}
+                                    placeholder="Add job notes..."
+                                    onChange={(e) =>
+                                      setEditNotes((prev) => ({
+                                        ...prev,
+                                        [checkIn.id]: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                  <div className="db-edit-actions">
+                                    <button
+                                      className="db-btn-save"
+                                      disabled={savingNoteId === checkIn.id}
+                                      onClick={() => handleNoteSave(checkIn)}
+                                    >
+                                      {savingNoteId === checkIn.id ? 'Saving\u2026' : 'Save'}
+                                    </button>
+                                    <button
+                                      className="db-btn-cancel"
+                                      onClick={() => {
+                                        setEditingNoteId(null)
+                                        setEditNotes((prev) => ({
+                                          ...prev,
+                                          [checkIn.id]: checkIn.notes || '',
+                                        }))
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="db-d-val">
+                                  {checkIn.notes || <span className="db-notes-empty">No notes added</span>}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           {/* Right col: photos + actions */}
@@ -957,19 +1064,34 @@ export default function Dashboard() {
                             </div>
                             {(checkIn.photoUrls?.length ?? 0) > 0 ? (
                               <div className="db-photo-grid">
-                                {checkIn.photoUrls!.map((url, idx) => (
-                                  <a
-                                    key={idx}
-                                    className="db-photo-thumb"
-                                    href={url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={url} alt={`Photo ${idx + 1}`} />
-                                  </a>
-                                ))}
+                                {checkIn.photoUrls!.map((url, idx) => {
+                                  const photoKey = `${checkIn.id}:${url}`
+                                  return (
+                                    <div key={idx} className="db-photo-thumb-wrap">
+                                      <a
+                                        className="db-photo-thumb"
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={url} alt={`Photo ${idx + 1}`} />
+                                      </a>
+                                      <button
+                                        className="db-photo-delete"
+                                        disabled={deletingPhotoKey === photoKey}
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handlePhotoDelete(checkIn, url)
+                                        }}
+                                        aria-label="Delete photo"
+                                      >
+                                        {deletingPhotoKey === photoKey ? '\u2026' : '\u00d7'}
+                                      </button>
+                                    </div>
+                                  )
+                                })}
                               </div>
                             ) : (
                               <div className="db-photo-empty">No photos attached</div>
