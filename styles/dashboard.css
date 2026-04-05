@@ -911,3 +911,249 @@
   color: var(--amber);
   margin-top: 4px;
 }
+
+/* Shell content area (Team, Reporting, Account pages) */
+.db-shell-content {
+  padding: 20px 24px 40px;
+  max-width: 960px;
+}
+
+/* Shell cards */
+.db-shell-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.db-shell-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--t1);
+  margin-bottom: 16px;
+}
+
+/* Shell table */
+.db-shell-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.db-shell-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.db-shell-table td {
+  padding: 10px 12px;
+  color: var(--t1);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.db-shell-table tr:last-child td { border-bottom: none; }
+.db-shell-table tr:hover td { background: var(--surface-2); }
+
+/* Shell form */
+.db-shell-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.db-shell-input {
+  flex: 1;
+  min-width: 200px;
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: 7px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--t1);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  outline: none;
+  transition: border-color .14s;
+  min-height: 36px;
+}
+.db-shell-input:focus { border-color: var(--sky); }
+.db-shell-select {
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: 7px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--t1);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  outline: none;
+  cursor: pointer;
+  min-height: 36px;
+}
+.db-shell-btn {
+  background: var(--sky-text);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  cursor: pointer;
+  min-height: 36px;
+  white-space: nowrap;
+}
+.db-shell-btn:disabled { opacity: .5; cursor: not-allowed; }
+.db-shell-btn-ghost {
+  background: transparent;
+  color: var(--red);
+  border: 1px solid var(--border-2);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  cursor: pointer;
+}
+
+/* Shell role badge / select */
+.db-role-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--surface-3);
+  color: var(--t2);
+}
+.db-shell-role-select {
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--t1);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Shell stat cells */
+.db-shell-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.db-shell-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.db-shell-stat-num {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--t1);
+  line-height: 1;
+}
+.db-shell-stat-lbl {
+  font-size: 11px;
+  color: var(--t3);
+  margin-top: 4px;
+}
+
+/* Shell invite link */
+.db-invite-link-row {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--green);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.db-invite-link-url {
+  word-break: break-all;
+  color: var(--t2);
+}
+.db-invite-copy-btn {
+  background: transparent;
+  border: 1px solid var(--border-2);
+  border-radius: 5px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sky-text);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Shell status badges */
+.db-status-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.db-status-high-intent  { background: #DCFCE7; color: #15803D; }
+.db-status-high-interest { background: #DBEAFE; color: #1D4ED8; }
+.db-status-under { background: var(--surface-3); color: var(--t3); }
+
+/* Shell pagination */
+.db-shell-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0 0;
+  font-size: 12px;
+  color: var(--t3);
+}
+.db-shell-page-btn {
+  background: transparent;
+  border: 1px solid var(--border-2);
+  border-radius: 5px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--t2);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+.db-shell-page-btn[aria-disabled="true"] {
+  color: var(--t4);
+  pointer-events: none;
+}
+
+/* Account form */
+.db-shell-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t2);
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.db-shell-field-static {
+  font-size: 14px;
+  color: var(--t1);
+  font-weight: 600;
+  padding: 4px 0;
+}
+.db-shell-alert-success {
+  font-size: 12px;
+  color: var(--green);
+  background: var(--green-bg);
+  border: 1px solid rgba(22,163,74,.2);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+.db-shell-alert-error {
+  font-size: 12px;
+  color: var(--red);
+  background: var(--red-bg);
+  border: 1px solid rgba(220,38,38,.2);
+  border-radius: 6px;
+  padding: 8px 12px;
+}

@@ -300,9 +300,15 @@ export default function Dashboard() {
   // Download
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
-  // Set theme on html element
+  // Sync theme with localStorage so it persists across pages
+  useEffect(() => {
+    const saved = localStorage.getItem('db-theme') as 'light' | 'dark' | null
+    if (saved) setTheme(saved)
+  }, [])
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('db-theme', theme)
   }, [theme])
 
   // Escape key closes publish modal
