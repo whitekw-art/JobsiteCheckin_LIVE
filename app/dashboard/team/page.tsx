@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import DashboardShell from '@/components/DashboardShell'
 
 interface TeamMember {
   id: string
@@ -45,9 +46,8 @@ export default function TeamPage() {
       const response = await fetch('/api/team/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole })
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
       })
-      
       if (response.ok) {
         const data = await response.json()
         setInviteEmail('')
@@ -65,12 +65,9 @@ export default function TeamPage() {
       const response = await fetch('/api/team/members', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, role: newRole })
+        body: JSON.stringify({ userId, role: newRole }),
       })
-      
-      if (response.ok) {
-        fetchMembers()
-      }
+      if (response.ok) fetchMembers()
     } catch (error) {
       console.error('Error updating role:', error)
     }
@@ -78,16 +75,12 @@ export default function TeamPage() {
 
   const handleRemoveMember = async (userId: string) => {
     if (!confirm('Are you sure you want to remove this member?')) return
-    
     try {
       const response = await fetch(`/api/team/members?userId=${encodeURIComponent(userId)}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       })
-      
-      if (response.ok) {
-        fetchMembers()
-      }
+      if (response.ok) fetchMembers()
     } catch (error) {
       console.error('Error removing member:', error)
     }
@@ -96,124 +89,123 @@ export default function TeamPage() {
   const isOwner = session?.user?.role === 'OWNER'
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Team Management</h1>
-
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Invite New Member</h2>
-          <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3">
-            <input
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="Email address"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md min-h-[44px]"
-              required
-            />
-            <select
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md min-h-[44px] sm:w-auto w-full"
-            >
-              <option value="USER">User</option>
-              <option value="ADMIN">Admin</option>
-              {isOwner && <option value="OWNER">Owner</option>}
-            </select>
+    <DashboardShell title="Team">
+      {/* Invite card */}
+      <div className="db-shell-card">
+        <div className="db-shell-card-title">Invite New Member</div>
+        <form onSubmit={handleInvite} className="db-shell-form">
+          <input
+            type="email"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            placeholder="Email address"
+            className="db-shell-input"
+            required
+          />
+          <select
+            value={inviteRole}
+            onChange={(e) => setInviteRole(e.target.value)}
+            className="db-shell-select"
+          >
+            <option value="USER">User</option>
+            <option value="ADMIN">Admin</option>
+            {isOwner && <option value="OWNER">Owner</option>}
+          </select>
+          <button type="submit" className="db-shell-btn">
+            Invite
+          </button>
+        </form>
+        {inviteLink && (
+          <div className="db-invite-link-row">
+            <span style={{ color: 'var(--green)', fontWeight: 700 }}>Invite link ready</span>
+            <span className="db-invite-link-url">{inviteLink}</span>
             <button
-              type="submit"
-              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 min-h-[44px] w-full sm:w-auto"
+              type="button"
+              className="db-invite-copy-btn"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(inviteLink)
+                  setInviteCopied(true)
+                } catch {
+                  setInviteCopied(false)
+                }
+              }}
             >
-              Invite
+              {inviteCopied ? 'Copied!' : 'Copy link'}
             </button>
-          </form>
-          {inviteLink && (
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-green-700">
-              <span className="break-all">Invitation link: {inviteLink}</span>
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(inviteLink)
-                    setInviteCopied(true)
-                  } catch {
-                    setInviteCopied(false)
-                  }
-                }}
-                className="rounded border border-green-600 px-3 py-1 text-green-700 hover:bg-green-50"
-              >
-                Copy invite link
-              </button>
-              {inviteCopied && <span className="text-xs text-green-700">Invite link copied</span>}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b">
-            <h2 className="text-xl font-semibold">Team Members</h2>
           </div>
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="p-8 text-center">Loading...</div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {members.map((member) => (
-                    <tr key={member.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {member.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {member.isPending ? 'Pending' : (member.name || '-')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {isOwner && !member.isPending && member.id !== session?.user?.id ? (
-                          <select
-                            value={member.role}
-                            onChange={(e) => handleRoleChange(member.id, e.target.value)}
-                            className="px-2 py-1 border border-gray-300 rounded text-xs"
-                          >
-                            <option value="USER">User</option>
-                            <option value="ADMIN">Admin</option>
-                            <option value="OWNER">Owner</option>
-                          </select>
-                        ) : (
-                          <span className="px-2 py-1 bg-gray-100 rounded text-xs">{member.role}</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {member.isPending || !member.createdAt
-                          ? '—'
-                          : new Date(member.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {isOwner && member.id !== session?.user?.id && (
-                          <button
-                            onClick={() => handleRemoveMember(member.id)}
-                            className="text-red-600 hover:text-red-800 min-h-[44px] px-2"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
+        )}
       </div>
-    </div>
+
+      {/* Members table */}
+      <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
+          <div className="db-shell-card-title" style={{ marginBottom: 0 }}>Team Members</div>
+        </div>
+        {loading ? (
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--t3)', fontSize: 13 }}>
+            Loading...
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="db-shell-table">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Joined</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((member) => (
+                  <tr key={member.id}>
+                    <td>{member.email}</td>
+                    <td style={{ color: 'var(--t2)' }}>
+                      {member.isPending ? (
+                        <span className="db-role-badge">Pending</span>
+                      ) : (
+                        member.name || '—'
+                      )}
+                    </td>
+                    <td>
+                      {isOwner && !member.isPending && member.id !== session?.user?.id ? (
+                        <select
+                          value={member.role}
+                          onChange={(e) => handleRoleChange(member.id, e.target.value)}
+                          className="db-shell-role-select"
+                        >
+                          <option value="USER">User</option>
+                          <option value="ADMIN">Admin</option>
+                          <option value="OWNER">Owner</option>
+                        </select>
+                      ) : (
+                        <span className="db-role-badge">{member.role}</span>
+                      )}
+                    </td>
+                    <td style={{ color: 'var(--t3)', fontSize: 12 }}>
+                      {member.isPending || !member.createdAt
+                        ? '—'
+                        : new Date(member.createdAt).toLocaleDateString()}
+                    </td>
+                    <td>
+                      {isOwner && member.id !== session?.user?.id && (
+                        <button
+                          onClick={() => handleRemoveMember(member.id)}
+                          className="db-shell-btn-ghost"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </DashboardShell>
   )
 }

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { ReportingJobTableBody } from '@/components/ReportingJobTableBody'
 import { ReportingPhotoTableBody } from '@/components/ReportingPhotoTableBody'
+import DashboardShell from '@/components/DashboardShell'
 
 type EventCounts = {
   PAGE_VIEW: number
@@ -34,12 +35,11 @@ export default async function ReportingPage({
 
   if (!currentUser || !currentUser.organizationId) {
     return (
-      <main className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-4xl mx-auto bg-white rounded-lg shadow p-6">
-          <h1 className="text-2xl font-bold mb-2">Reporting &amp; Key Metrics</h1>
-          <p className="text-gray-600">No organization is linked to this account.</p>
+      <DashboardShell title="Reporting &amp; Key Metrics">
+        <div className="db-shell-card">
+          <p style={{ fontSize: 13, color: 'var(--t2)' }}>No organization is linked to this account.</p>
         </div>
-      </main>
+      </DashboardShell>
     )
   }
 
@@ -181,22 +181,14 @@ export default async function ReportingPage({
   const photoEvents = await prisma.checkInEvent.findMany({
     where: {
       eventType: { in: ['PHOTO_CLICK', 'photo_click'] },
-      metadata: {
-        not: null,
-      },
-      checkIn: {
-        organizationId: currentUser.organizationId,
-      },
+      metadata: { not: null },
+      checkIn: { organizationId: currentUser.organizationId },
     },
     select: {
       checkInId: true,
       metadata: true,
       checkIn: {
-        select: {
-          doorType: true,
-          city: true,
-          state: true,
-        },
+        select: { doorType: true, city: true, state: true },
       },
     },
   })
@@ -220,14 +212,11 @@ export default async function ReportingPage({
         photoIndex?: number
         photoUrl?: string
       }
-
       if (typeof parsed.photoIndex !== 'number' || !parsed.photoUrl) continue
-
       const doorType = event.checkIn?.doorType || 'Job'
       const locationParts = [event.checkIn?.city, event.checkIn?.state].filter(Boolean)
       const location = locationParts.join(', ')
       const key = `${event.checkInId}:${parsed.photoIndex}`
-
       const existing = photoMap.get(key)
       if (existing) {
         existing.totalClicks += 1
@@ -257,7 +246,6 @@ export default async function ReportingPage({
 
   const photoSortField = resolvedSearchParams?.photoSort || 'totalClicks'
   const photoSortDir = resolvedSearchParams?.photoDir === 'asc' ? 'asc' : 'desc'
-
   const photoSortableFields = new Set(['totalClicks', 'doorType', 'location'])
 
   if (photoSortableFields.has(photoSortField)) {
@@ -290,7 +278,7 @@ export default async function ReportingPage({
       row.doorType || 'Job',
       [row.city, row.state].filter(Boolean).join(', '),
     ].filter(Boolean)
-    const jobTitle = jobTitleParts.join(' • ')
+    const jobTitle = jobTitleParts.join(' \u2022 ')
     const createdDate = row.timestamp
       ? new Date(row.timestamp).toLocaleDateString()
       : ''
@@ -316,155 +304,126 @@ export default async function ReportingPage({
   })
 
   return (
-    <main className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h1 className="text-2xl font-bold">Reporting &amp; Key Metrics</h1>
-          <p className="text-gray-600 mt-1">Engagement metrics for your published job pages.</p>
+    <DashboardShell title="Reporting">
+      {/* Stats */}
+      <div className="db-shell-stats">
+        <div className="db-shell-stat">
+          <div className="db-shell-stat-num">{counts.PAGE_VIEW}</div>
+          <div className="db-shell-stat-lbl">Total Page Views</div>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-white rounded-lg shadow p-5">
-            <p className="text-sm text-gray-500">Total Job Page Views</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{counts.PAGE_VIEW}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-5">
-            <p className="text-sm text-gray-500">Website Clicks</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{counts.WEBSITE_CLICK}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-5">
-            <p className="text-sm text-gray-500">Phone Clicks</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{counts.PHONE_CLICK}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-5">
-            <p className="text-sm text-gray-500">Photo Clicks</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{counts.PHOTO_CLICK}</p>
-          </div>
+        <div className="db-shell-stat">
+          <div className="db-shell-stat-num">{counts.WEBSITE_CLICK}</div>
+          <div className="db-shell-stat-lbl">Website Clicks</div>
         </div>
-
-        <div className="bg-white rounded-lg shadow mt-8">
-          <div className="px-6 py-4 border-b">
-            <h2 className="text-lg font-semibold">Per-Job Performance</h2>
-          </div>
-          <div className="overflow-x-auto">
-            {pageRows.length === 0 ? (
-              <div className="p-6 text-gray-600">No job performance data yet.</div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Job</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      <Link
-                        href={buildPageLink(1, 'pageViews', toggleDir('pageViews'))}
-                        className="hover:underline"
-                      >
-                        Page Views
-                      </Link>
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      <Link
-                        href={buildPageLink(1, 'photoClicks', toggleDir('photoClicks'))}
-                        className="hover:underline"
-                      >
-                        Photo Clicks
-                      </Link>
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      <Link
-                        href={buildPageLink(1, 'websiteClicks', toggleDir('websiteClicks'))}
-                        className="hover:underline"
-                      >
-                        Website Clicks
-                      </Link>
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      <Link
-                        href={buildPageLink(1, 'phoneClicks', toggleDir('phoneClicks'))}
-                        className="hover:underline"
-                      >
-                        Phone Clicks
-                      </Link>
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  </tr>
-                </thead>
-                <ReportingJobTableBody rows={tableRows} />
-              </table>
-            )}
-          </div>
-          {pageRows.length > 0 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t text-sm text-gray-600">
-              <span>
-                Page {safePage} of {totalPages}
-              </span>
-              <div className="flex items-center gap-2">
-                <Link
-                  href={buildPageLink(Math.max(1, safePage - 1), sortField, sortDir)}
-                  className={`px-3 py-1 rounded border ${
-                    safePage === 1 ? 'text-gray-400 border-gray-200 pointer-events-none' : 'hover:bg-gray-50'
-                  }`}
-                >
-                  Prev
-                </Link>
-                <Link
-                  href={buildPageLink(Math.min(totalPages, safePage + 1), sortField, sortDir)}
-                  className={`px-3 py-1 rounded border ${
-                    safePage === totalPages ? 'text-gray-400 border-gray-200 pointer-events-none' : 'hover:bg-gray-50'
-                  }`}
-                >
-                  Next
-                </Link>
-              </div>
-            </div>
-          )}
+        <div className="db-shell-stat">
+          <div className="db-shell-stat-num">{counts.PHONE_CLICK}</div>
+          <div className="db-shell-stat-lbl">Phone Clicks</div>
         </div>
-
-        <div className="bg-white rounded-lg shadow mt-8">
-          <div className="px-6 py-4 border-b">
-            <h2 className="text-lg font-semibold">Top Performing Photos</h2>
-          </div>
-          <div className="overflow-x-auto">
-            {photoRows.length === 0 ? (
-              <div className="p-6 text-gray-600">No photo click data yet.</div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Photo</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      <Link
-                        href={buildPhotoLink('doorType', photoSortField === 'doorType' && photoSortDir === 'asc' ? 'desc' : 'asc')}
-                        className="hover:underline"
-                      >
-                        Door Type
-                      </Link>
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      <Link
-                        href={buildPhotoLink('location', photoSortField === 'location' && photoSortDir === 'asc' ? 'desc' : 'asc')}
-                        className="hover:underline"
-                      >
-                        Location
-                      </Link>
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Job ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      <Link
-                        href={buildPhotoLink('totalClicks', photoSortField === 'totalClicks' && photoSortDir === 'asc' ? 'desc' : 'asc')}
-                        className="hover:underline"
-                      >
-                        Total Clicks
-                      </Link>
-                    </th>
-                  </tr>
-                </thead>
-                <ReportingPhotoTableBody rows={photoRows} />
-              </table>
-            )}
-          </div>
+        <div className="db-shell-stat">
+          <div className="db-shell-stat-num">{counts.PHOTO_CLICK}</div>
+          <div className="db-shell-stat-lbl">Photo Clicks</div>
         </div>
       </div>
-    </main>
+
+      {/* Per-job table */}
+      <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
+          <div className="db-shell-card-title" style={{ marginBottom: 0 }}>Per-Job Performance</div>
+        </div>
+        {pageRows.length === 0 ? (
+          <div style={{ padding: 24, fontSize: 13, color: 'var(--t3)' }}>No job performance data yet.</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="db-shell-table">
+              <thead>
+                <tr>
+                  <th>Job</th>
+                  <th>
+                    <Link href={buildPageLink(1, 'pageViews', toggleDir('pageViews'))} style={{ color: 'inherit', textDecoration: 'none' }}>
+                      Page Views
+                    </Link>
+                  </th>
+                  <th>
+                    <Link href={buildPageLink(1, 'photoClicks', toggleDir('photoClicks'))} style={{ color: 'inherit', textDecoration: 'none' }}>
+                      Photo Clicks
+                    </Link>
+                  </th>
+                  <th>
+                    <Link href={buildPageLink(1, 'websiteClicks', toggleDir('websiteClicks'))} style={{ color: 'inherit', textDecoration: 'none' }}>
+                      Website Clicks
+                    </Link>
+                  </th>
+                  <th>
+                    <Link href={buildPageLink(1, 'phoneClicks', toggleDir('phoneClicks'))} style={{ color: 'inherit', textDecoration: 'none' }}>
+                      Phone Clicks
+                    </Link>
+                  </th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <ReportingJobTableBody rows={tableRows} />
+            </table>
+          </div>
+        )}
+        {pageRows.length > 0 && (
+          <div className="db-shell-pagination" style={{ padding: '12px 24px' }}>
+            <span>Page {safePage} of {totalPages}</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Link
+                href={buildPageLink(Math.max(1, safePage - 1), sortField, sortDir)}
+                className="db-shell-page-btn"
+                aria-disabled={safePage === 1}
+              >
+                Prev
+              </Link>
+              <Link
+                href={buildPageLink(Math.min(totalPages, safePage + 1), sortField, sortDir)}
+                className="db-shell-page-btn"
+                aria-disabled={safePage === totalPages}
+              >
+                Next
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Top photos table */}
+      <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
+          <div className="db-shell-card-title" style={{ marginBottom: 0 }}>Top Performing Photos</div>
+        </div>
+        {photoRows.length === 0 ? (
+          <div style={{ padding: 24, fontSize: 13, color: 'var(--t3)' }}>No photo click data yet.</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="db-shell-table">
+              <thead>
+                <tr>
+                  <th>Photo</th>
+                  <th>
+                    <Link href={buildPhotoLink('doorType', photoSortField === 'doorType' && photoSortDir === 'asc' ? 'desc' : 'asc')} style={{ color: 'inherit', textDecoration: 'none' }}>
+                      Door Type
+                    </Link>
+                  </th>
+                  <th>
+                    <Link href={buildPhotoLink('location', photoSortField === 'location' && photoSortDir === 'asc' ? 'desc' : 'asc')} style={{ color: 'inherit', textDecoration: 'none' }}>
+                      Location
+                    </Link>
+                  </th>
+                  <th>Job ID</th>
+                  <th>
+                    <Link href={buildPhotoLink('totalClicks', photoSortField === 'totalClicks' && photoSortDir === 'asc' ? 'desc' : 'asc')} style={{ color: 'inherit', textDecoration: 'none' }}>
+                      Total Clicks
+                    </Link>
+                  </th>
+                </tr>
+              </thead>
+              <ReportingPhotoTableBody rows={photoRows} />
+            </table>
+          </div>
+        )}
+      </div>
+    </DashboardShell>
   )
 }

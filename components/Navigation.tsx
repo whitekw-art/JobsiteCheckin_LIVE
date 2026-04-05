@@ -12,8 +12,8 @@ export default function Navigation() {
 
   // Hide nav on public-facing pages
   const isPublicPage = pathname?.startsWith('/portfolio/') || pathname?.startsWith('/jobs/') || pathname === '/privacy' || pathname === '/terms'
-  const isDashboardPage = pathname === '/dashboard'
-  if (!session || isPublicPage || isDashboardPage) return null
+  const isSidebarPage = pathname === '/dashboard' || pathname?.startsWith('/dashboard/') || pathname === '/reporting' || pathname === '/account'
+  if (!session || isPublicPage || isSidebarPage) return null
 
   const userRole = session.user?.role
   const isOwner = userRole === 'OWNER'
