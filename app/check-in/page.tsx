@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { geocodeJobAddress } from '@/lib/geocode'
 import imageCompression from 'browser-image-compression'
+import DashboardShell from '@/components/DashboardShell'
 import '@/styles/checkin.css'
 
 export default function CheckInPage() {
@@ -271,28 +272,18 @@ export default function CheckInPage() {
   ]
 
   return (
-    <div className="ci-root">
+    <DashboardShell title="New Check-In">
       <div className="ci-card">
-
-        {/* Header */}
-        <div className="ci-header">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="ci-logo" src="/logo.png" alt="ProjectCheckin" />
-          <span className="ci-brand">ProjectCheckin</span>
-          <span className="ci-title">New Check-In</span>
-        </div>
-
-        {/* Form */}
         <div className="ci-body">
           <form className="ci-form" onSubmit={handleSubmit}>
 
             {/* Installer */}
             <div className="ci-field">
-              <label className="ci-label" htmlFor="installer">Installer</label>
+              <label className="ci-label" htmlFor="installer">Employee Name</label>
               <input
                 id="installer"
                 className="ci-input"
-                placeholder="Installer name"
+                placeholder="Enter Name"
                 value={installer}
                 onChange={(e) => setInstaller(e.target.value)}
                 readOnly={isUserRole}
@@ -355,14 +346,14 @@ export default function CheckInPage() {
 
             {/* Door type */}
             <div className="ci-field">
-              <label className="ci-label" htmlFor="doorType">Door Type</label>
+              <label className="ci-label" htmlFor="doorType">Product</label>
               <select
                 id="doorType"
                 className="ci-select"
                 value={doorType}
                 onChange={(e) => setDoorType(e.target.value)}
               >
-                <option value="">Select type</option>
+                <option value="">Select Product</option>
                 <option value="Wood Door">Wood Door</option>
                 <option value="Iron Door">Iron Door</option>
                 <option value="Fiberglass Front Door">Fiberglass Front Door</option>
@@ -377,7 +368,7 @@ export default function CheckInPage() {
               <textarea
                 id="notes"
                 className="ci-textarea"
-                placeholder="Any additional notes about this job"
+                placeholder="Be as specific and detailed as possible — materials used, colors, special requests, job conditions. Detailed notes rank higher in search results."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
@@ -479,6 +470,6 @@ export default function CheckInPage() {
           )}
         </div>
       </div>
-    </div>
+    </DashboardShell>
   )
 }
