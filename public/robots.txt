@@ -13,4 +13,4 @@ Disallow: /payments/
 Disallow: /onboarding/
 Disallow: /super-admin/
 
-Sitemap: https://jobsite-checkin-live-du7t.vercel.app/sitemap.xml
+Sitemap: https://projectcheckin.com/sitemap.xml
