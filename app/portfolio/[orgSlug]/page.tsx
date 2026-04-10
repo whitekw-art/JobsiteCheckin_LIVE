@@ -125,7 +125,7 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
     const citySlug = slugify(job.city || '')
     const stateSlug = slugify(job.state || '')
     const doorTypeSlug = slugify(job.doorType || 'job')
-    const jobPath = `/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${doorTypeSlug}-${job.id}`
+    const jobPath = `/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${doorTypeSlug}-${orgSlug}-${job.id}`
 
     return {
       id: job.id,
