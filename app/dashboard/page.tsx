@@ -258,6 +258,14 @@ function IcoSun() {
   )
 }
 
+function IcoMenu() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <path d="M2 4h12M2 8h12M2 12h12"/>
+    </svg>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -270,6 +278,7 @@ export default function Dashboard() {
 
   // UI state
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [activeFilter, setActiveFilter] = useState<'all' | 'live' | 'draft'>('all')
   const [installerFilter, setInstallerFilter] = useState('all')
@@ -670,8 +679,15 @@ export default function Dashboard() {
   return (
     <>
       <div className="db-root">
+        {/* ── Mobile sidebar overlay ──────────────────────────────────────── */}
+        <div
+          className={`db-sidebar-overlay${sidebarOpen ? ' is-visible' : ''}`}
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+
         {/* ── Sidebar ──────────────────────────────────────────────────────── */}
-        <aside className="db-sidebar">
+        <aside className={`db-sidebar${sidebarOpen ? ' is-open' : ''}`}>
           <div className="db-sidebar-logo">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img className="db-logo-img" src="/logo.png" alt="ProjectCheckin logo" />
@@ -681,18 +697,18 @@ export default function Dashboard() {
           <nav className="db-sidebar-nav">
             <span className="db-nav-label">Workspace</span>
 
-            <Link className="db-nav-item" href="/check-in">
+            <Link className="db-nav-item" href="/check-in" onClick={() => setSidebarOpen(false)}>
               <IcoCheckin />
               Check-In
             </Link>
 
-            <Link className="db-nav-item active" href="/dashboard">
+            <Link className="db-nav-item active" href="/dashboard" onClick={() => setSidebarOpen(false)}>
               <IcoJobs />
               Jobs
             </Link>
 
             {canPublish && (
-              <Link className="db-nav-item" href="/dashboard/team">
+              <Link className="db-nav-item" href="/dashboard/team" onClick={() => setSidebarOpen(false)}>
                 <IcoTeam />
                 Team
               </Link>
@@ -701,7 +717,7 @@ export default function Dashboard() {
             <span className="db-nav-label" style={{ marginTop: 8 }}>Analytics</span>
 
             {session?.user?.role === 'OWNER' && (
-              <Link className="db-nav-item" href="/reporting">
+              <Link className="db-nav-item" href="/reporting" onClick={() => setSidebarOpen(false)}>
                 <IcoReporting />
                 Reporting
               </Link>
@@ -710,13 +726,13 @@ export default function Dashboard() {
             <span className="db-nav-label" style={{ marginTop: 8 }}>Settings</span>
 
             {session?.user?.role === 'OWNER' && (
-              <Link className="db-nav-item" href="/account">
+              <Link className="db-nav-item" href="/account" onClick={() => setSidebarOpen(false)}>
                 <IcoAccount />
                 Account
               </Link>
             )}
 
-            <button className="db-nav-item" onClick={() => signOut()}>
+            <button className="db-nav-item" onClick={() => { setSidebarOpen(false); signOut() }}>
               <IcoSignOut />
               Sign Out
             </button>
@@ -744,6 +760,13 @@ export default function Dashboard() {
 
           {/* Top bar */}
           <div className="db-topbar">
+            <button
+              className="db-hamburger"
+              onClick={() => setSidebarOpen(o => !o)}
+              aria-label="Toggle menu"
+            >
+              <IcoMenu />
+            </button>
             <h1 className="db-page-title">Jobs</h1>
             <div className="db-topbar-right">
               <Link className="db-btn-new" href="/check-in">
