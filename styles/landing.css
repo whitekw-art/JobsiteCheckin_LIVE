@@ -128,11 +128,20 @@ nav.scrolled {
   justify-content: space-between;
 }
 .nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 20px;
   font-weight: 700;
   color: var(--navy);
   text-decoration: none;
   letter-spacing: -0.01em;
+}
+.nav-logo img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  mix-blend-mode: multiply;
 }
 .nav-links {
   display: flex;
@@ -452,7 +461,7 @@ nav.scrolled {
   margin-bottom: 16px;
 }
 .job-photo-thumb {
-  height: 54px;
+  height: 140px;
   border-radius: 6px;
   background: var(--bg-alt);
   border: 1px solid rgba(14,165,233,0.15);
@@ -2226,4 +2235,63 @@ footer {
   .pricing-feature-name {
     font-size: 12px;
   }
+}
+
+/* ─── HERO FULL-BLEED PHOTO ─── */
+.hero-fullbleed-wrap {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  max-height: 460px;
+}
+.hero-fullbleed-wrap img {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center 35%;
+  max-height: 460px;
+}
+.hero-fullbleed-caption {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, rgba(12,74,110,0.72) 0%, transparent 100%);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 32px 40px 20px;
+  letter-spacing: 0.01em;
+}
+
+/* ─── HOW IT WORKS SCENE PHOTO ─── */
+.how-scene-wrap {
+  margin-bottom: 56px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.28);
+  position: relative;
+  max-height: 360px;
+}
+.how-scene-wrap img {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center 45%;
+  max-height: 360px;
+  filter: brightness(0.88);
+}
+.how-scene-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, rgba(12,74,110,0.75) 0%, transparent 100%);
+  padding: 40px 32px 24px;
+  color: rgba(255,255,255,0.85);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 640px) {
+  .how-scene-wrap { max-height: 220px; }
+  .how-scene-wrap img { max-height: 220px; }
+  .hero-fullbleed-caption { font-size: 15px; padding: 24px 20px 16px; }
 }

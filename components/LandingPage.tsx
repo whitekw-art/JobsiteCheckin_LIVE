@@ -338,7 +338,11 @@ export default function LandingPage({ registrationOpen = false }: { registration
       {/* NAV */}
       <nav id="nav" className={navScrolled ? 'scrolled' : ''}>
         <div className="nav-inner">
-          <a href="#" className="nav-logo">ProjectCheckin</a>
+          <a href="#" className="nav-logo">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="ProjectCheckin logo" />
+            ProjectCheckin
+          </a>
           <ul className={`nav-links${navOpen ? ' open' : ''}`}>
             <li><a href="#how" onClick={() => setNavOpen(false)}>How It Works</a></li>
             <li><a href="#pricing" onClick={() => setNavOpen(false)}>Pricing</a></li>
@@ -452,14 +456,18 @@ export default function LandingPage({ registrationOpen = false }: { registration
                 </div>
                 <div className="job-body">
                   <div className="job-photos-row">
-                    {[0, 1, 2].map((i) => (
-                      <div key={i} className="job-photo-thumb">
-                        <svg className="photo-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                          <rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3" />
-                          <circle cx="9" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.3" />
-                        </svg>
-                      </div>
-                    ))}
+                    <div className="job-photo-thumb">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/images/lp-finished-door.png" alt="Finished door installation" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', objectPosition: 'center center' }} />
+                    </div>
+                    <div className="job-photo-thumb">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/images/lp-door-stone-home.png" alt="Elegant stone home entrance" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', objectPosition: 'center center' }} />
+                    </div>
+                    <div className="job-photo-thumb">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/images/lp-door-craftsman.png" alt="Craftsman home entrance" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', objectPosition: 'center center' }} />
+                    </div>
                   </div>
                   <div className="job-structured">
                     <div className="structured-row">
@@ -495,6 +503,13 @@ export default function LandingPage({ registrationOpen = false }: { registration
 
         </div>
       </section>
+
+      {/* FULL-BLEED PHOTO */}
+      <div className="hero-fullbleed-wrap">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/lp-contractor-photo-wide.png" alt="Contractor photographing completed door installation at suburban home" />
+        <div className="hero-fullbleed-caption">30 seconds. Job done. Page live on Google.</div>
+      </div>
 
       {/* SOCIAL PROOF STRIP */}
       <div className="proof-strip">
@@ -728,6 +743,14 @@ export default function LandingPage({ registrationOpen = false }: { registration
       <section className="how" id="how">
         <div className="how-inner">
           <h2 className="how-h2 reveal">How It Works</h2>
+
+          {/* Scene photo */}
+          <div className="how-scene-wrap reveal">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/lp-crew-arriving.png" alt="Contractor crew arriving at suburban home job site with work van" />
+            <div className="how-scene-overlay">Your crew shows up. They do great work. That&apos;s all they need to do.</div>
+          </div>
+
           <div className="how-grid">
             <div className="how-step reveal">
               <div className="how-number">01</div>
