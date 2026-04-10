@@ -15,6 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       state: true,
       doorType: true,
       timestamp: true,
+      organization: { select: { slug: true } },
     },
     orderBy: { timestamp: 'desc' },
   })
@@ -23,8 +24,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const citySlug = slugify(checkIn.city || '') || 'city'
     const stateSlug = slugify(checkIn.state || '') || 'state'
     const doorTypeSlug = slugify(checkIn.doorType || 'job')
+    const orgSlug = checkIn.organization?.slug || ''
     const location = `${citySlug}-${stateSlug}`
-    const slug = `${doorTypeSlug}-${checkIn.id}`
+    const slug = orgSlug
+      ? `${doorTypeSlug}-${orgSlug}-${checkIn.id}`
+      : `${doorTypeSlug}-${checkIn.id}`
 
     return {
       url: `${baseUrl}/jobs/${location}/${slug}`,

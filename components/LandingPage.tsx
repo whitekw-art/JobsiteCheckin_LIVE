@@ -52,11 +52,11 @@ const faqs: FaqItem[] = [
   },
   {
     q: 'How many jobs do we need to see results?',
-    a: 'Consistency matters more than volume. Even a handful of jobs a week adds up to dozens of Google pages over 90 days. The more you check in, the faster your presence builds \u2014 but there\u2019s no minimum to get started.',
+    a: 'Consistency matters more than volume. Every check-in creates a permanent, indexed page with your business name and location on it. A job or two a week builds a library of pages that compounds over time \u2014 the more you publish, the stronger your presence grows.',
   },
   {
-    q: 'How does the 90-day guarantee work?',
-    a: 'Check in at least 3 times per week for 90 days. If your dashboard doesn\u2019t show real traffic \u2014 page views, phone taps, or website clicks \u2014 email us. We verify your activity data and refund your last 2 months. No forms, no arguments.',
+    q: 'Is there a contract or commitment?',
+    a: 'No contract, no commitment, no cancellation fees. Cancel any time from your account page. You keep every page and every photo you\u2019ve published \u2014 they stay indexed on Google even after you cancel.',
   },
   {
     q: 'Can I control which jobs get published?',
@@ -92,6 +92,10 @@ function PCheck() {
 
 function PDash() {
   return <span className="pdash">&mdash;</span>
+}
+
+function CSBadge() {
+  return <span className="cs-badge">Coming Soon</span>
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -485,7 +489,7 @@ export default function LandingPage({ registrationOpen = false }: { registration
               </div>
             </div>
             <p style={{ fontSize: '12px', color: '#4A7FA0', textAlign: 'center', marginTop: '8px', fontStyle: 'italic' }}>
-              Actual output from the ProjectCheckin app
+              Example of how a published job page appears in Google search results
             </p>
           </div>
 
@@ -516,9 +520,9 @@ export default function LandingPage({ registrationOpen = false }: { registration
             <div className="stat-source">BrightLocal 2024</div>
           </div>
           <div className="stat-col reveal">
-            <span className="stat-number" data-target="76" data-suffix="%">0%</span>
-            <div className="stat-label">of local searches result in a call within 24 hours</div>
-            <div className="stat-source">Google</div>
+            <span className="stat-number" data-target="88" data-suffix="%">0%</span>
+            <div className="stat-label">of local mobile searches lead to a call or visit within 24 hours</div>
+            <div className="stat-source">Think with Google</div>
           </div>
           <div className="stat-col reveal">
             <span className="stat-number" data-target="54" data-suffix="%">0%</span>
@@ -780,99 +784,18 @@ export default function LandingPage({ registrationOpen = false }: { registration
         </div>
       </section>
 
-      {/* GUARANTEE */}
-      <section className="guarantee">
-        <div className="guarantee-inner">
-          <div className="reveal">
-            <p className="guarantee-promise">
-              &ldquo;If you don&rsquo;t see real traffic in 90 days, we refund your last 2 months.&rdquo;
-            </p>
-            <p className="guarantee-no-hassle">No forms. No lengthy process. Just email us.</p>
-
-            <div className="check-row">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <circle cx="8" cy="8" r="7.5" stroke="#059669" strokeWidth="1" />
-                <path d="M5 8l2 2 4-4" stroke="#059669" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Minimum 3 check-ins per week for 90 days
-            </div>
-            <div className="check-row">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <circle cx="8" cy="8" r="7.5" stroke="#059669" strokeWidth="1" />
-                <path d="M5 8l2 2 4-4" stroke="#059669" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Real traffic (views, calls, clicks) visible in dashboard
-            </div>
-            <div className="check-row">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <circle cx="8" cy="8" r="7.5" stroke="#059669" strokeWidth="1" />
-                <path d="M5 8l2 2 4-4" stroke="#059669" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Email us. We verify your activity data. Refund issued within 48 hours.
-            </div>
-
-            <div className="cancel-anytime-row">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <rect x="4" y="9" width="12" height="9" rx="2" stroke="#0EA5E9" strokeWidth="1.5" />
-                <path d="M7 9V6a3 3 0 016 0v3" stroke="#0EA5E9" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-              <span className="cancel-anytime-text">Cancel anytime. No contracts.</span>
-            </div>
+      {/* PROOF STATEMENT */}
+      <section className="proof-statement">
+        <div className="proof-statement-inner">
+          <div className="proof-statement-text reveal">
+            <span className="proof-statement-label">How it actually works</span>
+            <h2 className="proof-statement-headline">Your crew does the work.<br /><em>That work becomes your marketing.</em></h2>
+            <p className="proof-statement-body">Every page ProjectCheckin publishes is built from a real job your team completed. Your photos. Your location. Your business name. Google indexes the actual work &mdash; not a blog post, not a stock photo, not a description someone wrote about your industry. The job itself is the content.</p>
+            <hr className="proof-statement-rule" />
+            <p className="proof-statement-closer">No one writes this for you. Your crew does &mdash; every time they check in.</p>
           </div>
-
-          {/* Dashboard mockup */}
-          <div className="dash-card reveal">
-            <div className="dash-title">Your Results This Month</div>
-
-            <div className="dash-metric-row">
-              <span className="dash-metric-label">Page Views</span>
-              <div className="dash-metric-right">
-                <div className="sparkline">
-                  <div className="spark-bar" style={{ height: '8px' }}></div>
-                  <div className="spark-bar" style={{ height: '12px' }}></div>
-                  <div className="spark-bar" style={{ height: '10px' }}></div>
-                  <div className="spark-bar" style={{ height: '16px' }}></div>
-                  <div className="spark-bar" style={{ height: '14px' }}></div>
-                  <div className="spark-bar" style={{ height: '20px' }}></div>
-                  <div className="spark-bar" style={{ height: '22px' }}></div>
-                </div>
-                <span className="dash-metric-val">847</span>
-              </div>
-            </div>
-
-            <div className="dash-metric-row">
-              <span className="dash-metric-label">Phone Taps</span>
-              <div className="dash-metric-right">
-                <div className="sparkline">
-                  <div className="spark-bar" style={{ height: '6px' }}></div>
-                  <div className="spark-bar" style={{ height: '8px' }}></div>
-                  <div className="spark-bar" style={{ height: '7px' }}></div>
-                  <div className="spark-bar" style={{ height: '10px' }}></div>
-                  <div className="spark-bar" style={{ height: '14px' }}></div>
-                  <div className="spark-bar" style={{ height: '16px' }}></div>
-                  <div className="spark-bar" style={{ height: '18px' }}></div>
-                </div>
-                <span className="dash-metric-val">23</span>
-              </div>
-            </div>
-
-            <div className="dash-metric-row">
-              <span className="dash-metric-label">Website Clicks</span>
-              <div className="dash-metric-right">
-                <div className="sparkline">
-                  <div className="spark-bar" style={{ height: '5px' }}></div>
-                  <div className="spark-bar" style={{ height: '9px' }}></div>
-                  <div className="spark-bar" style={{ height: '8px' }}></div>
-                  <div className="spark-bar" style={{ height: '12px' }}></div>
-                  <div className="spark-bar" style={{ height: '11px' }}></div>
-                  <div className="spark-bar" style={{ height: '15px' }}></div>
-                  <div className="spark-bar" style={{ height: '20px' }}></div>
-                </div>
-                <span className="dash-metric-val">41</span>
-              </div>
-            </div>
-
-            <div className="dash-trend">&#8593; 34% from last month</div>
+          <div className="proof-statement-photo reveal">
+            <img src="/images/lp-contractor-results.png" alt="Contractor reviewing job results on phone" />
           </div>
         </div>
       </section>
@@ -1000,7 +923,7 @@ export default function LandingPage({ registrationOpen = false }: { registration
                     <td className="cell-free"></td><td className="cell-pro"></td><td className="cell-elite"></td><td className="cell-titan"></td>
                   </tr>
                   <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Full SEO optimization per page</td>
+                    <td className="pricing-feature-name">Each job page built for Google search</td>
                     <td className="cell-free"><PDash /></td>
                     <td className="cell-pro"><PCheck /></td>
                     <td className="cell-elite"><PCheck /></td>
@@ -1021,7 +944,7 @@ export default function LandingPage({ registrationOpen = false }: { registration
                     <td className="cell-titan"><PCheck /></td>
                   </tr>
                   <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">90-day results guarantee</td>
+                    <td className="pricing-feature-name">Cancel any time</td>
                     <td className="cell-free"><PDash /></td>
                     <td className="cell-pro"><PCheck /></td>
                     <td className="cell-elite"><PCheck /></td>
@@ -1037,22 +960,22 @@ export default function LandingPage({ registrationOpen = false }: { registration
                     <td className="pricing-feature-name">Google Business Profile auto-posts</td>
                     <td className="cell-free"><PDash /></td>
                     <td className="cell-pro"><PDash /></td>
-                    <td className="cell-elite"><PCheck /></td>
-                    <td className="cell-titan"><PCheck /></td>
+                    <td className="cell-elite"><CSBadge /></td>
+                    <td className="cell-titan"><CSBadge /></td>
                   </tr>
                   <tr className="pricing-feature-row">
                     <td className="pricing-feature-name">Post-job review request texts</td>
                     <td className="cell-free"><PDash /></td>
                     <td className="cell-pro"><PDash /></td>
-                    <td className="cell-elite"><PCheck /></td>
-                    <td className="cell-titan"><PCheck /></td>
+                    <td className="cell-elite"><CSBadge /></td>
+                    <td className="cell-titan"><CSBadge /></td>
                   </tr>
                   <tr className="pricing-feature-row">
                     <td className="pricing-feature-name">Before/after photo tagging</td>
                     <td className="cell-free"><PDash /></td>
                     <td className="cell-pro"><PDash /></td>
-                    <td className="cell-elite"><PCheck /></td>
-                    <td className="cell-titan"><PCheck /></td>
+                    <td className="cell-elite"><CSBadge /></td>
+                    <td className="cell-titan"><CSBadge /></td>
                   </tr>
 
                   {/* GROUP: Scale */}
@@ -1065,21 +988,21 @@ export default function LandingPage({ registrationOpen = false }: { registration
                     <td className="cell-free"><PDash /></td>
                     <td className="cell-pro"><PDash /></td>
                     <td className="cell-elite"><PDash /></td>
-                    <td className="cell-titan"><PCheck /></td>
+                    <td className="cell-titan"><CSBadge /></td>
                   </tr>
                   <tr className="pricing-feature-row">
                     <td className="pricing-feature-name">CRM &amp; QuickBooks integration</td>
                     <td className="cell-free"><PDash /></td>
                     <td className="cell-pro"><PDash /></td>
                     <td className="cell-elite"><PDash /></td>
-                    <td className="cell-titan"><PCheck /></td>
+                    <td className="cell-titan"><CSBadge /></td>
                   </tr>
                   <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">White-label widget</td>
+                    <td className="pricing-feature-name">Website integration</td>
                     <td className="cell-free"><PDash /></td>
                     <td className="cell-pro"><PDash /></td>
                     <td className="cell-elite"><PDash /></td>
-                    <td className="cell-titan"><PCheck /></td>
+                    <td className="cell-titan"><CSBadge /></td>
                   </tr>
                   <tr className="pricing-feature-row">
                     <td className="pricing-feature-name">Multi-location support</td>

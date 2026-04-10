@@ -640,7 +640,10 @@ export default function Dashboard() {
     const citySlug = slugify(checkIn.city || '')
     const stateSlug = slugify(checkIn.state || '')
     const doorTypeSlug = slugify(checkIn.doorType || 'job')
-    return `${baseUrl}/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${doorTypeSlug}-${checkIn.id}`
+    const slug = orgSlug
+      ? `${doorTypeSlug}-${orgSlug}-${checkIn.id}`
+      : `${doorTypeSlug}-${checkIn.id}`
+    return `${baseUrl}/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${slug}`
   }
 
   const formatDate = (ts: string) => {

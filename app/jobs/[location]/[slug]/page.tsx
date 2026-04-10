@@ -160,7 +160,8 @@ export default async function JobPage(
     const citySlug = slugify(job.city || '')
     const stateSlug = slugify(job.state || '')
     const doorTypeSlug = slugify(job.doorType || 'job')
-    const jobPath = `/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${doorTypeSlug}-${job.id}`
+    const relatedJobSlug = orgSlug ? `${doorTypeSlug}-${orgSlug}-${job.id}` : `${doorTypeSlug}-${job.id}`
+    const jobPath = `/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${relatedJobSlug}`
 
     return {
       id: job.id,

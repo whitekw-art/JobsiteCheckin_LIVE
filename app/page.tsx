@@ -41,15 +41,15 @@ const faqJsonLd = {
       name: 'How many jobs do we need to see results?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Consistency matters more than volume. Even a job or two a week adds up to real Google presence over 90 days. The more you check in, the faster your presence builds — but there\'s no minimum to get started.',
+        text: 'Consistency matters more than volume. Every check-in creates a permanent, indexed page with your business name and location on it. A job or two a week builds a library of pages that compounds over time — the more you publish, the stronger your presence grows.',
       },
     },
     {
       '@type': 'Question',
-      name: 'How does the 90-day guarantee work?',
+      name: 'Is there a contract or commitment?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Check in at least 3 times per week for 90 days. If your dashboard doesn\'t show real traffic — page views, phone taps, or website clicks — email us. We verify your activity data and refund your last 2 months. No forms, no arguments.',
+        text: 'No contract, no commitment, no cancellation fees. Cancel any time from your account page. You keep every page and every photo you\'ve published — they stay indexed on Google even after you cancel.',
       },
     },
     {
