@@ -914,6 +914,8 @@
 
 /* Shell content area (Team, Reporting, Account pages) */
 .db-shell-content {
+  flex: 1;
+  overflow-y: auto;
   padding: 20px 24px 40px;
   max-width: 960px;
 }
@@ -1156,4 +1158,143 @@
   border: 1px solid rgba(220,38,38,.2);
   border-radius: 6px;
   padding: 8px 12px;
+}
+
+/* ─── MOBILE HAMBURGER (hidden on desktop) ─── */
+.db-hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--t2);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-right: 8px;
+  transition: background .12s, color .12s;
+}
+.db-hamburger:hover { background: var(--surface-3); color: var(--t1); }
+
+/* ─── SIDEBAR OVERLAY (hidden on desktop) ─── */
+.db-sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 150;
+  cursor: pointer;
+}
+.db-sidebar-overlay.is-visible { display: block; }
+
+/* ════════════════════════════════════
+   MOBILE ≤ 768px
+════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Root — switch from fixed overlay shell to normal page flow */
+  .db-root {
+    position: relative;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  /* Sidebar — slides in as fixed overlay on mobile */
+  .db-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform .25s cubic-bezier(.4, 0, .2, 1);
+    width: 240px;
+    box-shadow: none;
+  }
+  .db-sidebar.is-open {
+    transform: translateX(0);
+    box-shadow: 6px 0 32px rgba(0,0,0,.22);
+  }
+
+  /* Overlay sits behind sidebar */
+  .db-sidebar-overlay { z-index: 199; }
+
+  /* Main — full width, allow natural scroll */
+  .db-main {
+    overflow: visible;
+    width: 100%;
+  }
+
+  /* Topbar — sticky so it stays visible while scrolling */
+  .db-topbar {
+    padding: 0 14px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .db-hamburger { display: flex; }
+
+  /* Shell content (check-in, team, reporting, account) */
+  .db-shell-content {
+    padding: 16px 14px 80px;
+    overflow: visible;
+    flex: unset;
+  }
+
+  /* Stats row — 2×2 on mobile */
+  .db-stats-row { flex-wrap: wrap; }
+  .db-stat-cell {
+    padding: 10px 16px;
+    flex-basis: 50%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .db-stat-cell:nth-child(odd)  { border-right: 1px solid var(--border); }
+  .db-stat-cell:last-child      { border-bottom: none; }
+  .db-stat-cell:nth-last-child(2):nth-child(odd) { border-bottom: none; }
+
+  /* Portfolio bar */
+  .db-portfolio-bar {
+    margin: 10px 14px 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  /* Filter bar */
+  .db-filter-bar {
+    padding: 8px 14px;
+    height: auto;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .db-filter-tabs { flex-wrap: wrap; }
+  .db-fselect    { font-size: 11px; }
+  .db-fsearch, .db-fsearch:focus { width: 120px; }
+
+  /* Jobs wrap */
+  .db-jobs-wrap {
+    overflow: visible;
+    padding: 10px 14px 40px;
+  }
+
+  /* Job card row — hide status chip, compress actions */
+  .db-card-row {
+    grid-template-columns: 44px 1fr auto 36px;
+  }
+  .db-card-status { display: none; }
+  .db-card-action { padding: 0 2px; }
+  .db-btn-publish { padding: 5px 10px; font-size: 11px; }
+  .db-btn-unpub   { padding: 4px 10px; font-size: 11px; }
+
+  /* Expanded detail — single column */
+  .db-detail-grid { grid-template-columns: 1fr; }
+  .db-detail-col + .db-detail-col {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Typography */
+  .db-page-title { font-size: 18px; }
 }

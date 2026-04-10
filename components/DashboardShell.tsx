@@ -72,10 +72,19 @@ interface Props {
   action?: React.ReactNode
 }
 
+function IcoMenu() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <path d="M2 4h12M2 8h12M2 12h12"/>
+    </svg>
+  )
+}
+
 export default function DashboardShell({ title, children, action }: Props) {
   const { data: session } = useSession()
   const pathname = usePathname()
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Sync theme with localStorage so it persists across pages
   useEffect(() => {
@@ -108,8 +117,15 @@ export default function DashboardShell({ title, children, action }: Props) {
 
   return (
     <div className="db-root">
+      {/* ── Mobile sidebar overlay ─────────────────────────────────────────── */}
+      <div
+        className={`db-sidebar-overlay${sidebarOpen ? ' is-visible' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+        aria-hidden="true"
+      />
+
       {/* ── Sidebar ────────────────────────────────────────────────────────── */}
-      <aside className="db-sidebar">
+      <aside className={`db-sidebar${sidebarOpen ? ' is-open' : ''}`}>
         <div className="db-sidebar-logo">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="db-logo-img" src="/logo.png" alt="ProjectCheckin logo" />
@@ -119,18 +135,18 @@ export default function DashboardShell({ title, children, action }: Props) {
         <nav className="db-sidebar-nav">
           <span className="db-nav-label">Workspace</span>
 
-          <Link className="db-nav-item" href="/check-in">
+          <Link className="db-nav-item" href="/check-in" onClick={() => setSidebarOpen(false)}>
             <IcoCheckin />
             Check-In
           </Link>
 
-          <Link className={navItem('/dashboard')} href="/dashboard">
+          <Link className={navItem('/dashboard')} href="/dashboard" onClick={() => setSidebarOpen(false)}>
             <IcoJobs />
             Jobs
           </Link>
 
           {canPublish && (
-            <Link className={navItem('/dashboard/team')} href="/dashboard/team">
+            <Link className={navItem('/dashboard/team')} href="/dashboard/team" onClick={() => setSidebarOpen(false)}>
               <IcoTeam />
               Team
             </Link>
@@ -139,7 +155,7 @@ export default function DashboardShell({ title, children, action }: Props) {
           <span className="db-nav-label" style={{ marginTop: 8 }}>Analytics</span>
 
           {isOwner && (
-            <Link className={navItem('/reporting')} href="/reporting">
+            <Link className={navItem('/reporting')} href="/reporting" onClick={() => setSidebarOpen(false)}>
               <IcoReporting />
               Reporting
             </Link>
@@ -148,13 +164,13 @@ export default function DashboardShell({ title, children, action }: Props) {
           <span className="db-nav-label" style={{ marginTop: 8 }}>Settings</span>
 
           {isOwner && (
-            <Link className={navItem('/account')} href="/account">
+            <Link className={navItem('/account')} href="/account" onClick={() => setSidebarOpen(false)}>
               <IcoAccount />
               Account
             </Link>
           )}
 
-          <button className="db-nav-item" onClick={() => signOut()}>
+          <button className="db-nav-item" onClick={() => { setSidebarOpen(false); signOut() }}>
             <IcoSignOut />
             Sign Out
           </button>
@@ -180,6 +196,13 @@ export default function DashboardShell({ title, children, action }: Props) {
       {/* ── Main ───────────────────────────────────────────────────────────── */}
       <div className="db-main">
         <div className="db-topbar">
+          <button
+            className="db-hamburger"
+            onClick={() => setSidebarOpen(o => !o)}
+            aria-label="Toggle menu"
+          >
+            <IcoMenu />
+          </button>
           <h1 className="db-page-title">{title}</h1>
           {action && <div className="db-topbar-right">{action}</div>}
         </div>
