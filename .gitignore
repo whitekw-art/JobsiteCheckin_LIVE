@@ -32,6 +32,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# temp photo uploads — stored in Supabase, not git
+/public/temp-photos
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
