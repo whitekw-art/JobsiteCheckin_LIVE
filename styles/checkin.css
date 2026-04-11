@@ -1,0 +1,286 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+/* Reuse the same CSS variable system as the dashboard */
+[data-theme="light"] {
+  --app-bg:     #F4F7FA;
+  --surface:    #FFFFFF;
+  --border:     #E8ECF1;
+  --border-2:   #D3DCE6;
+  --t1: #0F172A;
+  --t2: #475569;
+  --t3: #94A3B8;
+  --sky:        #0EA5E9;
+  --sky-dim:    rgba(14,165,233,.08);
+  --sky-text:   #0284C7;
+  --orange:     #F97316;
+  --orange-h:   #EA6C0A;
+  --green:      #16A34A;
+  --green-bg:   #F0FDF4;
+  --red:        #DC2626;
+  --red-bg:     #FEF2F2;
+  --shadow-card: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+}
+
+/* ════════════════════════════════════
+   PAGE SHELL
+════════════════════════════════════ */
+.ci-root {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--app-bg);
+  color: var(--t1);
+  min-height: 100vh;
+  padding: 24px 16px 48px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.ci-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  max-width: 480px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+/* ── Card header ── */
+.ci-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ci-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.ci-brand {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -.2px;
+}
+
+.ci-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--t1);
+  margin-left: auto;
+}
+
+/* ── Form body ── */
+.ci-body {
+  padding: 20px 24px 24px;
+}
+
+.ci-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Field group ── */
+.ci-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ci-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--t3);
+}
+
+.ci-input,
+.ci-select,
+.ci-textarea {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 15px;
+  color: var(--t1);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  outline: none;
+  transition: border-color .14s;
+  min-height: 44px;
+  appearance: none;
+}
+.ci-input:focus,
+.ci-select:focus,
+.ci-textarea:focus { border-color: var(--sky); }
+.ci-input::placeholder,
+.ci-textarea::placeholder { color: var(--t3); }
+.ci-input[readonly] { background: var(--app-bg); color: var(--t2); }
+
+.ci-select {
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394A3B8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+.ci-textarea {
+  resize: vertical;
+  min-height: 88px;
+  line-height: 1.5;
+}
+
+/* ── Row layouts ── */
+.ci-row {
+  display: flex;
+  gap: 10px;
+}
+.ci-row .ci-field { flex: 1; }
+
+/* ── Photo section ── */
+.ci-photo-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ci-photo-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* Camera button — primary */
+.ci-btn-camera {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--orange);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  cursor: pointer;
+  min-height: 44px;
+  transition: background .14s;
+}
+.ci-btn-camera:hover { background: var(--orange-h); }
+
+/* Library button — secondary */
+.ci-btn-library {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--t2);
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  cursor: pointer;
+  min-height: 44px;
+  transition: all .14s;
+}
+.ci-btn-library:hover { background: var(--app-bg); color: var(--t1); border-color: var(--border-2); }
+
+/* Hidden file inputs */
+.ci-file-input { display: none; }
+
+/* Photo count badge */
+.ci-photo-count {
+  font-size: 12px;
+  color: var(--sky-text);
+  font-weight: 600;
+  background: var(--sky-dim);
+  border-radius: 20px;
+  padding: 3px 10px;
+  display: inline-block;
+  align-self: flex-start;
+}
+
+/* Photo preview grid */
+.ci-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.ci-preview-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.ci-preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ci-preview-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0,0,0,.55);
+  border: none;
+  color: #fff;
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  line-height: 1;
+}
+.ci-preview-remove:hover { background: var(--red); }
+
+/* ── Divider ── */
+.ci-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* ── Submit button ── */
+.ci-btn-submit {
+  width: 100%;
+  background: var(--sky-text);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 13px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  cursor: pointer;
+  min-height: 48px;
+  transition: opacity .14s;
+}
+.ci-btn-submit:hover:not(:disabled) { opacity: .9; }
+.ci-btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Message ── */
+.ci-message {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 0 0;
+}
+.ci-message.success { color: var(--green); }
+.ci-message.error   { color: var(--red); }

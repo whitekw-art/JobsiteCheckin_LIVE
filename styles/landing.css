@@ -4,8 +4,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:          #F0F9FF;
-  --bg-alt:      #E0F2FE;
+  --bg:          #FAFCFF;
+  --bg-alt:      #F4F8FD;
   --primary:     #0EA5E9;
   --secondary:   #38BDF8;
   --cta:         #F97316;
@@ -128,11 +128,20 @@ nav.scrolled {
   justify-content: space-between;
 }
 .nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 20px;
   font-weight: 700;
   color: var(--navy);
   text-decoration: none;
   letter-spacing: -0.01em;
+}
+.nav-logo img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  mix-blend-mode: multiply;
 }
 .nav-links {
   display: flex;
@@ -197,7 +206,7 @@ nav.scrolled {
 .hero {
   padding-top: calc(64px + 56px);
   padding-bottom: 120px;
-  background: var(--bg);
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg) 75%, #ffffff 100%);
 }
 .hero-inner {
   max-width: var(--max-w);
@@ -452,7 +461,7 @@ nav.scrolled {
   margin-bottom: 16px;
 }
 .job-photo-thumb {
-  height: 54px;
+  height: 140px;
   border-radius: 6px;
   background: var(--bg-alt);
   border: 1px solid rgba(14,165,233,0.15);
@@ -606,7 +615,7 @@ nav.scrolled {
    STATS
 ============================================= */
 .stats {
-  background: var(--bg-alt);
+  background: linear-gradient(180deg, #ffffff 0%, var(--bg-alt) 12%, var(--bg-alt) 88%, #ffffff 100%);
   padding: 120px 0;
 }
 .stats-grid {
@@ -1360,6 +1369,103 @@ nav.scrolled {
   font-size: 16px;
   font-weight: 700;
   color: #0EA5E9;
+}
+
+/* =============================================
+   PROOF STATEMENT
+============================================= */
+.proof-statement {
+  background: var(--white);
+  padding: 100px 0;
+  border-top: 1px solid #E2ECF4;
+  border-bottom: 1px solid #E2ECF4;
+}
+.proof-statement-inner {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 0 var(--px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+.proof-statement-text { text-align: left; }
+.proof-statement-photo {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 12px 48px rgba(14,165,233,0.14);
+}
+.proof-statement-photo img {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center 30%;
+}
+@media (max-width: 900px) {
+  .proof-statement-inner {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+  .proof-statement-text { text-align: center; }
+}
+.proof-statement-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #38BDF8;
+  margin-bottom: 28px;
+  display: block;
+}
+.proof-statement-headline {
+  font-size: clamp(32px, 5vw, 54px);
+  font-weight: 800;
+  color: var(--navy);
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin-bottom: 28px;
+}
+.proof-statement-headline em {
+  font-style: normal;
+  color: var(--primary);
+}
+.proof-statement-body {
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--muted);
+  max-width: 620px;
+  margin: 0 0 40px;
+}
+.proof-statement-rule {
+  width: 48px;
+  height: 2px;
+  background: #38BDF8;
+  margin: 0 0 28px;
+  border: none;
+}
+.proof-statement-closer {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+@media (max-width: 640px) {
+  .proof-statement { padding: 72px 0; }
+}
+
+/* Coming Soon badge */
+.cs-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #0EA5E9;
+  background: rgba(14,165,233,0.08);
+  border: 1px solid rgba(14,165,233,0.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
 }
 
 /* Dashboard mockup */
@@ -2129,4 +2235,63 @@ footer {
   .pricing-feature-name {
     font-size: 12px;
   }
+}
+
+/* ─── HERO FULL-BLEED PHOTO ─── */
+.hero-fullbleed-wrap {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  max-height: 460px;
+}
+.hero-fullbleed-wrap img {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center 35%;
+  max-height: 460px;
+}
+.hero-fullbleed-caption {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, rgba(12,74,110,0.72) 0%, transparent 100%);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 32px 40px 20px;
+  letter-spacing: 0.01em;
+}
+
+/* ─── HOW IT WORKS SCENE PHOTO ─── */
+.how-scene-wrap {
+  margin-bottom: 56px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.28);
+  position: relative;
+  max-height: 360px;
+}
+.how-scene-wrap img {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center 45%;
+  max-height: 360px;
+  filter: brightness(0.88);
+}
+.how-scene-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, rgba(12,74,110,0.75) 0%, transparent 100%);
+  padding: 40px 32px 24px;
+  color: rgba(255,255,255,0.85);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 640px) {
+  .how-scene-wrap { max-height: 220px; }
+  .how-scene-wrap img { max-height: 220px; }
+  .hero-fullbleed-caption { font-size: 15px; padding: 24px 20px 16px; }
 }
