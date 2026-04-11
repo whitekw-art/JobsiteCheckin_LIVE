@@ -76,7 +76,7 @@ export async function generateMetadata(
 export default async function JobPage(
   { params }: { params: Promise<{ location: string; slug: string }> }
 ) {
-  const { slug } = await params
+  const { slug, location } = await params
 
   const uuidMatch = slug.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)
   const checkInId = uuidMatch ? uuidMatch[0] : ''
@@ -176,6 +176,38 @@ export default async function JobPage(
 
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
 
+  // Build BreadcrumbList JSON-LD
+  const breadcrumbItems: Array<{ '@type': string; position: number; name: string; item: string }> = [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: `${baseUrl}/` },
+  ]
+  if (orgSlug) {
+    breadcrumbItems.push({
+      '@type': 'ListItem',
+      position: 2,
+      name: `${organization?.name || 'Portfolio'}`,
+      item: `${baseUrl}/portfolio/${orgSlug}`,
+    })
+    breadcrumbItems.push({
+      '@type': 'ListItem',
+      position: 3,
+      name: effectiveTitle,
+      item: `${baseUrl}/jobs/${location}/${slug}`,
+    })
+  } else {
+    breadcrumbItems.push({
+      '@type': 'ListItem',
+      position: 2,
+      name: effectiveTitle,
+      item: `${baseUrl}/jobs/${location}/${slug}`,
+    })
+  }
+
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: breadcrumbItems,
+  }
+
   // Build JSON-LD structured data
   const localBusiness: Record<string, any> = {
     '@type': 'LocalBusiness',
@@ -233,6 +265,10 @@ export default async function JobPage(
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
       <CheckInPageViewTracker checkInId={checkInId} />
       <JobDetailClient
