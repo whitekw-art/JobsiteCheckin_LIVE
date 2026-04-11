@@ -175,12 +175,25 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
     },
   }
 
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${baseUrl}/` },
+      { '@type': 'ListItem', position: 2, name: `${org.name} Portfolio`, item: `${baseUrl}/portfolio/${orgSlug}` },
+    ],
+  }
+
   return (
     <main className="min-h-screen bg-surface-50">
       {/* JSON-LD */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
       {/* All visual content rendered in the client component */}

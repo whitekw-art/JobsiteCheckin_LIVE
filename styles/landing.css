@@ -4,8 +4,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:          #F0F9FF;
-  --bg-alt:      #E0F2FE;
+  --bg:          #FAFCFF;
+  --bg-alt:      #F4F8FD;
   --primary:     #0EA5E9;
   --secondary:   #38BDF8;
   --cta:         #F97316;
@@ -206,7 +206,7 @@ nav.scrolled {
 .hero {
   padding-top: calc(64px + 56px);
   padding-bottom: 120px;
-  background: var(--bg);
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg) 75%, #ffffff 100%);
 }
 .hero-inner {
   max-width: var(--max-w);
@@ -615,7 +615,7 @@ nav.scrolled {
    STATS
 ============================================= */
 .stats {
-  background: var(--bg-alt);
+  background: linear-gradient(180deg, #ffffff 0%, var(--bg-alt) 12%, var(--bg-alt) 88%, #ffffff 100%);
   padding: 120px 0;
 }
 .stats-grid {
