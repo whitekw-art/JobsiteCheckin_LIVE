@@ -227,6 +227,129 @@ function IcoDownload() {
     </svg>
   )
 }
+function IcoGbp() {
+  return (
+    <span style={{ fontSize: 10, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.3px' }}>
+      <span style={{ color: '#4285F4' }}>G</span>
+    </span>
+  )
+}
+
+function GbpPostModal({
+  checkIn,
+  publicUrl,
+  onClose,
+}: {
+  checkIn: CheckIn
+  publicUrl: string
+  onClose: () => void
+}) {
+  const [copied, setCopied] = useState(false)
+
+  const location = [checkIn.city, checkIn.state].filter(Boolean).join(', ')
+  const jobType = checkIn.doorType || 'Job'
+  const postText = [
+    `${jobType} completed${location ? ` in ${location}` : ''}.`,
+    checkIn.notes?.trim() ? checkIn.notes.trim() : null,
+    `See the full job details and photos: ${publicUrl}`,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+
+  function handleCopy() {
+    navigator.clipboard.writeText(postText)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)',
+        backdropFilter: 'blur(3px)', zIndex: 9999,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'var(--surface)', borderRadius: 14, maxWidth: 480, width: '100%',
+          padding: '24px', boxShadow: '0 20px 60px rgba(0,0,0,.22)',
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          border: '1px solid var(--border)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--t1)' }}>Post to Google Business</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Copy the text below, then open your Google Business Profile to create a new post.</div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', padding: 4, lineHeight: 1 }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <div style={{
+          background: 'var(--surface-2)', border: '1px solid var(--border)',
+          borderRadius: 8, padding: '12px 14px', fontSize: 13, color: 'var(--t1)',
+          lineHeight: 1.6, marginBottom: 14, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        }}>
+          {postText}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={handleCopy}
+            className="db-shell-btn"
+            style={{ flex: 1, height: 38, fontSize: 13 }}
+          >
+            {copied ? 'Copied!' : 'Copy post text'}
+          </button>
+          <a
+            href="https://business.google.com"
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              flex: 1, height: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              background: '#fff', color: '#3c4043', border: '1px solid #dadce0',
+              borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none',
+              boxShadow: '0 1px 2px rgba(0,0,0,.06)',
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '-0.3px', lineHeight: 1 }}>
+              <span style={{ color: '#4285F4' }}>G</span>
+              <span style={{ color: '#EA4335' }}>o</span>
+              <span style={{ color: '#FBBC05' }}>o</span>
+              <span style={{ color: '#4285F4' }}>g</span>
+              <span style={{ color: '#34A853' }}>l</span>
+              <span style={{ color: '#EA4335' }}>e</span>
+            </span>
+            Open Google Business
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+              <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+          </a>
+        </div>
+
+        <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)', fontSize: 12, color: 'var(--t3)', lineHeight: 1.5 }}>
+          Want to skip this step?{' '}
+          <a href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
+            Connect your Google Business Profile
+          </a>
+          {' '}in Account &rsaquo; Connections to post automatically when you publish jobs.
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function IcoArrow() {
   return (
     <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -282,9 +405,14 @@ export default function Dashboard() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [activeFilter, setActiveFilter] = useState<'all' | 'live' | 'draft'>('all')
   const [installerFilter, setInstallerFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState<'all' | '30' | '90'>('all')
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'address'>('newest')
   const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const JOBS_PER_PAGE = 20
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [gbpPostId, setGbpPostId] = useState<string | null>(null)
+  const [gbpCopied, setGbpCopied] = useState(false)
 
   // Address editing (keyed by checkIn.id)
   const [editAddresses, setEditAddresses] = useState<Record<string, EditAddr>>({})
@@ -356,12 +484,18 @@ export default function Dashboard() {
   )
 
   const filteredCheckIns = useMemo(() => {
+    const cutoff = dateFilter !== 'all'
+      ? new Date(Date.now() - Number(dateFilter) * 24 * 60 * 60 * 1000)
+      : null
+
     let result = checkIns.filter((c) => {
       const statusMatch =
         activeFilter === 'all' ||
         (activeFilter === 'live' ? c.isPublic : !c.isPublic)
       const installerMatch =
         installerFilter === 'all' || c.installer === installerFilter
+      const dateMatch =
+        !cutoff || new Date(c.timestamp) >= cutoff
       const q = searchQuery.toLowerCase()
       const searchMatch =
         !q ||
@@ -370,7 +504,7 @@ export default function Dashboard() {
           .join(' ')
           .toLowerCase()
           .includes(q)
-      return statusMatch && installerMatch && searchMatch
+      return statusMatch && installerMatch && dateMatch && searchMatch
     })
 
     if (sortOrder === 'newest')
@@ -387,7 +521,7 @@ export default function Dashboard() {
       )
 
     return result
-  }, [checkIns, activeFilter, installerFilter, sortOrder, searchQuery])
+  }, [checkIns, activeFilter, installerFilter, dateFilter, sortOrder, searchQuery])
 
   const liveCount  = checkIns.filter((c) => c.isPublic).length
   const draftCount = checkIns.filter((c) => !c.isPublic).length
@@ -668,11 +802,19 @@ export default function Dashboard() {
       .filter(Boolean)
       .join(', ') || 'Unknown address'
 
+  const totalFiltered = filteredCheckIns.length
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / JOBS_PER_PAGE))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginatedCheckIns = filteredCheckIns.slice(
+    (safePage - 1) * JOBS_PER_PAGE,
+    safePage * JOBS_PER_PAGE
+  )
+
   const isFiltered =
-    activeFilter !== 'all' || installerFilter !== 'all' || searchQuery.trim() !== ''
+    activeFilter !== 'all' || installerFilter !== 'all' || dateFilter !== 'all' || searchQuery.trim() !== ''
   const resultsLabel = isFiltered
-    ? `Showing ${filteredCheckIns.length} of ${checkIns.length} jobs`
-    : 'Recent Jobs'
+    ? `${totalFiltered} job${totalFiltered !== 1 ? 's' : ''} match${totalFiltered === 1 ? 'es' : ''} your filters`
+    : `All Jobs (${checkIns.length})`
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -802,16 +944,22 @@ export default function Dashboard() {
               <div className="db-portfolio-left">
                 <div className="db-portfolio-dot" />
                 <span className="db-portfolio-txt">
-                  Portfolio live at <strong>{portfolioUrl.replace(/^https?:\/\//, '')}</strong>
+                  Your public portfolio is live — {publishedCount} {publishedCount === 1 ? 'job' : 'jobs'} indexed on Google
                 </span>
               </div>
               <a
-                className="db-portfolio-link"
                 href={portfolioUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '6px 14px', borderRadius: 7, textDecoration: 'none',
+                  fontSize: 12, fontWeight: 700,
+                  background: 'var(--green-bg)', border: '1.5px solid rgba(22,163,74,.25)',
+                  color: 'var(--green)',
+                }}
               >
-                View public page
+                View Portfolio
                 <IcoArrow />
               </a>
             </div>
@@ -824,7 +972,7 @@ export default function Dashboard() {
                 <button
                   key={f}
                   className={`db-ftab${activeFilter === f ? ' active' : ''}`}
-                  onClick={() => setActiveFilter(f)}
+                  onClick={() => { setActiveFilter(f); setCurrentPage(1) }}
                 >
                   {f.charAt(0).toUpperCase() + f.slice(1)}
                   <span className="db-ftab-count">
@@ -837,7 +985,7 @@ export default function Dashboard() {
               <select
                 className="db-fselect"
                 value={installerFilter}
-                onChange={(e) => setInstallerFilter(e.target.value)}
+                onChange={(e) => { setInstallerFilter(e.target.value); setCurrentPage(1) }}
               >
                 <option value="all">All Installers</option>
                 {uniqueInstallers.map((name) => (
@@ -845,6 +993,15 @@ export default function Dashboard() {
                     {name}
                   </option>
                 ))}
+              </select>
+              <select
+                className="db-fselect"
+                value={dateFilter}
+                onChange={(e) => { setDateFilter(e.target.value as typeof dateFilter); setCurrentPage(1) }}
+              >
+                <option value="all">All time</option>
+                <option value="90">Last 90 days</option>
+                <option value="30">Last 30 days</option>
               </select>
               <select
                 className="db-fselect"
@@ -862,7 +1019,7 @@ export default function Dashboard() {
                   type="text"
                   placeholder="Search address..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1) }}
                 />
               </div>
             </div>
@@ -885,7 +1042,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="db-jobs-list">
-                {filteredCheckIns.map((checkIn) => {
+                {paginatedCheckIns.map((checkIn) => {
                   const { mo, dy } = formatDate(checkIn.timestamp)
                   const address = buildAddress(checkIn)
                   const isExpanded = expandedIds.has(checkIn.id)
@@ -1022,6 +1179,28 @@ export default function Dashboard() {
                                 Cancel
                               </button>
                             </div>
+
+                            {(() => {
+                              const mapsUrl = checkIn.latitude && checkIn.longitude
+                                ? `https://maps.google.com/?q=${checkIn.latitude},${checkIn.longitude}`
+                                : [editAddr.street, editAddr.city, editAddr.state, editAddr.zip].filter(Boolean).length > 0
+                                  ? `https://maps.google.com/?q=${encodeURIComponent([editAddr.street, editAddr.city, editAddr.state, editAddr.zip].filter(Boolean).join(', '))}`
+                                  : null
+                              return mapsUrl ? (
+                                <a
+                                  href={mapsUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: 'var(--sky-text)', textDecoration: 'none', marginTop: 6 }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+                                  </svg>
+                                  View on Google Maps
+                                </a>
+                              ) : null
+                            })()}
 
                             {checkIn.locationSource === 'DEVICE' && (
                               <div className="db-location-warning">
@@ -1162,6 +1341,19 @@ export default function Dashboard() {
                                   {downloadingId === checkIn.id ? 'Preparing\u2026' : 'Download All'}
                                 </button>
                               )}
+                              {checkIn.isPublic && (
+                                <button
+                                  className="db-btn-ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setGbpPostId(checkIn.id)
+                                    setGbpCopied(false)
+                                  }}
+                                >
+                                  <IcoGbp />
+                                  Post to Google Business
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1169,6 +1361,33 @@ export default function Dashboard() {
                     </div>
                   )
                 })}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0 8px', borderTop: '1px solid var(--border)', marginTop: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--t3)' }}>
+                  Page {safePage} of {totalPages} &middot; {totalFiltered} jobs
+                </span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    className="db-btn-ghost"
+                    disabled={safePage === 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    style={{ opacity: safePage === 1 ? 0.4 : 1 }}
+                  >
+                    &larr; Prev
+                  </button>
+                  <button
+                    className="db-btn-ghost"
+                    disabled={safePage === totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    style={{ opacity: safePage === totalPages ? 0.4 : 1 }}
+                  >
+                    Next &rarr;
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -1192,6 +1411,17 @@ export default function Dashboard() {
           isPublishing={togglingId === publishModal.checkIn.id}
         />
       )}
+      {gbpPostId && (() => {
+        const ci = checkIns.find((c) => c.id === gbpPostId)
+        if (!ci) return null
+        return (
+          <GbpPostModal
+            checkIn={ci}
+            publicUrl={getPublicUrl(ci)}
+            onClose={() => setGbpPostId(null)}
+          />
+        )
+      })()}
     </>
   )
 }
