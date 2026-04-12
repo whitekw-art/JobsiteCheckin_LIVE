@@ -171,6 +171,7 @@ export default function JobDetailClient({
 
   const location = [city, state].filter(Boolean).join(', ')
   const fullLocation = [city, state, zip].filter(Boolean).join(', ')
+  const photoAltBase = [doorType, location].filter(Boolean).join(' in ') || 'Contractor job photo'
 
   // Keyboard support for lightbox
   useEffect(() => {
@@ -307,7 +308,7 @@ export default function JobDetailClient({
                 <div className="relative" style={{ height: 'min(60vh, 500px)' }}>
                   <Image
                     src={photos[featuredIndex]}
-                    alt={`${doorType} installation in ${city}, ${state} - photo ${featuredIndex + 1}`}
+                    alt={`${photoAltBase} - photo ${featuredIndex + 1}`}
                     fill
                     className="object-cover"
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 76rem"
@@ -347,7 +348,7 @@ export default function JobDetailClient({
                     >
                       <Image
                         src={url}
-                        alt={`${doorType} installation in ${city}, ${state} - thumbnail ${i + 1}`}
+                        alt={`${photoAltBase} - thumbnail ${i + 1}`}
                         width={80}
                         height={80}
                         className="w-full h-full object-cover"
@@ -659,7 +660,7 @@ function RelatedJobCard({ job, index }: { job: RelatedJob; index: number }) {
         {job.thumbnail ? (
           <Image
             src={job.thumbnail}
-            alt={`${job.doorType} in ${job.city}, ${job.state}`}
+            alt={[job.doorType, [job.city, job.state].filter(Boolean).join(', ')].filter(Boolean).join(' in ') || 'Contractor job photo'}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-300"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
@@ -854,7 +855,7 @@ function Lightbox({
       >
         <img
           src={photos[currentIndex]}
-          alt={`${doorType} installation in ${city}, ${state} - photo ${currentIndex + 1}`}
+          alt={`${photoAltBase} - photo ${currentIndex + 1}`}
           className="max-w-full max-h-[85vh] object-contain rounded-lg"
         />
       </div>
