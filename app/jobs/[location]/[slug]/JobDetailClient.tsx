@@ -797,6 +797,8 @@ function Lightbox({
   onNext: () => void
   onGoTo: (i: number) => void
 }) {
+  const location = [city, state].filter(Boolean).join(', ')
+  const photoAltBase = [doorType, location].filter(Boolean).join(' in ') || 'Contractor job photo'
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center"
