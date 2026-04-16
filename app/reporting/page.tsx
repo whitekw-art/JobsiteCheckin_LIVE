@@ -63,8 +63,60 @@ function pctDelta(recent: number, prev: number): { sign: '+' | '' | '−'; num: 
   return { sign: pct >= 0 ? '+' : '−', num: Math.abs(pct) }
 }
 
-// Donut using strokeDasharray on a circle (r=36, circ≈226.2)
-const DONUT_R = 36
+// ── Heatmap SVG (server-rendered, 7-col × 5-row calendar grid) ──────────────
+
+function HeatmapSvg({ series, padding = 5 }: { series: number[]; padding?: number }) {
+  const CELL = 14, GAP = 3, COLS = 7
+  const total = padding + series.length
+  const ROWS = Math.ceil(total / COLS)
+  const W = COLS * (CELL + GAP) - GAP        // 116
+  const H = ROWS * (CELL + GAP) - GAP        // 82 for 5 rows
+  const LABEL_H = 14
+  const LEGEND_Y = LABEL_H + H + 8
+  const SVG_H = LEGEND_Y + 12
+
+  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+
+  const cells: React.ReactNode[] = []
+  for (let i = 0; i < ROWS * COLS; i++) {
+    const col = i % COLS
+    const row = Math.floor(i / COLS)
+    const x = col * (CELL + GAP)
+    const y = LABEL_H + row * (CELL + GAP)
+    const dataIdx = i - padding
+    if (dataIdx < 0 || dataIdx >= series.length) continue
+    const val = series[dataIdx]
+    const fill = val === 0 ? 'var(--surface-3)'
+      : val === 1 ? 'rgba(14,165,233,.28)'
+      : val === 2 ? 'rgba(14,165,233,.62)'
+      : 'var(--sky)'
+    cells.push(<rect key={i} x={x} y={y} width={CELL} height={CELL} rx="2" fill={fill}/>)
+  }
+
+  return (
+    <svg viewBox={`0 0 ${W} ${SVG_H}`} width="100%" height={SVG_H} style={{ display: 'block' }}>
+      {dayLabels.map((label, col) => (
+        <text key={col} x={col * (CELL + GAP) + CELL / 2} y={10}
+          textAnchor="middle"
+          style={{ fontSize: 8.5, fill: 'var(--t3)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          {label}
+        </text>
+      ))}
+      {cells}
+      <text x={0} y={LEGEND_Y + 9}
+        style={{ fontSize: 8.5, fill: 'var(--t4)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Less</text>
+      <rect x={70} y={LEGEND_Y} width={9} height={9} rx="2" fill="var(--surface-3)"/>
+      <rect x={84} y={LEGEND_Y} width={9} height={9} rx="2" fill="rgba(14,165,233,.28)"/>
+      <rect x={98} y={LEGEND_Y} width={9} height={9} rx="2" fill="rgba(14,165,233,.62)"/>
+      <rect x={112} y={LEGEND_Y} width={9} height={9} rx="2" fill="var(--sky)"/>
+      <text x={125} y={LEGEND_Y + 9}
+        style={{ fontSize: 8.5, fill: 'var(--t4)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>More</text>
+    </svg>
+  )
+}
+
+// Donut using strokeDasharray on a circle (r=64, circ≈402.1)
+const DONUT_R = 64
 const DONUT_CIRC = 2 * Math.PI * DONUT_R
 
 function donutDash(fraction: number) {
@@ -169,6 +221,27 @@ export default async function ReportingPage({
   const prevTotal   = sumSeries(totalSeries, 0, 15)
 
   const totalDelta = pctDelta(recentTotal, prevTotal)
+
+  // ── Portfolio view counts (last 30 days) ──
+  const portfolioRaw = await prisma.portfolioView.findMany({
+    where: {
+      organizationId: currentUser.organizationId,
+      createdAt: { gte: thirtyDaysAgo },
+    },
+    select: { createdAt: true },
+  })
+
+  const portfolioBuckets: Record<string, number> = {}
+  for (const day of days) portfolioBuckets[day] = 0
+  for (const ev of portfolioRaw) {
+    const day = ev.createdAt.toISOString().slice(0, 10)
+    if (day in portfolioBuckets) portfolioBuckets[day]++
+  }
+  const portfolioSeries = days.map(d => portfolioBuckets[d])
+  const portfolioThisMonth = sumSeries(portfolioSeries, 15, 30)
+  const portfolioLastMonth = sumSeries(portfolioSeries, 0, 15)
+  const portfolioTotal = portfolioSeries.reduce((s, v) => s + v, 0)
+  const portfolioDelta = pctDelta(portfolioThisMonth, portfolioLastMonth)
 
   // ── Per-job metrics ──
   const checkIns = await prisma.checkIn.findMany({
@@ -441,36 +514,31 @@ export default async function ReportingPage({
 
       {/* ── Engagement breakdown ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        {/* Donut card */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 20px', boxShadow: 'var(--shadow-card)' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)', marginBottom: 14 }}>Engagement Breakdown</div>
+        {/* Donut card — flex-column so content fills full tile height */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 20px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)' }}>Engagement Breakdown</div>
           {engagementTotal > 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-              <svg viewBox="0 0 88 88" width="88" height="88" style={{ flexShrink: 0 }}>
-                {/* Background ring */}
-                <circle cx="44" cy="44" r={DONUT_R} fill="none" stroke="var(--surface-3)" strokeWidth="14"/>
-                {/* Page Views */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 28, padding: '12px 0' }}>
+              <svg viewBox="0 0 160 160" width="160" height="160" style={{ flexShrink: 0 }}>
+                <circle cx="80" cy="80" r={DONUT_R} fill="none" stroke="var(--surface-3)" strokeWidth="22"/>
                 {pvFrac > 0 && (
-                  <circle cx="44" cy="44" r={DONUT_R} fill="none" stroke="var(--sky)" strokeWidth="14"
+                  <circle cx="80" cy="80" r={DONUT_R} fill="none" stroke="var(--sky)" strokeWidth="22"
                     strokeDasharray={donutDash(pvFrac)} strokeDashoffset={pvOffset} strokeLinecap="butt"/>
                 )}
-                {/* Website Clicks */}
                 {wcFrac > 0 && (
-                  <circle cx="44" cy="44" r={DONUT_R} fill="none" stroke="#8B5CF6" strokeWidth="14"
+                  <circle cx="80" cy="80" r={DONUT_R} fill="none" stroke="#8B5CF6" strokeWidth="22"
                     strokeDasharray={donutDash(wcFrac)} strokeDashoffset={wcOffset} strokeLinecap="butt"/>
                 )}
-                {/* Phone Clicks */}
                 {pcFrac > 0 && (
-                  <circle cx="44" cy="44" r={DONUT_R} fill="none" stroke="var(--green)" strokeWidth="14"
+                  <circle cx="80" cy="80" r={DONUT_R} fill="none" stroke="var(--green)" strokeWidth="22"
                     strokeDasharray={donutDash(pcFrac)} strokeDashoffset={pcOffset} strokeLinecap="butt"/>
                 )}
-                {/* Photo Clicks */}
                 {phFrac > 0 && (
-                  <circle cx="44" cy="44" r={DONUT_R} fill="none" stroke="var(--orange)" strokeWidth="14"
+                  <circle cx="80" cy="80" r={DONUT_R} fill="none" stroke="var(--orange)" strokeWidth="22"
                     strokeDasharray={donutDash(phFrac)} strokeDashoffset={phOffset} strokeLinecap="butt"/>
                 )}
-                <text x="44" y="44" textAnchor="middle" dominantBaseline="central"
-                  style={{ fontSize: 12, fontWeight: 700, fill: 'var(--t1)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                <text x="80" y="80" textAnchor="middle" dominantBaseline="central"
+                  style={{ fontSize: 20, fontWeight: 800, fill: 'var(--t1)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   {engagementTotal}
                 </text>
               </svg>
@@ -481,8 +549,8 @@ export default async function ReportingPage({
                   { label: 'Phone Clicks', val: counts.PHONE_CLICK, color: 'var(--green)' },
                   { label: 'Photo Views', val: counts.PHOTO_CLICK, color: 'var(--orange)' },
                 ].map(({ label, val, color }) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 12 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }}/>
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, fontSize: 13 }}>
+                    <span style={{ width: 12, height: 12, borderRadius: '50%', background: color, flexShrink: 0 }}/>
                     <span style={{ flex: 1, color: 'var(--t2)' }}>{label}</span>
                     <span style={{ fontWeight: 700, color: 'var(--t1)' }}>{val.toLocaleString()}</span>
                   </div>
@@ -490,24 +558,57 @@ export default async function ReportingPage({
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: 'var(--t3)', paddingTop: 8 }}>No engagement data yet. Publish a job to start tracking.</div>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+              <div style={{ fontSize: 13, color: 'var(--t3)' }}>No engagement data yet. Publish a job to start tracking.</div>
+            </div>
           )}
         </div>
 
-        {/* Recent GBP Posts card */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 20px', boxShadow: 'var(--shadow-card)' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)', marginBottom: 14 }}>Recent GBP Posts</div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100% - 30px)', gap: 10, paddingTop: 8 }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
-            </svg>
-            <div style={{ fontSize: 12, color: 'var(--t3)', textAlign: 'center', lineHeight: 1.5 }}>
-              No posts yet.{' '}
-              <Link href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
-                Connect GBP
-              </Link>{' '}
-              to start posting.
+        {/* Right column: Recent GBP Posts + Portfolio Views side by side */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {/* Recent GBP Posts */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 16px', boxShadow: 'var(--shadow-card)' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)', marginBottom: 14 }}>Recent GBP Posts</div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100% - 30px)', gap: 10, paddingTop: 8 }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+              </svg>
+              <div style={{ fontSize: 11, color: 'var(--t3)', textAlign: 'center', lineHeight: 1.5 }}>
+                No posts yet.{' '}
+                <Link href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
+                  Connect GBP
+                </Link>
+              </div>
             </div>
+          </div>
+
+          {/* Portfolio Views */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 16px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)', marginBottom: 6 }}>Portfolio Views</div>
+            {portfolioTotal > 0 ? (
+              <>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--t1)', lineHeight: 1, letterSpacing: '-0.3px' }}>
+                  {portfolioThisMonth.toLocaleString()}
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 600, marginTop: 3, marginBottom: 10, color: portfolioDelta.sign === '+' ? 'var(--green)' : portfolioDelta.sign === '−' ? 'var(--red)' : 'var(--t3)' }}>
+                  {portfolioDelta.sign !== '' ? `${portfolioDelta.sign}${portfolioDelta.num}% vs prior 15d` : 'Last 15 days'}
+                </div>
+                <HeatmapSvg series={portfolioSeries} />
+              </>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 8, paddingTop: 8 }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+                <div style={{ fontSize: 11, color: 'var(--t3)', textAlign: 'center', lineHeight: 1.5 }}>
+                  No data yet.{' '}
+                  <Link href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
+                    Share your link
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

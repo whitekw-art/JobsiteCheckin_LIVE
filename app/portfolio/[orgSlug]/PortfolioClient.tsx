@@ -28,6 +28,7 @@ interface FilterTab {
 
 interface PortfolioClientProps {
   orgName: string
+  orgSlug: string
   orgPhone: string | null
   normalizedWebsite: string
   regionDescription: string
@@ -153,6 +154,7 @@ const ImagePlaceholder = ({ className = 'w-12 h-12' }: { className?: string }) =
 
 export default function PortfolioClient({
   orgName,
+  orgSlug,
   orgPhone,
   normalizedWebsite,
   regionDescription,
@@ -166,6 +168,18 @@ export default function PortfolioClient({
   const [activeFilter, setActiveFilter] = useState('all')
   const [showCount, setShowCount] = useState(12)
   const { handleMouseMove, handleMouseLeave } = useCardParallax()
+
+  // Fire portfolio view tracking when visitor arrives via UTM link
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('utm_source') === 'gbp') {
+      fetch('/api/portfolio-click', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgSlug }),
+      }).catch(() => { /* non-critical — silent fail */ })
+    }
+  }, [orgSlug])
 
   // Filter jobs
   const filteredJobs = activeFilter === 'all' ? jobs : jobs.filter((j) => j.doorType === activeFilter)

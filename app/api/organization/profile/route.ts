@@ -17,6 +17,7 @@ export async function GET() {
       where: { id: currentUser.organizationId },
       select: {
         name: true,
+        slug: true,
         phone: true,
         website: true,
       },
@@ -70,6 +71,7 @@ export async function PATCH(request: NextRequest) {
       },
       select: {
         name: true,
+        slug: true,
         phone: true,
         website: true,
       },

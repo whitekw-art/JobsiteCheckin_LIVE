@@ -8,6 +8,7 @@ type Tab = 'general' | 'team' | 'billing' | 'connections'
 
 interface OrganizationProfile {
   name: string
+  slug: string | null
   phone: string | null
   website: string | null
 }
@@ -116,6 +117,21 @@ export default function AccountPage() {
   // Local: add NEXT_PUBLIC_GBP_API_READY=true to .env.local
   // Vercel: add to staging/prod when Google API application is approved
   const GBP_API_READY = process.env.NEXT_PUBLIC_GBP_API_READY === 'true'
+
+  // Portfolio link state
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [showHowToModal, setShowHowToModal] = useState(false)
+
+  function handleCopyPortfolioLink() {
+    const slug = profile?.slug
+    if (!slug) return
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://projectcheckin.com').replace(/\/$/, '')
+    const url = `${baseUrl}/portfolio/${slug}?utm_source=gbp&utm_medium=profile`
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    })
+  }
 
   // Connections tab state (localStorage-backed, Phase 1)
   const [gbpConnected, setGbpConnected] = useState(false)
@@ -531,6 +547,174 @@ export default function AccountPage() {
               </>
             )}
           </div>
+
+          {/* Portfolio Link card */}
+          {profile?.slug && (
+            <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Portfolio Link</div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Share your work and track visits from any source</div>
+                  </div>
+                </div>
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, flexShrink: 0,
+                  background: 'var(--green-bg)', color: 'var(--green)',
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
+                  Available now
+                </span>
+              </div>
+              <div style={{ padding: '16px 20px' }}>
+                {/* URL display row */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: 'var(--surface-3)', border: '1px solid var(--border-2)',
+                  borderRadius: 8, padding: '10px 14px', marginBottom: 10,
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                  </svg>
+                  <span style={{
+                    flex: 1, fontSize: 12.5, fontWeight: 600, color: 'var(--t1)',
+                    fontFamily: 'monospace', letterSpacing: '-0.2px',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    projectcheckin.com/portfolio/{profile.slug}
+                  </span>
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    fontSize: 10.5, fontWeight: 700, color: 'var(--green)',
+                    background: 'var(--green-bg)', borderRadius: 4, padding: '2px 7px', whiteSpace: 'nowrap', flexShrink: 0,
+                  }}>
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    tracking on
+                  </span>
+                  <button
+                    onClick={handleCopyPortfolioLink}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '6px 14px', borderRadius: 7,
+                      fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
+                      background: linkCopied ? 'var(--green)' : 'var(--sky-text)',
+                      color: '#fff', border: 'none',
+                      transition: 'background .15s',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      {linkCopied
+                        ? <polyline points="20 6 9 17 4 12"/>
+                        : <><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>
+                      }
+                    </svg>
+                    {linkCopied ? 'Copied' : 'Copy link'}
+                  </button>
+                </div>
+                {/* How to use link */}
+                <button
+                  onClick={() => setShowHowToModal(true)}
+                  style={{
+                    background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    fontSize: 12, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer',
+                    padding: 0, display: 'inline-flex', alignItems: 'center', gap: 4,
+                  }}
+                >
+                  How to use this link
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* How to use modal */}
+          {showHowToModal && (
+            <div
+              onClick={(e) => { if (e.target === e.currentTarget) setShowHowToModal(false) }}
+              style={{
+                position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)',
+                backdropFilter: 'blur(3px)', zIndex: 9999,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+              }}
+            >
+              <div style={{
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 14, width: '100%', maxWidth: 460,
+                boxShadow: '0 20px 60px rgba(0,0,0,.15)', padding: '28px 24px', position: 'relative',
+              }}>
+                <button
+                  onClick={() => setShowHowToModal(false)}
+                  style={{
+                    position: 'absolute', top: 16, right: 16, width: 28, height: 28,
+                    borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-3)',
+                    color: 'var(--t2)', cursor: 'pointer', display: 'grid', placeItems: 'center',
+                    fontSize: 16, lineHeight: 1,
+                  }}
+                >
+                  &times;
+                </button>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--t1)', marginBottom: 6 }}>
+                  How to use your portfolio link
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--t2)', lineHeight: 1.55, marginBottom: 20 }}>
+                  Copy your link and paste it anywhere customers might look you up. Every visit is tracked and shows up in your Reporting page.
+                </div>
+                {[
+                  { step: 1, content: 'Copy your link using the button above.' },
+                  {
+                    step: 2, content: (
+                      <div>
+                        Paste it wherever your customers find you:
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                          {['Google Business Profile', 'Facebook', 'Instagram bio', 'Nextdoor', 'Email signature', 'Printed estimates', 'Text messages'].map((p) => (
+                            <span key={p} style={{
+                              display: 'inline-flex', alignItems: 'center',
+                              padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                              background: 'var(--surface-3)', color: 'var(--t2)', border: '1px solid var(--border)',
+                            }}>{p}</span>
+                          ))}
+                        </div>
+                      </div>
+                    ),
+                  },
+                  { step: 3, content: 'When a homeowner clicks the link, their visit is recorded. Check Reporting to see how many people have viewed your portfolio.' },
+                ].map(({ step, content }) => (
+                  <div key={step} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: 'var(--t2)', lineHeight: 1.55, marginBottom: 12 }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: '50%',
+                      background: 'var(--sky-dim)', color: 'var(--sky-text)',
+                      fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center',
+                      flexShrink: 0, marginTop: 1,
+                    }}>{step}</div>
+                    <div>{content}</div>
+                  </div>
+                ))}
+                <div style={{ height: 1, background: 'var(--border)', margin: '16px 0' }} />
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)', marginBottom: 8 }}>Adding to Google Business Profile</div>
+                <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.55 }}>
+                  Go to <strong>business.google.com</strong> → Edit profile → Contact → Website → paste your link. This puts your portfolio in front of homeowners who find you on Google Maps or Search.
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Google Search Console — coming soon */}
           <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden', opacity: 0.65 }}>
