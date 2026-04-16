@@ -51,6 +51,15 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
   const router = useRouter()
   const [step, setStep] = useState(1)
 
+  // Step 3 GBP state (localStorage-backed, Phase 1)
+  const [gbpConnected, setGbpConnected] = useState(false)
+
+  function handleGbpConnect() {
+    const next = !gbpConnected
+    setGbpConnected(next)
+    try { localStorage.setItem('gbp_connected', String(next)) } catch {}
+  }
+
   // Step 2 form state
   const [bizName,      setBizName]      = useState('')
   const [bizPhone,     setBizPhone]     = useState('')
@@ -124,7 +133,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
 
         {/* Progress dots */}
         <div style={styles.dots}>
-          {[1,2,3].map(n => (
+          {[1,2,3,4].map(n => (
             <div key={n} style={{ ...styles.dot, ...(n === step ? styles.dotActive : n < step ? styles.dotDone : {}) }} />
           ))}
         </div>
@@ -293,8 +302,98 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
           </div>
         )}
 
-        {/* ── STEP 3: First steps ── */}
+        {/* ── STEP 3: Google Business Profile ── */}
         {step === 3 && (
+          <div style={styles.body}>
+            <div style={{ ...styles.welcomeIcon, background: '#fff', borderColor: '#dadce0', boxShadow: '0 1px 4px rgba(0,0,0,.08)' }}>
+              <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1 }}>
+                <span style={{ color: '#4285F4' }}>G</span>
+                <span style={{ color: '#EA4335' }}>o</span>
+                <span style={{ color: '#FBBC05' }}>o</span>
+                <span style={{ color: '#4285F4' }}>g</span>
+                <span style={{ color: '#34A853' }}>l</span>
+                <span style={{ color: '#EA4335' }}>e</span>
+              </span>
+            </div>
+            <h2 style={styles.stepTitle}>Connect your Google Business Profile</h2>
+            <p style={styles.stepSub}>
+              Every job you publish can automatically appear as a post on your Google listing — keeping your profile active and bringing in more calls.
+            </p>
+
+            <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 10, padding: '12px 14px', marginBottom: 20, fontSize: 13, color: '#0C4A6E', lineHeight: 1.6 }}>
+              Businesses with active GBP posts get <strong>42% more direction requests</strong> and <strong>35% more website clicks</strong>. — Google
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 22 }}>
+              {[
+                'Job posts go live on your Google listing automatically when you publish',
+                'Posts include your job photo, location, and work description',
+                'Google rewards consistent activity — your profile ranks higher',
+              ].map((txt, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: '#4B7A94', lineHeight: 1.5 }}>
+                  <div style={{ width: 20, height: 20, background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0EA5E9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </div>
+                  {txt}
+                </div>
+              ))}
+            </div>
+
+            {!gbpConnected ? (
+              <button
+                onClick={handleGbpConnect}
+                style={{
+                  width: '100%', padding: '11px 16px', borderRadius: 10, marginBottom: 12,
+                  background: '#fff', color: '#3c4043',
+                  border: '1px solid #dadce0', boxShadow: '0 1px 2px rgba(0,0,0,.08)',
+                  fontSize: 14, fontWeight: 600,
+                  fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                <span style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1 }}>
+                  <span style={{ color: '#4285F4' }}>G</span>
+                  <span style={{ color: '#EA4335' }}>o</span>
+                  <span style={{ color: '#FBBC05' }}>o</span>
+                  <span style={{ color: '#4285F4' }}>g</span>
+                  <span style={{ color: '#34A853' }}>l</span>
+                  <span style={{ color: '#EA4335' }}>e</span>
+                </span>
+                Connect Google Business Profile
+              </button>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 16px', borderRadius: 10, background: '#F0FDF4', border: '1px solid #A7F3D0', marginBottom: 12, fontSize: 14, fontWeight: 600, color: '#059669' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                Google Business Profile connected
+              </div>
+            )}
+
+            <button
+              style={{ ...styles.btnPrimary, marginTop: 0 }}
+              onClick={() => setStep(4)}
+            >
+              {gbpConnected ? 'Continue' : 'Continue'}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                stroke="white" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+
+            <button
+              onClick={() => setStep(4)}
+              style={{ background: 'none', border: 'none', color: '#4B7A94', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', marginTop: 10, alignSelf: 'center' }}
+            >
+              Skip for now
+            </button>
+          </div>
+        )}
+
+        {/* ── STEP 4: First steps ── */}
+        {step === 4 && (
           <div style={styles.body}>
             <div style={{ ...styles.welcomeIcon, background: '#F0FDF4', borderColor: '#A7F3D0' }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none"

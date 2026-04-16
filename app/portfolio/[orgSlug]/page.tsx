@@ -199,6 +199,7 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
       {/* All visual content rendered in the client component */}
       <PortfolioClient
         orgName={org.name}
+        orgSlug={orgSlug}
         orgPhone={org.phone}
         normalizedWebsite={normalizedWebsite}
         regionDescription={regionDescription}

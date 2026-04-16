@@ -14,3 +14,4 @@ Disallow: /onboarding/
 Disallow: /super-admin/
 
 Sitemap: https://projectcheckin.com/sitemap.xml
+Sitemap: https://projectcheckin.com/sitemap-images
