@@ -204,6 +204,15 @@ model PasswordResetToken {
   @@index([expiresAt])
 }
 
+model PortfolioView {
+  id             String   @id @default(uuid())
+  organizationId String
+  source         String
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+}
+
 model WaitlistEntry {
   id           String   @id @default(cuid())
   email        String   @unique
