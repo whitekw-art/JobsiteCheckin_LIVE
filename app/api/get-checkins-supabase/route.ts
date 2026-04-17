@@ -29,9 +29,6 @@ export async function GET() {
         timestamp: true,
         isPublic: true,
         photoUrls: true,
-        homeCustomerName: true,
-        homeCustomerPhone: true,
-        homeCustomerEmail: true,
       },
       orderBy: {
         timestamp: 'desc',
