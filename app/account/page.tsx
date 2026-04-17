@@ -11,6 +11,7 @@ interface OrganizationProfile {
   slug: string | null
   phone: string | null
   website: string | null
+  gbpReviewLink: string | null
 }
 
 const PLAN_LABELS: Record<string, string> = {
@@ -120,7 +121,14 @@ export default function AccountPage() {
 
   // Portfolio link state
   const [linkCopied, setLinkCopied] = useState(false)
-  const [showHowToModal, setShowHowToModal] = useState(false)
+  const [showPortfolioDisc, setShowPortfolioDisc] = useState(false)
+
+  // GBP Review Link state
+  const [gbpReviewLinkInput, setGbpReviewLinkInput] = useState('')
+  const [gbpReviewLinkSaving, setGbpReviewLinkSaving] = useState(false)
+  const [gbpReviewLinkSaved, setGbpReviewLinkSaved] = useState(false)
+  const [editingReviewLink, setEditingReviewLink] = useState(false)
+  const [showReviewLinkDisc, setShowReviewLinkDisc] = useState(false)
 
   function handleCopyPortfolioLink() {
     const slug = profile?.slug
@@ -154,6 +162,7 @@ export default function AccountPage() {
         setProfile(org)
         setPhone(org.phone || '')
         setWebsite(org.website || '')
+        setGbpReviewLinkInput(org.gbpReviewLink || '')
       } catch (err: any) {
         setError(err.message || 'Failed to load profile')
       } finally {
@@ -190,6 +199,28 @@ export default function AccountPage() {
       setServicesSync(false)
       localStorage.removeItem('gbp_post_mode')
       localStorage.removeItem('gbp_services_sync')
+    }
+  }
+
+  async function handleSaveGbpReviewLink() {
+    const link = gbpReviewLinkInput.trim()
+    setGbpReviewLinkSaving(true)
+    try {
+      const res = await fetch('/api/organization/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gbpReviewLink: link || null }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || 'Failed to save')
+      setProfile((prev) => prev ? { ...prev, gbpReviewLink: data.organization.gbpReviewLink } : prev)
+      setEditingReviewLink(false)
+      setGbpReviewLinkSaved(true)
+      setTimeout(() => setGbpReviewLinkSaved(false), 2000)
+    } catch {
+      // no-op — input stays open so user can retry
+    } finally {
+      setGbpReviewLinkSaving(false)
     }
   }
 
@@ -374,48 +405,29 @@ export default function AccountPage() {
       {activeTab === 'connections' && (
         <div style={{ maxWidth: 560 }}>
 
-          {/* Google Business Profile card */}
+          {/* ── Connect Your Google Business Profile ── */}
           <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden', opacity: GBP_API_READY ? 1 : 0.72 }}>
-
-            {/* Card header */}
-            <div style={{
-              padding: '16px 20px',
-              borderBottom: '1px solid var(--border)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-            }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
                   <GoogleGIcon />
                 </div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Google Business Profile</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Connect Your Google Business Profile</div>
                   <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Publish job updates to your Google listing</div>
                 </div>
               </div>
-              {/* Badge: Coming soon when API not ready, otherwise connection status */}
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, flexShrink: 0,
-                background: !GBP_API_READY ? 'var(--surface-3)' : gbpConnected ? 'var(--green-bg)' : 'var(--surface-3)',
-                color: !GBP_API_READY ? 'var(--t3)' : gbpConnected ? 'var(--green)' : 'var(--t3)',
-              }}>
-                {!GBP_API_READY ? (
-                  'Coming soon'
-                ) : (
-                  <>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: gbpConnected ? 'var(--green)' : 'var(--t4)' }} />
-                    {gbpConnected ? 'Connected' : 'Not connected'}
-                  </>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, flexShrink: 0, background: !GBP_API_READY ? 'var(--surface-3)' : gbpConnected ? 'var(--green-bg)' : 'var(--surface-3)', color: !GBP_API_READY ? 'var(--t3)' : gbpConnected ? 'var(--green)' : 'var(--t3)' }}>
+                {!GBP_API_READY ? 'Coming soon' : (
+                  <><span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: gbpConnected ? 'var(--green)' : 'var(--t4)' }} />{gbpConnected ? 'Connected' : 'Not connected'}</>
                 )}
               </span>
             </div>
-
-            {/* Value prop — always visible */}
-            <div style={{ padding: '18px 20px', borderBottom: GBP_API_READY && !gbpConnected ? '1px solid var(--border)' : undefined }}>
+            <div style={{ padding: '16px 20px', borderBottom: GBP_API_READY && !gbpConnected ? '1px solid var(--border)' : undefined }}>
               <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: 'var(--t2)', lineHeight: 1.6 }}>
                 Businesses with active GBP posts get <strong style={{ color: 'var(--t1)' }}>42% more direction requests</strong> and <strong style={{ color: 'var(--t1)' }}>35% more website clicks</strong>. — Google
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 18 }}>
                 {[
                   'Every published job creates a Google Business post automatically',
                   'Posts include your job photo, location, and work description',
@@ -423,52 +435,26 @@ export default function AccountPage() {
                 ].map((txt, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: 'var(--t2)', lineHeight: 1.5 }}>
                     <div style={{ width: 20, height: 20, background: 'var(--sky-dim)', color: 'var(--sky-text)', borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     </div>
                     {txt}
                   </div>
                 ))}
               </div>
-
-              {/* Connect button — disabled when API not ready */}
               {!GBP_API_READY ? (
-                <button
-                  disabled
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 8,
-                    padding: '8px 18px', borderRadius: 8,
-                    background: 'var(--surface-3)', color: 'var(--t3)',
-                    border: '1px solid var(--border)', fontSize: 13, fontWeight: 600,
-                    fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'not-allowed',
-                  }}
-                >
+                <button disabled style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderRadius: 8, background: 'var(--surface-3)', color: 'var(--t3)', border: '1px solid var(--border)', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'not-allowed' }}>
                   <GoogleWordmark />
                   Connect Google Business — Coming Soon
                 </button>
               ) : !gbpConnected ? (
-                <button
-                  onClick={handleGbpConnect}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 8,
-                    padding: '8px 18px', borderRadius: 8,
-                    background: '#fff', color: '#3c4043',
-                    border: '1px solid #dadce0', boxShadow: '0 1px 2px rgba(0,0,0,.08)',
-                    fontSize: 13, fontWeight: 600,
-                    fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer',
-                  }}
-                >
+                <button onClick={handleGbpConnect} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderRadius: 8, background: '#fff', color: '#3c4043', border: '1px solid #dadce0', boxShadow: '0 1px 2px rgba(0,0,0,.08)', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer' }}>
                   <GoogleWordmark />
                   Connect Google Business Profile
                 </button>
               ) : null}
             </div>
-
-            {/* Post-connect controls — only when API ready and connected */}
             {GBP_API_READY && gbpConnected && (
               <>
-                {/* Posting mode */}
                 <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)', marginBottom: 8 }}>Posting mode</div>
                   <div style={{ display: 'flex', gap: 18, marginBottom: 6 }}>
@@ -485,62 +471,32 @@ export default function AccountPage() {
                     {postMode === 'auto' ? 'Posts go live on Google immediately when you publish a job.' : 'You approve each post from the job card before it goes live on Google.'}
                   </div>
                 </div>
-
-                {/* Services sync */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>Sync services list</span>
-                      {/* Info icon with tooltip */}
                       <div style={{ position: 'relative', display: 'inline-flex' }}>
-                        <button
-                          onMouseEnter={() => setShowServicesTip(true)}
-                          onMouseLeave={() => setShowServicesTip(false)}
-                          onFocus={() => setShowServicesTip(true)}
-                          onBlur={() => setShowServicesTip(false)}
-                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--t3)', display: 'flex', alignItems: 'center' }}
-                          aria-label="What does sync services list do?"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                          </svg>
+                        <button onMouseEnter={() => setShowServicesTip(true)} onMouseLeave={() => setShowServicesTip(false)} onFocus={() => setShowServicesTip(true)} onBlur={() => setShowServicesTip(false)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--t3)', display: 'flex', alignItems: 'center' }} aria-label="What does sync services list do?">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                         </button>
                         {showServicesTip && (
-                          <div style={{
-                            position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
-                            marginBottom: 8, width: 260, background: 'var(--t1)', color: 'var(--surface)',
-                            borderRadius: 8, padding: '10px 12px', fontSize: 12, lineHeight: 1.55,
-                            boxShadow: '0 4px 16px rgba(0,0,0,.2)', zIndex: 100,
-                            pointerEvents: 'none',
-                          }}>
-                            Your Google Business Profile has a "Services" section that lists what you do — like <em>Door Installation</em> or <em>Garage Doors</em>. When this is on, ProjectCheckin automatically keeps that list updated to match the trade types in your account. You won't need to log into Google to update it manually.
+                          <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 8, width: 260, background: 'var(--t1)', color: 'var(--surface)', borderRadius: 8, padding: '10px 12px', fontSize: 12, lineHeight: 1.55, boxShadow: '0 4px 16px rgba(0,0,0,.2)', zIndex: 100, pointerEvents: 'none' }}>
+                            Your Google Business Profile has a &ldquo;Services&rdquo; section that lists what you do — like <em>Door Installation</em> or <em>Garage Doors</em>. When this is on, ProjectCheckin automatically keeps that list updated to match the trade types in your account.
                             <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 10, height: 10, background: 'var(--t1)', clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }} />
                           </div>
                         )}
                       </div>
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3, lineHeight: 1.5 }}>
-                      Auto-update your GBP services to match your trade types.
-                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3, lineHeight: 1.5 }}>Auto-update your GBP services to match your trade types.</div>
                   </div>
                   <Toggle checked={servicesSync} onChange={handleServicesSyncToggle} />
                 </div>
-
-                {/* Disconnect */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>Disconnect</div>
-                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>Remove ProjectCheckin's access to your Google Business Profile.</div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>Remove ProjectCheckin&apos;s access to your Google Business Profile.</div>
                   </div>
-                  <button
-                    onClick={handleGbpConnect}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', padding: '5px 12px', borderRadius: 7,
-                      fontSize: 12, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif",
-                      cursor: 'pointer', background: 'var(--red-bg)', color: 'var(--red)',
-                      border: '1px solid rgba(220,38,38,.2)', flexShrink: 0,
-                    }}
-                  >
+                  <button onClick={handleGbpConnect} style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid rgba(220,38,38,.2)', flexShrink: 0 }}>
                     Disconnect
                   </button>
                 </div>
@@ -548,14 +504,109 @@ export default function AccountPage() {
             )}
           </div>
 
-          {/* Portfolio Link card */}
+          {/* ── Enable Google Business Review Requests ── */}
+          <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--amber)" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Enable Google Business Review Requests</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Send customers directly to your Google Business Review page</div>
+                </div>
+              </div>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, flexShrink: 0, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
+                Available now
+              </span>
+            </div>
+            <div style={{ padding: '16px 20px' }}>
+              {profile?.gbpReviewLink && !editingReviewLink ? (
+                /* Saved state */
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
+                      Review link active
+                    </span>
+                    <button
+                      onClick={() => { setEditingReviewLink(true); setGbpReviewLinkInput(profile?.gbpReviewLink || '') }}
+                      style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    >
+                      Edit
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--t3)', fontFamily: 'monospace', letterSpacing: '-0.2px' }}>
+                    {profile.gbpReviewLink}
+                  </div>
+                </>
+              ) : (
+                /* Input state */
+                <>
+                  <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, marginBottom: 12 }}>
+                    Paste your Google Business review link below and click save — you&apos;ll have full control over when, how, and who your review requests are sent to in your Dashboard.
+                  </p>
+                  <input
+                    type="url"
+                    value={gbpReviewLinkInput}
+                    onChange={(e) => setGbpReviewLinkInput(e.target.value)}
+                    placeholder="https://g.page/r/XXXXXXXXXXXXXXXX/review"
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', outline: 'none', marginBottom: 10 }}
+                  />
+                  <button
+                    onClick={handleSaveGbpReviewLink}
+                    disabled={gbpReviewLinkSaving || !gbpReviewLinkInput.trim()}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: gbpReviewLinkSaving || !gbpReviewLinkInput.trim() ? 'not-allowed' : 'pointer', background: gbpReviewLinkSaved ? 'var(--green)' : 'var(--sky-text)', color: '#fff', border: 'none', transition: 'background .15s', opacity: !gbpReviewLinkInput.trim() ? 0.5 : 1 }}
+                  >
+                    {gbpReviewLinkSaving ? 'Saving\u2026' : gbpReviewLinkSaved ? 'Saved!' : 'Save'}
+                  </button>
+                </>
+              )}
+
+              {/* Collapsible: how to find */}
+              <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', marginTop: 12 }}>
+                <button
+                  onClick={() => setShowReviewLinkDisc(!showReviewLinkDisc)}
+                  style={{ width: '100%', background: 'none', border: 'none', padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    How to find your Google review link
+                  </span>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: 'transform .2s', transform: showReviewLinkDisc ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                {showReviewLinkDisc && (
+                  <div style={{ padding: '0 14px 12px', borderTop: '1px solid var(--border)' }}>
+                    {([
+                      'Go to business.google.com and sign in.',
+                      'Select your business, then click Ask for reviews in the left menu (or Home page).',
+                    ] as const).map((txt, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--t2)', lineHeight: 1.55, marginTop: 10 }}>
+                        <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--sky-dim)', color: 'var(--sky-text)', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                        <div>{txt}</div>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--t2)', lineHeight: 1.55, marginTop: 10 }}>
+                      <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--sky-dim)', color: 'var(--sky-text)', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>3</div>
+                      <div>Copy the link that appears — it looks like <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--t1)' }}>g.page/r/&hellip;/review</span>. Paste it above.</div>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                      This link sends homeowners straight to the 5-star review form — no searching required.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Share Your Project Check-In Portfolio ── */}
           {profile?.slug && (
             <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid var(--border)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-              }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -564,159 +615,79 @@ export default function AccountPage() {
                     </svg>
                   </div>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Portfolio Link</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Share Your Project Check-In Portfolio</div>
                     <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Share your work and track visits from any source</div>
                   </div>
                 </div>
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, flexShrink: 0,
-                  background: 'var(--green-bg)', color: 'var(--green)',
-                }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, flexShrink: 0, background: 'var(--green-bg)', color: 'var(--green)' }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
                   Available now
                 </span>
               </div>
               <div style={{ padding: '16px 20px' }}>
-                {/* URL display row */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  background: 'var(--surface-3)', border: '1px solid var(--border-2)',
-                  borderRadius: 8, padding: '10px 14px', marginBottom: 10,
-                }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                    <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                  </svg>
-                  <span style={{
-                    flex: 1, fontSize: 12.5, fontWeight: 600, color: 'var(--t1)',
-                    fontFamily: 'monospace', letterSpacing: '-0.2px',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    projectcheckin.com/portfolio/{profile.slug}
-                  </span>
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    fontSize: 10.5, fontWeight: 700, color: 'var(--green)',
-                    background: 'var(--green-bg)', borderRadius: 4, padding: '2px 7px', whiteSpace: 'nowrap', flexShrink: 0,
-                  }}>
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                    tracking on
-                  </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <button
                     onClick={handleCopyPortfolioLink}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 5,
-                      padding: '6px 14px', borderRadius: 7,
-                      fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Plus Jakarta Sans', sans-serif",
-                      cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
-                      background: linkCopied ? 'var(--green)' : 'var(--sky-text)',
-                      color: '#fff', border: 'none',
-                      transition: 'background .15s',
-                    }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: linkCopied ? 'var(--green)' : 'var(--sky-text)', color: '#fff', border: 'none', transition: 'background .15s' }}
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      {linkCopied
-                        ? <polyline points="20 6 9 17 4 12"/>
-                        : <><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>
-                      }
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      {linkCopied ? <polyline points="20 6 9 17 4 12"/> : <><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>}
                     </svg>
-                    {linkCopied ? 'Copied' : 'Copy link'}
+                    {linkCopied ? 'Copied!' : 'Copy portfolio link'}
                   </button>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
+                    tracking on
+                  </span>
                 </div>
-                {/* How to use link */}
-                <button
-                  onClick={() => setShowHowToModal(true)}
-                  style={{
-                    background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif",
-                    fontSize: 12, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer',
-                    padding: 0, display: 'inline-flex', alignItems: 'center', gap: 4,
-                  }}
-                >
-                  How to use this link
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
+                <div style={{ fontSize: 11.5, color: 'var(--t3)', fontFamily: 'monospace', letterSpacing: '-0.2px', marginTop: 7 }}>
+                  projectcheckin.com/portfolio/{profile.slug}
+                </div>
 
-          {/* How to use modal */}
-          {showHowToModal && (
-            <div
-              onClick={(e) => { if (e.target === e.currentTarget) setShowHowToModal(false) }}
-              style={{
-                position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)',
-                backdropFilter: 'blur(3px)', zIndex: 9999,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-              }}
-            >
-              <div style={{
-                background: 'var(--surface)', border: '1px solid var(--border)',
-                borderRadius: 14, width: '100%', maxWidth: 460,
-                boxShadow: '0 20px 60px rgba(0,0,0,.15)', padding: '28px 24px', position: 'relative',
-              }}>
-                <button
-                  onClick={() => setShowHowToModal(false)}
-                  style={{
-                    position: 'absolute', top: 16, right: 16, width: 28, height: 28,
-                    borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-3)',
-                    color: 'var(--t2)', cursor: 'pointer', display: 'grid', placeItems: 'center',
-                    fontSize: 16, lineHeight: 1,
-                  }}
-                >
-                  &times;
-                </button>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--t1)', marginBottom: 6 }}>
-                  How to use your portfolio link
-                </div>
-                <div style={{ fontSize: 12.5, color: 'var(--t2)', lineHeight: 1.55, marginBottom: 20 }}>
-                  Copy your link and paste it anywhere customers might look you up. Every visit is tracked and shows up in your Reporting page.
-                </div>
-                {[
-                  { step: 1, content: 'Copy your link using the button above.' },
-                  {
-                    step: 2, content: (
-                      <div>
-                        Paste it wherever your customers find you:
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                          {['Google Business Profile', 'Facebook', 'Instagram bio', 'Nextdoor', 'Email signature', 'Printed estimates', 'Text messages'].map((p) => (
-                            <span key={p} style={{
-                              display: 'inline-flex', alignItems: 'center',
-                              padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                              background: 'var(--surface-3)', color: 'var(--t2)', border: '1px solid var(--border)',
-                            }}>{p}</span>
-                          ))}
+                {/* Collapsible: how to use */}
+                <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', marginTop: 12 }}>
+                  <button
+                    onClick={() => setShowPortfolioDisc(!showPortfolioDisc)}
+                    style={{ width: '100%', background: 'none', border: 'none', padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      How to use this link
+                    </span>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: 'transform .2s', transform: showPortfolioDisc ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                  {showPortfolioDisc && (
+                    <div style={{ padding: '0 14px 12px', borderTop: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--t2)', lineHeight: 1.55, marginTop: 10 }}>
+                        <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--sky-dim)', color: 'var(--sky-text)', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>1</div>
+                        <div>Copy your link using the button above.</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--t2)', lineHeight: 1.55, marginTop: 10 }}>
+                        <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--sky-dim)', color: 'var(--sky-text)', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>2</div>
+                        <div>
+                          Paste it wherever your customers find you:
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 7 }}>
+                            {['Google Business Profile', 'Facebook', 'Instagram bio', 'Nextdoor', 'Email signature', 'Text messages'].map((p) => (
+                              <span key={p} style={{ padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: 'var(--surface)', color: 'var(--t2)', border: '1px solid var(--border)' }}>{p}</span>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    ),
-                  },
-                  { step: 3, content: 'When a homeowner clicks the link, their visit is recorded. Check Reporting to see how many people have viewed your portfolio.' },
-                ].map(({ step, content }) => (
-                  <div key={step} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: 'var(--t2)', lineHeight: 1.55, marginBottom: 12 }}>
-                    <div style={{
-                      width: 22, height: 22, borderRadius: '50%',
-                      background: 'var(--sky-dim)', color: 'var(--sky-text)',
-                      fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center',
-                      flexShrink: 0, marginTop: 1,
-                    }}>{step}</div>
-                    <div>{content}</div>
-                  </div>
-                ))}
-                <div style={{ height: 1, background: 'var(--border)', margin: '16px 0' }} />
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)', marginBottom: 8 }}>Adding to Google Business Profile</div>
-                <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.55 }}>
-                  Go to <strong>business.google.com</strong> → Edit profile → Contact → Website → paste your link. This puts your portfolio in front of homeowners who find you on Google Maps or Search.
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--t2)', lineHeight: 1.55, marginTop: 10 }}>
+                        <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--sky-dim)', color: 'var(--sky-text)', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>3</div>
+                        <div>When a homeowner clicks the link, their visit is recorded. Check Reporting to see how many people have viewed your portfolio.</div>
+                      </div>
+                      <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.55, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                        Go to <strong>business.google.com</strong> → Edit profile → Contact → Website → paste your link to put your portfolio in front of homeowners on Google Maps.
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Google Search Console — coming soon */}
+          {/* ── Integrate Google Search Console ── */}
           <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden', opacity: 0.65 }}>
             <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -726,15 +697,11 @@ export default function AccountPage() {
                   </svg>
                 </div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Google Search Console</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Integrate Google Search Console</div>
                   <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>See your search impressions and clicks inside this dashboard</div>
                 </div>
               </div>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                background: 'var(--surface-3)', color: 'var(--t3)', flexShrink: 0,
-              }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: 'var(--surface-3)', color: 'var(--t3)', flexShrink: 0 }}>
                 Coming soon
               </span>
             </div>

@@ -20,6 +20,7 @@ export async function GET() {
         slug: true,
         phone: true,
         website: true,
+        gbpReviewLink: true,
       },
     })
 
@@ -58,9 +59,10 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const { phone, website } = (await request.json()) as {
+    const { phone, website, gbpReviewLink } = (await request.json()) as {
       phone?: string
       website?: string
+      gbpReviewLink?: string
     }
 
     const updated = await prisma.organization.update({
@@ -68,12 +70,14 @@ export async function PATCH(request: NextRequest) {
       data: {
         phone: phone ?? null,
         website: website ?? null,
+        ...(gbpReviewLink !== undefined && { gbpReviewLink: gbpReviewLink || null }),
       },
       select: {
         name: true,
         slug: true,
         phone: true,
         website: true,
+        gbpReviewLink: true,
       },
     })
 
