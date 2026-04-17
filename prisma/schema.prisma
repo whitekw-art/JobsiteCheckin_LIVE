@@ -24,6 +24,7 @@ model Organization {
   subscriptionStatus   String?
   planTier             String?
   planVersion          Int     @default(1)
+  gbpReviewLink        String?
   Invitations Invitations[]
   users       User[]
   checkIns    CheckIn[]
@@ -62,10 +63,13 @@ model CheckIn {
   seoDescription String?
   doorType       String?
   zip            String?
-  photoUrls      String?
-  isPublic       Boolean        @default(false)
-  locationSource String?
-  events         CheckInEvent[]
+  photoUrls          String?
+  isPublic           Boolean        @default(false)
+  locationSource     String?
+  homeCustomerName   String?
+  homeCustomerPhone  String?
+  homeCustomerEmail  String?
+  events             CheckInEvent[]
 
   @@index([organizationId])
 }
