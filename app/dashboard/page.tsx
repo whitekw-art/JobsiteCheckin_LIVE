@@ -444,14 +444,16 @@ export default function Dashboard() {
 
   // Review request modal
   const [reviewModalCheckIn, setReviewModalCheckIn] = useState<CheckIn | null>(null)
-  const [reviewMethod, setReviewMethod] = useState<'text' | 'email' | 'both'>('text')
+  const [reviewMethod, setReviewMethod] = useState<'text' | 'email'>('text')
   const [reviewShowManual, setReviewShowManual] = useState(false)
   const [reviewMessageText, setReviewMessageText] = useState('')
+  const [reviewSignature, setReviewSignature] = useState('')
   const [reviewOverrideName, setReviewOverrideName] = useState('')
   const [reviewOverridePhone, setReviewOverridePhone] = useState('')
   const [reviewOverrideEmail, setReviewOverrideEmail] = useState('')
   const [reviewCopied, setReviewCopied] = useState(false)
-  const [reviewSending, setReviewSending] = useState(false)
+  const [reviewTextSent, setReviewTextSent] = useState(false)
+  const [reviewEmailSent, setReviewEmailSent] = useState(false)
 
   // Photo delete
   const [deletingPhotoKey, setDeletingPhotoKey] = useState<string | null>(null)
@@ -902,7 +904,8 @@ export default function Dashboard() {
     const linkLine = gbpReviewLink
       ? `\nLINK to Google Business Reviews: ${gbpReviewLink}`
       : '\n[review link]'
-    return `Hi ${firstName}, thanks for choosing ${org}! We just finished your ${jobDesc}installation. Mind leaving us a quick Google review? It takes 1 minute and means a lot to our small team. ⭐${linkLine}`
+    const jobUrl = checkIn.isPublic ? `\nView your project photos: ${getPublicUrl(checkIn)}` : ''
+    return `Hi ${firstName}, thanks for choosing ${org}! We just finished your ${jobDesc}installation. Mind leaving us a quick Google review? It takes 1 minute and means a lot to our small team. ⭐${linkLine}${jobUrl}`
   }
 
   const openReviewModal = (checkIn: CheckIn) => {
@@ -912,10 +915,13 @@ export default function Dashboard() {
     setReviewMethod('text')
     setReviewShowManual(false)
     setReviewCopied(false)
+    setReviewTextSent(false)
+    setReviewEmailSent(false)
     setReviewOverrideName(custName)
     setReviewOverridePhone(cust?.phones?.find((p) => p.num)?.num || '')
     setReviewOverrideEmail(cust?.emails?.find((e) => e.addr)?.addr || '')
     setReviewMessageText(buildReviewMessage(checkIn, custName))
+    setReviewSignature(`Thanks! ${orgName}`)
   }
 
   const getReviewRecipient = (checkIn: CheckIn) => {
@@ -930,38 +936,43 @@ export default function Dashboard() {
     }
   }
 
-  const handleSendReview = async () => {
+  const handleSendReview = () => {
     if (!reviewModalCheckIn) return
-    const { name, phone, email } = getReviewRecipient(reviewModalCheckIn)
-    const message = reviewMessageText
+    const { phone, email } = getReviewRecipient(reviewModalCheckIn)
+    const fullMessage = `${reviewMessageText}\n\n${reviewSignature}`
 
-    if (reviewMethod === 'text' || reviewMethod === 'both') {
+    const hasPhone = !!phone
+    const hasEmail = !!email
+
+    if (reviewMethod === 'text') {
       if (!phone) { alert('No phone number saved for this customer. Add it in the Customer Info section.'); return }
-      window.open(`sms:${phone}?body=${encodeURIComponent(message)}`, '_blank')
+      window.open(`sms:${phone}?body=${encodeURIComponent(fullMessage)}`, '_blank')
+      setReviewTextSent(true)
+      if (!hasEmail) setReviewModalCheckIn(null)
     }
-    if (reviewMethod === 'email' || reviewMethod === 'both') {
+
+    if (reviewMethod === 'email') {
       if (!email) { alert('No email address saved for this customer. Add it in the Customer Info section.'); return }
-      setReviewSending(true)
-      try {
-        const res = await fetch('/api/review-request/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: email, name, message }),
-        })
-        if (!res.ok) throw new Error('Failed to send email')
-      } catch {
-        alert('Failed to send email. Please try again.')
-        setReviewSending(false)
-        return
-      }
-      setReviewSending(false)
+      const subject = encodeURIComponent('Quick favor — would you leave us a Google review?')
+      const body = encodeURIComponent(fullMessage)
+      window.open(`mailto:${email}?subject=${subject}&body=${body}`)
+      setReviewEmailSent(true)
+      if (!hasPhone) setReviewModalCheckIn(null)
     }
-    setReviewModalCheckIn(null)
   }
+
+  // Auto-close when both have been sent (called via useEffect watching sent state)
+  useEffect(() => {
+    if (!reviewModalCheckIn) return
+    const { phone, email } = getReviewRecipient(reviewModalCheckIn)
+    if (reviewTextSent && reviewEmailSent && phone && email) {
+      setReviewModalCheckIn(null)
+    }
+  }, [reviewTextSent, reviewEmailSent])
 
   const handleCopyReview = () => {
     if (!reviewModalCheckIn) return
-    navigator.clipboard.writeText(reviewMessageText).catch(() => {})
+    navigator.clipboard.writeText(`${reviewMessageText}\n\n${reviewSignature}`).catch(() => {})
     setReviewCopied(true)
     setTimeout(() => setReviewCopied(false), 2000)
   }
@@ -1888,23 +1899,21 @@ export default function Dashboard() {
               <div style={{ marginBottom: 14 }}>
                 <div className="rrm-label" style={{ marginBottom: 8 }}>Send via</div>
                 <div className="rrm-method-row">
-                  <button className={`rrm-method-btn${reviewMethod === 'text' ? ' active' : ''}`} onClick={() => setReviewMethod('text')}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    </svg>
-                    Text
+                  <button className={`rrm-method-btn${reviewMethod === 'text' ? ' active' : ''}${reviewTextSent ? ' rrm-method-sent' : ''}`} onClick={() => setReviewMethod('text')}>
+                    {reviewTextSent ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    ) : (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    )}
+                    {reviewTextSent ? 'Text Sent!' : 'Text'}
                   </button>
-                  <button className={`rrm-method-btn${reviewMethod === 'email' ? ' active' : ''}`} onClick={() => setReviewMethod('email')}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
-                    </svg>
-                    Email
-                  </button>
-                  <button className={`rrm-method-btn${reviewMethod === 'both' ? ' active' : ''}`} onClick={() => setReviewMethod('both')}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-                    </svg>
-                    Both
+                  <button className={`rrm-method-btn${reviewMethod === 'email' ? ' active' : ''}${reviewEmailSent ? ' rrm-method-sent' : ''}`} onClick={() => setReviewMethod('email')}>
+                    {reviewEmailSent ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    ) : (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    )}
+                    {reviewEmailSent ? 'Email Sent!' : 'Email'}
                   </button>
                 </div>
               </div>
@@ -1926,17 +1935,29 @@ export default function Dashboard() {
                 </div>
               )}
 
+              {/* Signature */}
+              <div className="rrm-preview-label" style={{ marginTop: 10 }}>
+                Signature
+                <span className="rrm-preview-hint">edit before sending</span>
+              </div>
+              <input
+                className="rrm-input"
+                type="text"
+                value={reviewSignature}
+                onChange={(e) => setReviewSignature(e.target.value)}
+                placeholder="Thanks! Your Company Name"
+              />
+
               {/* Footer */}
               <div className="rrm-footer">
                 <button
                   className="rrm-btn-send"
-                  disabled={reviewSending}
                   onClick={handleSendReview}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
                   </svg>
-                  {reviewSending ? 'Sending\u2026' : 'Send Review Request'}
+                  {reviewMethod === 'text' ? 'Send via Text' : 'Send via Email'}
                 </button>
                 <button className="rrm-btn-copy" onClick={handleCopyReview}>
                   <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -1946,9 +1967,9 @@ export default function Dashboard() {
                 </button>
               </div>
               <div className="rrm-footer-note">
-                {reviewMethod === 'text' || reviewMethod === 'both'
-                  ? 'Text opens your phone\'s messaging app — tap Send to deliver.'
-                  : 'Email sends automatically via ProjectCheckin.'}
+                {reviewMethod === 'text'
+                  ? 'Opens your messaging app — tap Send to deliver.'
+                  : 'Opens your email app — tap Send to deliver.'}
               </div>
 
             </div>
