@@ -441,7 +441,7 @@ export default async function ReportingPage({
       </div>
 
       {/* ── Sparkline stat cards ── */}
-      <div className="rpt-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
         {[
           { label: 'Page Views', count: counts.PAGE_VIEW, recent: recentPV, prev: prevPV, series: pageViewSeries, color: 'var(--sky)' },
           { label: 'Phone Clicks', count: counts.PHONE_CLICK, recent: recentPC, prev: prevPC, series: phoneClickSeries, color: 'var(--green)' },
@@ -494,7 +494,7 @@ export default async function ReportingPage({
             </svg>
           </Link>
         </div>
-        <div className="rpt-gbp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
           {['Profile Views', 'Direction Requests', 'Search Appearances'].map((label, i) => (
             <div key={label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px', boxShadow: 'var(--shadow-card)' }}>
               <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--t3)', marginBottom: 8 }}>{label}</div>
@@ -513,13 +513,13 @@ export default async function ReportingPage({
       </div>
 
       {/* ── Engagement breakdown ── */}
-      <div className="rpt-engagement-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
         {/* Donut card — flex-column so content fills full tile height */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 20px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)' }}>Engagement Breakdown</div>
           {engagementTotal > 0 ? (
-            <div className="rpt-donut-wrap" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 28, padding: '12px 0' }}>
-              <svg className="rpt-donut-svg" viewBox="0 0 160 160" width="160" height="160" style={{ flexShrink: 0 }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 28, padding: '12px 0' }}>
+              <svg viewBox="0 0 160 160" width="160" height="160" style={{ flexShrink: 0 }}>
                 <circle cx="80" cy="80" r={DONUT_R} fill="none" stroke="var(--surface-3)" strokeWidth="22"/>
                 {pvFrac > 0 && (
                   <circle cx="80" cy="80" r={DONUT_R} fill="none" stroke="var(--sky)" strokeWidth="22"
@@ -565,7 +565,7 @@ export default async function ReportingPage({
         </div>
 
         {/* Right column: Recent GBP Posts + Portfolio Views side by side */}
-        <div className="rpt-sidebar-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {/* Recent GBP Posts */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 16px', boxShadow: 'var(--shadow-card)' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)', marginBottom: 14 }}>Recent GBP Posts</div>
