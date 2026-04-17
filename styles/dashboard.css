@@ -1403,12 +1403,15 @@
   .db-filter-bar {
     padding: 8px 14px;
     height: auto;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
   }
   .db-filter-tabs { flex-wrap: wrap; }
-  .db-fselect    { font-size: 11px; }
-  .db-fsearch, .db-fsearch:focus { width: 120px; }
+  .db-filter-controls { flex-wrap: wrap; }
+  .db-fselect { font-size: 11px; flex: 1 1 auto; min-width: 0; }
+  .db-fsearch-wrap { flex: 1 1 100%; }
+  .db-fsearch, .db-fsearch:focus { width: 100%; box-sizing: border-box; }
 
   /* Jobs wrap */
   .db-jobs-wrap {
