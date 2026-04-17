@@ -1434,6 +1434,20 @@
 
   /* Typography */
   .db-page-title { font-size: 18px; }
+
+  /* Reporting — collapse all multi-column grids */
+  .rpt-stat-grid       { grid-template-columns: repeat(2, 1fr) !important; }
+  .rpt-gbp-grid        { grid-template-columns: 1fr !important; }
+  .rpt-engagement-grid { grid-template-columns: 1fr !important; }
+  .rpt-sidebar-grid    { grid-template-columns: 1fr !important; }
+  .rpt-donut-wrap      { gap: 16px !important; }
+  .rpt-donut-svg       { width: 120px !important; height: 120px !important; }
+
+  /* Account — connections tab card padding */
+  .db-shell-card { width: 100%; box-sizing: border-box; }
+
+  /* Sub-tab nav wraps on very small screens */
+  .db-sub-tabs { flex-wrap: wrap; }
 }
 
 /* ── Review Request Modal ───────────────────────────────────────────────────── */
@@ -1456,6 +1470,8 @@
   padding: 24px;
   box-shadow: 0 20px 60px rgba(0,0,0,.22);
   border: 1px solid var(--border);
+  max-height: 92dvh;
+  overflow-y: auto;
 }
 .rrm-header {
   display: flex;
