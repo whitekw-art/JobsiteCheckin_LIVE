@@ -1556,6 +1556,7 @@
   transition: all .14s;
 }
 .rrm-method-btn.active { background: var(--sky-dim); border-color: var(--sky); color: var(--sky-text); }
+.rrm-method-btn.rrm-method-sent { background: var(--green-bg); border-color: var(--green); color: var(--green); font-weight: 700; }
 .rrm-preview-label {
   font-size: 10px;
   font-weight: 700;
