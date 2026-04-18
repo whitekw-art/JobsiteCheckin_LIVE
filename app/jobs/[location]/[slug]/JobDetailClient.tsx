@@ -305,12 +305,12 @@ export default function JobDetailClient({
                 type="button"
                 aria-label="Open photo lightbox"
               >
-                <div className="relative" style={{ height: 'min(60vh, 500px)' }}>
+                <div className="relative" style={{ height: 'min(60vh, 500px)', background: '#080e0b' }}>
                   <Image
                     src={photos[featuredIndex]}
                     alt={`${photoAltBase} - photo ${featuredIndex + 1}`}
                     fill
-                    className="object-cover"
+                    className="object-contain md:object-cover"
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 76rem"
                     priority
                   />
