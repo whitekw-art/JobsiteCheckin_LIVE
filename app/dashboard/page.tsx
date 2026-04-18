@@ -440,6 +440,8 @@ export default function Dashboard() {
 
   // Org info (for review message)
   const [orgName, setOrgName] = useState('')
+  const [orgPhone, setOrgPhone] = useState('')
+  const [orgEmail, setOrgEmail] = useState('')
   const [gbpReviewLink, setGbpReviewLink] = useState('')
 
   // Review request modal
@@ -511,6 +513,8 @@ export default function Dashboard() {
       .then((r) => r.json())
       .then((d) => {
         if (d.organization?.name) setOrgName(d.organization.name)
+        if (d.organization?.phone) setOrgPhone(d.organization.phone)
+        if (d.organization?.email) setOrgEmail(d.organization.email)
         if (d.organization?.gbpReviewLink) setGbpReviewLink(d.organization.gbpReviewLink)
       })
       .catch(() => {})
@@ -919,7 +923,10 @@ export default function Dashboard() {
     setReviewOverridePhone(cust?.phones?.find((p) => p.num)?.num || '')
     setReviewOverrideEmail(cust?.emails?.find((e) => e.addr)?.addr || '')
     setReviewMessageText(buildReviewMessage(checkIn, custName))
-    setReviewSignature(`Thanks! ${orgName}`)
+    const sigLines = [`Thanks! ${orgName}`]
+    if (orgPhone) sigLines.push(orgPhone)
+    if (orgEmail) sigLines.push(orgEmail)
+    setReviewSignature(sigLines.join('\n'))
   }
 
   const getReviewRecipient = (checkIn: CheckIn) => {
