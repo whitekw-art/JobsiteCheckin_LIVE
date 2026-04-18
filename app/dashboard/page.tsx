@@ -958,7 +958,7 @@ export default function Dashboard() {
       setReviewTextSent(true)
       if (!hasEmail) setReviewModalCheckIn(null)
     } else {
-      const subject = encodeURIComponent('Quick favor — would you leave us a Google review?')
+      const subject = encodeURIComponent('We appreciated working with you — quick favor if you have a minute')
       const body = encodeURIComponent(fullMessage)
       window.open(`mailto:${email}?subject=${subject}&body=${body}`)
       setReviewEmailSent(true)
