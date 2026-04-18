@@ -525,7 +525,25 @@ export default function Dashboard() {
       const res = await fetch('/api/get-checkins-supabase')
       if (res.ok) {
         const data = await res.json()
-        setCheckIns(data.checkIns || [])
+        const loaded: CheckIn[] = data.checkIns || []
+        setCheckIns(loaded)
+        // Pre-populate editCustomers so review modal has data without requiring card open
+        setEditCustomers(
+          Object.fromEntries(
+            loaded.map((c) => [
+              c.id,
+              {
+                name: c.homeCustomerName || '',
+                phones: c.homeCustomerPhone
+                  ? c.homeCustomerPhone.split('\n').filter(Boolean).map((num) => ({ type: 'Mobile', num }))
+                  : [{ type: 'Mobile', num: '' }],
+                emails: c.homeCustomerEmail
+                  ? c.homeCustomerEmail.split('\n').filter(Boolean).map((addr) => ({ type: 'Home', addr }))
+                  : [{ type: 'Home', addr: '' }],
+              },
+            ])
+          )
+        )
       }
     } catch (err) {
       console.error('Error fetching check-ins:', err)
@@ -950,7 +968,8 @@ export default function Dashboard() {
 
     if (reviewMethod === 'text') {
       if (!phone) { alert('No phone number saved for this customer. Add it in the Customer Info section.'); return }
-      window.open(`sms:${phone}?body=${encodeURIComponent(fullMessage)}`, '_blank')
+      const cleanPhone = phone.replace(/[^0-9+]/g, '')
+      window.open(`sms:${cleanPhone}?body=${encodeURIComponent(fullMessage)}`, '_blank')
       setReviewTextSent(true)
       if (!hasEmail) setReviewModalCheckIn(null)
     }
