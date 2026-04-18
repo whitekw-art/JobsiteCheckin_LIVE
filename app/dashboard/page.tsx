@@ -23,6 +23,9 @@ interface CheckIn {
   doorType?: string | null
   isPublic: boolean
   photoUrls?: string[]
+  homeCustomerName?: string | null
+  homeCustomerPhone?: string | null
+  homeCustomerEmail?: string | null
 }
 
 interface EditAddr {
@@ -30,6 +33,12 @@ interface EditAddr {
   city: string
   state: string
   zip: string
+}
+
+interface EditCustomer {
+  name: string
+  phones: Array<{ type: string; num: string }>
+  emails: Array<{ type: string; addr: string }>
 }
 
 function validateForPublish(checkIn: CheckIn): { hardBlocked: boolean; warnings: string[] } {
@@ -416,12 +425,37 @@ export default function Dashboard() {
 
   // Address editing (keyed by checkIn.id)
   const [editAddresses, setEditAddresses] = useState<Record<string, EditAddr>>({})
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
 
   // Notes editing (keyed by checkIn.id)
   const [editNotes, setEditNotes] = useState<Record<string, string>>({})
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null)
+
+  // Customer editing (keyed by checkIn.id)
+  const [editCustomers, setEditCustomers] = useState<Record<string, EditCustomer>>({})
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null)
+  const [savingCustomerId, setSavingCustomerId] = useState<string | null>(null)
+
+  // Org info (for review message)
+  const [orgName, setOrgName] = useState('')
+  const [orgPhone, setOrgPhone] = useState('')
+  const [orgEmail, setOrgEmail] = useState('')
+  const [gbpReviewLink, setGbpReviewLink] = useState('')
+
+  // Review request modal
+  const [reviewModalCheckIn, setReviewModalCheckIn] = useState<CheckIn | null>(null)
+  const [reviewMethod, setReviewMethod] = useState<'text' | 'email'>('text')
+  const [reviewShowManual, setReviewShowManual] = useState(false)
+  const [reviewMessageText, setReviewMessageText] = useState('')
+  const [reviewSignature, setReviewSignature] = useState('')
+  const [reviewOverrideName, setReviewOverrideName] = useState('')
+  const [reviewOverridePhone, setReviewOverridePhone] = useState('')
+  const [reviewOverrideEmail, setReviewOverrideEmail] = useState('')
+  const [reviewCopied, setReviewCopied] = useState(false)
+  const [reviewTextSent, setReviewTextSent] = useState(false)
+  const [reviewEmailSent, setReviewEmailSent] = useState(false)
 
   // Photo delete
   const [deletingPhotoKey, setDeletingPhotoKey] = useState<string | null>(null)
@@ -458,8 +492,32 @@ export default function Dashboard() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [publishModal])
 
+  // Keep sessionStorage cache in sync with any local mutations (customer save, address save, etc.)
   useEffect(() => {
+    if (!loading) {
+      try { sessionStorage.setItem('db-checkins', JSON.stringify(checkIns)) } catch { /* ignore */ }
+    }
+  }, [checkIns, loading])
+
+  useEffect(() => {
+    // Seed from cache immediately so UI isn't blank while fetch runs
+    try {
+      const cached = sessionStorage.getItem('db-checkins')
+      if (cached) {
+        setCheckIns(JSON.parse(cached))
+        setLoading(false)
+      }
+    } catch { /* ignore */ }
     fetchCheckIns()
+    fetch('/api/organization/profile')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.organization?.name) setOrgName(d.organization.name)
+        if (d.organization?.phone) setOrgPhone(d.organization.phone)
+        if (d.organization?.email) setOrgEmail(d.organization.email)
+        if (d.organization?.gbpReviewLink) setGbpReviewLink(d.organization.gbpReviewLink)
+      })
+      .catch(() => {})
   }, [])
 
   const fetchCheckIns = async () => {
@@ -549,6 +607,18 @@ export default function Dashboard() {
         },
       }))
       setEditNotes((prev) => ({ ...prev, [checkIn.id]: checkIn.notes || '' }))
+      setEditCustomers((prev) => ({
+        ...prev,
+        [checkIn.id]: {
+          name: checkIn.homeCustomerName || '',
+          phones: checkIn.homeCustomerPhone
+            ? checkIn.homeCustomerPhone.split('\n').filter(Boolean).map((num) => ({ type: 'Mobile', num }))
+            : [{ type: 'Mobile', num: '' }],
+          emails: checkIn.homeCustomerEmail
+            ? checkIn.homeCustomerEmail.split('\n').filter(Boolean).map((addr) => ({ type: 'Home', addr }))
+            : [{ type: 'Home', addr: '' }],
+        },
+      }))
     }
     setExpandedIds(next)
   }
@@ -570,6 +640,7 @@ export default function Dashboard() {
         zip: checkIn.zip || '',
       },
     }))
+    setEditingAddressId(null)
   }
 
   // ── Address save ───────────────────────────────────────────────────────────
@@ -612,6 +683,7 @@ export default function Dashboard() {
             : c
         )
       )
+      setEditingAddressId(null)
     } catch (err: any) {
       alert(err.message || 'Failed to update address')
     } finally {
@@ -727,6 +799,186 @@ export default function Dashboard() {
     } finally {
       setSavingNoteId(null)
     }
+  }
+
+  // ── Customer info save ─────────────────────────────────────────────────────
+
+  const handleCustomerSave = async (checkIn: CheckIn) => {
+    const cust = editCustomers[checkIn.id]
+    if (!cust) return
+    setSavingCustomerId(checkIn.id)
+    try {
+      const phonesStr = cust.phones.filter((p) => p.num).map((p) => p.num).join('\n') || ''
+      const emailsStr = cust.emails.filter((e) => e.addr).map((e) => e.addr).join('\n') || ''
+      const res = await fetch('/api/checkins/customer', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: checkIn.id,
+          homeCustomerName: cust.name,
+          homeCustomerPhone: phonesStr,
+          homeCustomerEmail: emailsStr,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed to save customer info')
+      setCheckIns((prev) =>
+        prev.map((c) =>
+          c.id === checkIn.id
+            ? { ...c, homeCustomerName: cust.name, homeCustomerPhone: phonesStr, homeCustomerEmail: emailsStr }
+            : c
+        )
+      )
+      setEditingCustomerId(null)
+    } catch (err: any) {
+      alert(err.message || 'Failed to save customer info')
+    } finally {
+      setSavingCustomerId(null)
+    }
+  }
+
+  const cancelCustomerEdit = (checkIn: CheckIn) => {
+    setEditCustomers((prev) => ({
+      ...prev,
+      [checkIn.id]: {
+        name: checkIn.homeCustomerName || '',
+        phones: checkIn.homeCustomerPhone
+          ? checkIn.homeCustomerPhone.split('\n').filter(Boolean).map((num) => ({ type: 'Mobile', num }))
+          : [{ type: 'Mobile', num: '' }],
+        emails: checkIn.homeCustomerEmail
+          ? checkIn.homeCustomerEmail.split('\n').filter(Boolean).map((addr) => ({ type: 'Home', addr }))
+          : [{ type: 'Home', addr: '' }],
+      },
+    }))
+    setEditingCustomerId(null)
+  }
+
+  const addCustomerPhone = (id: string) => {
+    setEditCustomers((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], phones: [...prev[id].phones, { type: 'Mobile', num: '' }] },
+    }))
+  }
+
+  const removeCustomerPhone = (id: string, idx: number) => {
+    setEditCustomers((prev) => {
+      const phones = [...prev[id].phones]
+      if (phones.length > 1) phones.splice(idx, 1)
+      else phones[0] = { ...phones[0], num: '' }
+      return { ...prev, [id]: { ...prev[id], phones } }
+    })
+  }
+
+  const updateCustomerPhone = (id: string, idx: number, field: 'type' | 'num', value: string) => {
+    setEditCustomers((prev) => {
+      const phones = prev[id].phones.map((p, i) => (i === idx ? { ...p, [field]: value } : p))
+      return { ...prev, [id]: { ...prev[id], phones } }
+    })
+  }
+
+  const addCustomerEmail = (id: string) => {
+    setEditCustomers((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], emails: [...prev[id].emails, { type: 'Home', addr: '' }] },
+    }))
+  }
+
+  const removeCustomerEmail = (id: string, idx: number) => {
+    setEditCustomers((prev) => {
+      const emails = [...prev[id].emails]
+      if (emails.length > 1) emails.splice(idx, 1)
+      else emails[0] = { ...emails[0], addr: '' }
+      return { ...prev, [id]: { ...prev[id], emails } }
+    })
+  }
+
+  const updateCustomerEmail = (id: string, idx: number, field: 'type' | 'addr', value: string) => {
+    setEditCustomers((prev) => {
+      const emails = prev[id].emails.map((e, i) => (i === idx ? { ...e, [field]: value } : e))
+      return { ...prev, [id]: { ...prev[id], emails } }
+    })
+  }
+
+  // ── Review request modal ───────────────────────────────────────────────────
+
+  const buildReviewMessage = (checkIn: CheckIn, custName: string) => {
+    const firstName = custName.trim().split(' ')[0] || 'there'
+    const linkLine = gbpReviewLink
+      ? `\nGoogle review link: ${gbpReviewLink}`
+      : '\n[paste your Google review link here]'
+    const jobUrl = checkIn.isPublic ? `\nView your project photos: ${getPublicUrl(checkIn)}` : ''
+    return `${firstName} — we really appreciated your business. Hope you love the result — but please don't hesitate to call if anything needs attention. If you have a minute, a Google review helps us more than you know:${linkLine}${jobUrl}`
+  }
+
+  const openReviewModal = (checkIn: CheckIn) => {
+    const cust = editCustomers[checkIn.id]
+    const custName = cust?.name || ''
+    setReviewModalCheckIn(checkIn)
+    setReviewMethod('text')
+    setReviewShowManual(false)
+    setReviewCopied(false)
+    setReviewTextSent(false)
+    setReviewEmailSent(false)
+    setReviewOverrideName(custName)
+    setReviewOverridePhone(cust?.phones?.find((p) => p.num)?.num || '')
+    setReviewOverrideEmail(cust?.emails?.find((e) => e.addr)?.addr || '')
+    setReviewMessageText(buildReviewMessage(checkIn, custName))
+    const sigLines = [`Thanks! ${orgName}`]
+    if (orgPhone) sigLines.push(orgPhone)
+    if (orgEmail) sigLines.push(orgEmail)
+    setReviewSignature(sigLines.join('\n'))
+  }
+
+  const getReviewRecipient = (checkIn: CheckIn) => {
+    const cust = editCustomers[checkIn.id]
+    if (reviewShowManual) {
+      return { name: reviewOverrideName, phone: reviewOverridePhone, email: reviewOverrideEmail }
+    }
+    return {
+      name: cust?.name || reviewOverrideName,
+      phone: cust?.phones?.find((p) => p.num)?.num || reviewOverridePhone,
+      email: cust?.emails?.find((e) => e.addr)?.addr || reviewOverrideEmail,
+    }
+  }
+
+  const handleSendReview = () => {
+    if (!reviewModalCheckIn) return
+    const { phone, email } = getReviewRecipient(reviewModalCheckIn)
+    const fullMessage = `${reviewMessageText}\n\n${reviewSignature}`
+    const hasPhone = !!phone
+    const hasEmail = !!email
+
+    if (reviewMethod === 'text') {
+      if (!phone) { alert('No phone number saved for this customer. Add it in the Customer Info section.'); return }
+      window.open(`sms:${phone}?body=${encodeURIComponent(fullMessage)}`, '_blank')
+      setReviewTextSent(true)
+      if (!hasEmail) setReviewModalCheckIn(null)
+    }
+
+    if (reviewMethod === 'email') {
+      if (!email) { alert('No email address saved for this customer. Add it in the Customer Info section.'); return }
+      const subject = encodeURIComponent('We appreciated working with you — quick favor if you have a minute')
+      const body = encodeURIComponent(fullMessage)
+      window.open(`mailto:${email}?subject=${subject}&body=${body}`)
+      setReviewEmailSent(true)
+      if (!hasPhone) setReviewModalCheckIn(null)
+    }
+  }
+
+  // Auto-close when both have been sent (called via useEffect watching sent state)
+  useEffect(() => {
+    if (!reviewModalCheckIn) return
+    const { phone, email } = getReviewRecipient(reviewModalCheckIn)
+    if (reviewTextSent && reviewEmailSent && phone && email) {
+      setReviewModalCheckIn(null)
+    }
+  }, [reviewTextSent, reviewEmailSent])
+
+  const handleCopyReview = () => {
+    if (!reviewModalCheckIn) return
+    navigator.clipboard.writeText(`${reviewMessageText}\n\n${reviewSignature}`).catch(() => {})
+    setReviewCopied(true)
+    setTimeout(() => setReviewCopied(false), 2000)
   }
 
   // ── Photo delete ───────────────────────────────────────────────────────────
@@ -1132,88 +1384,229 @@ export default function Dashboard() {
                       {/* Expanded detail */}
                       <div className="db-card-detail">
                         <div className="db-detail-grid">
-                          {/* Left col: address + installer + notes */}
+                          {/* Left col: customer info + address + job info + notes */}
                           <div className="db-detail-col">
-                            <div className="db-d-label">Address</div>
-                            <input
-                              className="db-field"
-                              value={editAddr.street}
-                              placeholder="Street"
-                              onChange={(e) => updateEditAddr(checkIn.id, 'street', e.target.value)}
-                            />
-                            <div className="db-field-row">
-                              <input
-                                className="db-field"
-                                style={{ flex: 2 }}
-                                value={editAddr.city}
-                                placeholder="City"
-                                onChange={(e) => updateEditAddr(checkIn.id, 'city', e.target.value)}
-                              />
-                              <input
-                                className="db-field"
-                                style={{ flex: 0.8 }}
-                                value={editAddr.state}
-                                placeholder="State"
-                                onChange={(e) => updateEditAddr(checkIn.id, 'state', e.target.value)}
-                              />
-                              <input
-                                className="db-field"
-                                style={{ flex: 1.5 }}
-                                value={editAddr.zip}
-                                placeholder="ZIP"
-                                onChange={(e) => updateEditAddr(checkIn.id, 'zip', e.target.value)}
-                              />
-                            </div>
-                            <div className="db-edit-actions">
-                              <button
-                                className="db-btn-save"
-                                disabled={savingId === checkIn.id}
-                                onClick={() => handleEditSave(checkIn)}
-                              >
-                                {savingId === checkIn.id ? 'Saving\u2026' : 'Save'}
-                              </button>
-                              <button
-                                className="db-btn-cancel"
-                                onClick={() => resetEditAddr(checkIn)}
-                              >
-                                Cancel
-                              </button>
-                            </div>
 
+                            {/* ── Customer Info ── */}
                             {(() => {
-                              const mapsUrl = checkIn.latitude && checkIn.longitude
-                                ? `https://maps.google.com/?q=${checkIn.latitude},${checkIn.longitude}`
-                                : [editAddr.street, editAddr.city, editAddr.state, editAddr.zip].filter(Boolean).length > 0
-                                  ? `https://maps.google.com/?q=${encodeURIComponent([editAddr.street, editAddr.city, editAddr.state, editAddr.zip].filter(Boolean).join(', '))}`
-                                  : null
-                              return mapsUrl ? (
-                                <a
-                                  href={mapsUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: 'var(--sky-text)', textDecoration: 'none', marginTop: 6 }}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
-                                  </svg>
-                                  View on Google Maps
-                                </a>
-                              ) : null
+                              const cust = editCustomers[checkIn.id]
+                              const isEditing = editingCustomerId === checkIn.id
+                              const hasData = cust?.name || cust?.phones?.some((p) => p.num) || cust?.emails?.some((e) => e.addr)
+                              return (
+                                <>
+                                  <div className="cust-section-hdr">
+                                    <span className="cust-section-title">Customer Info</span>
+                                    {!isEditing && hasData && (
+                                      <button className="db-btn-note-edit" onClick={() => setEditingCustomerId(checkIn.id)}>Edit</button>
+                                    )}
+                                  </div>
+
+                                  {isEditing ? (
+                                    <div>
+                                      <input
+                                        className="db-field"
+                                        value={cust?.name ?? ''}
+                                        placeholder="Customer name"
+                                        style={{ marginBottom: 10 }}
+                                        onChange={(e) => setEditCustomers((prev) => ({ ...prev, [checkIn.id]: { ...prev[checkIn.id], name: e.target.value } }))}
+                                      />
+                                      <div className="cust-field-section-lbl">Phone</div>
+                                      {cust?.phones.map((phone, idx) => (
+                                        <div key={idx} className="cust-entry-row">
+                                          <select
+                                            className="cust-type-select"
+                                            value={phone.type}
+                                            onChange={(e) => updateCustomerPhone(checkIn.id, idx, 'type', e.target.value)}
+                                          >
+                                            <option>Mobile</option>
+                                            <option>Home</option>
+                                            <option>Work</option>
+                                            <option>Other</option>
+                                          </select>
+                                          <input
+                                            className="db-field cust-entry-input"
+                                            type="tel"
+                                            value={phone.num}
+                                            placeholder="Phone number"
+                                            onChange={(e) => updateCustomerPhone(checkIn.id, idx, 'num', e.target.value)}
+                                          />
+                                          <button className="cust-remove-btn" onClick={() => removeCustomerPhone(checkIn.id, idx)}>−</button>
+                                        </div>
+                                      ))}
+                                      <button className="cust-add-link" onClick={() => addCustomerPhone(checkIn.id)}>+ add phone</button>
+
+                                      <div className="cust-field-section-lbl">Email</div>
+                                      {cust?.emails.map((email, idx) => (
+                                        <div key={idx} className="cust-entry-row">
+                                          <select
+                                            className="cust-type-select"
+                                            value={email.type}
+                                            onChange={(e) => updateCustomerEmail(checkIn.id, idx, 'type', e.target.value)}
+                                          >
+                                            <option>Home</option>
+                                            <option>Work</option>
+                                            <option>Other</option>
+                                          </select>
+                                          <input
+                                            className="db-field cust-entry-input"
+                                            type="email"
+                                            value={email.addr}
+                                            placeholder="Email address"
+                                            onChange={(e) => updateCustomerEmail(checkIn.id, idx, 'addr', e.target.value)}
+                                          />
+                                          <button className="cust-remove-btn" onClick={() => removeCustomerEmail(checkIn.id, idx)}>−</button>
+                                        </div>
+                                      ))}
+                                      <button className="cust-add-link" onClick={() => addCustomerEmail(checkIn.id)}>+ add email</button>
+
+                                      <div className="db-edit-actions">
+                                        <button
+                                          className="db-btn-save"
+                                          disabled={savingCustomerId === checkIn.id}
+                                          onClick={() => handleCustomerSave(checkIn)}
+                                        >
+                                          {savingCustomerId === checkIn.id ? 'Saving\u2026' : 'Save'}
+                                        </button>
+                                        <button className="db-btn-cancel" onClick={() => cancelCustomerEdit(checkIn)}>Cancel</button>
+                                      </div>
+                                    </div>
+                                  ) : hasData ? (
+                                    <div style={{ marginBottom: 4 }}>
+                                      {cust.name && (
+                                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)', marginBottom: 5 }}>{cust.name}</div>
+                                      )}
+                                      {cust.phones.filter((p) => p.num).map((p, i) => (
+                                        <div key={i} className="cust-read-contact">
+                                          <span className="cust-read-type">{p.type}</span>
+                                          <span className="cust-read-val">{p.num}</span>
+                                        </div>
+                                      ))}
+                                      {cust.emails.filter((e) => e.addr).map((e, i) => (
+                                        <div key={i} className="cust-read-contact" style={{ marginTop: 1 }}>
+                                          <span className="cust-read-type">{e.type}</span>
+                                          <span className="cust-read-val">{e.addr}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <button
+                                      className="db-btn-note-edit"
+                                      style={{ padding: 0, marginBottom: 4 }}
+                                      onClick={() => setEditingCustomerId(checkIn.id)}
+                                    >
+                                      + Add customer info
+                                    </button>
+                                  )}
+                                </>
+                              )
                             })()}
 
-                            {checkIn.locationSource === 'DEVICE' && (
-                              <div className="db-location-warning">
-                                Device location — please verify address
+                            {/* Address */}
+                            <div style={{ marginTop: 14 }}>
+                              <div className="db-notes-header">
+                                <span className="db-d-label">Address</span>
+                                {editingAddressId !== checkIn.id && (
+                                  <button className="db-btn-note-edit" onClick={() => setEditingAddressId(checkIn.id)}>Edit</button>
+                                )}
                               </div>
-                            )}
-
-                            <div className="db-installer-row">
-                              <span className="db-d-label">Installer</span>
-                              <span className="db-installer-name">{checkIn.installer}</span>
+                              {editingAddressId === checkIn.id ? (
+                                <>
+                                  <input
+                                    className="db-field"
+                                    value={editAddr.street}
+                                    placeholder="Street"
+                                    onChange={(e) => updateEditAddr(checkIn.id, 'street', e.target.value)}
+                                  />
+                                  <div className="db-field-row">
+                                    <input
+                                      className="db-field"
+                                      style={{ flex: 2 }}
+                                      value={editAddr.city}
+                                      placeholder="City"
+                                      onChange={(e) => updateEditAddr(checkIn.id, 'city', e.target.value)}
+                                    />
+                                    <input
+                                      className="db-field"
+                                      style={{ flex: 0.8 }}
+                                      value={editAddr.state}
+                                      placeholder="State"
+                                      onChange={(e) => updateEditAddr(checkIn.id, 'state', e.target.value)}
+                                    />
+                                    <input
+                                      className="db-field"
+                                      style={{ flex: 1.5 }}
+                                      value={editAddr.zip}
+                                      placeholder="ZIP"
+                                      onChange={(e) => updateEditAddr(checkIn.id, 'zip', e.target.value)}
+                                    />
+                                  </div>
+                                  <div className="db-edit-actions">
+                                    <button
+                                      className="db-btn-save"
+                                      disabled={savingId === checkIn.id}
+                                      onClick={() => handleEditSave(checkIn)}
+                                    >
+                                      {savingId === checkIn.id ? 'Saving\u2026' : 'Save'}
+                                    </button>
+                                    <button className="db-btn-cancel" onClick={() => resetEditAddr(checkIn)}>Cancel</button>
+                                  </div>
+                                </>
+                              ) : (
+                                <div style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.5, marginBottom: 4 }}>
+                                  {[checkIn.street, [checkIn.city, checkIn.state, checkIn.zip].filter(Boolean).join(', ')].filter(Boolean).join(', ') || <span style={{ color: 'var(--t4)' }}>No address saved</span>}
+                                </div>
+                              )}
+                              {(() => {
+                                const mapsUrl = checkIn.latitude && checkIn.longitude
+                                  ? `https://maps.google.com/?q=${checkIn.latitude},${checkIn.longitude}`
+                                  : [checkIn.street, checkIn.city, checkIn.state, checkIn.zip].filter(Boolean).length > 0
+                                    ? `https://maps.google.com/?q=${encodeURIComponent([checkIn.street, checkIn.city, checkIn.state, checkIn.zip].filter(Boolean).join(', '))}`
+                                    : null
+                                return mapsUrl ? (
+                                  <a
+                                    href={mapsUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: 'var(--sky-text)', textDecoration: 'none', marginTop: 2 }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+                                    </svg>
+                                    View on Google Maps
+                                  </a>
+                                ) : null
+                              })()}
+                              {checkIn.locationSource === 'DEVICE' && (
+                                <div className="db-location-warning">
+                                  Device location — please verify address
+                                </div>
+                              )}
                             </div>
 
-                            <div style={{ marginTop: 12 }}>
+                            {/* ── Job Info ── */}
+                            <div style={{ height: 1, background: 'var(--border)', margin: '16px 0' }} />
+                            <span className="cust-section-title" style={{ display: 'block', marginBottom: 10 }}>Job Info</span>
+
+                            <div className="job-info-row">
+                              <span className="db-d-label">Installer</span>
+                              <span className="job-info-val">{checkIn.installer}</span>
+                            </div>
+                            {checkIn.doorType && (
+                              <div className="job-info-row">
+                                <span className="db-d-label">Job Type</span>
+                                <span className="job-info-val">{checkIn.doorType}</span>
+                              </div>
+                            )}
+                            <div className="job-info-row" style={{ marginBottom: 12 }}>
+                              <span className="db-d-label">Job Date</span>
+                              <span className="job-info-val">
+                                {new Date(checkIn.timestamp).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                              </span>
+                            </div>
+
+                            {/* Notes */}
+                            <div>
                               <div className="db-notes-header">
                                 <span className="db-d-label">Notes</span>
                                 {editingNoteId !== checkIn.id && (
@@ -1266,6 +1659,7 @@ export default function Dashboard() {
                                 </div>
                               )}
                             </div>
+
                           </div>
 
                           {/* Right col: photos + actions */}
@@ -1354,6 +1748,16 @@ export default function Dashboard() {
                                   Post to Google Business
                                 </button>
                               )}
+                              <button
+                                className="db-btn-ghost db-btn-review"
+                                data-tooltip="Texts and/or emails your customer a personalized message and link to leave you a Google review"
+                                onClick={(e) => { e.stopPropagation(); openReviewModal(checkIn) }}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                </svg>
+                                Request Google Review
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1420,6 +1824,160 @@ export default function Dashboard() {
             publicUrl={getPublicUrl(ci)}
             onClose={() => setGbpPostId(null)}
           />
+        )
+      })()}
+
+      {/* ── Review Request Modal ── */}
+      {reviewModalCheckIn && (() => {
+        const ci = reviewModalCheckIn
+        const { name, phone, email } = getReviewRecipient(ci)
+        const savedCust = editCustomers[ci.id]
+        const hasCustomer = !!(savedCust?.name || savedCust?.phones?.find((p) => p.num)?.num)
+        const subLine = [ci.street || ci.city, ci.doorType, ci.timestamp ? new Date(ci.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''].filter(Boolean).join(' · ')
+        return (
+          <div className="rrm-overlay" onClick={() => setReviewModalCheckIn(null)}>
+            <div className="rrm-box" onClick={(e) => e.stopPropagation()}>
+
+              <div className="rrm-header">
+                <div>
+                  <div className="rrm-title">Request a Google Review</div>
+                  {subLine && <div className="rrm-sub">{subLine}</div>}
+                </div>
+                <button className="rrm-close" onClick={() => setReviewModalCheckIn(null)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+
+              {/* Customer display / manual fields */}
+              {hasCustomer && !reviewShowManual ? (
+                <div className="rrm-cust-display">
+                  <div>
+                    <div className="rrm-cust-name">{name || '—'}</div>
+                    <div className="rrm-cust-phone">{phone || 'No phone saved'}</div>
+                  </div>
+                  <button className="rrm-change-btn" onClick={() => setReviewShowManual(true)}>Change</button>
+                </div>
+              ) : (
+                <div>
+                  <div className="rrm-field-group">
+                    <div className="rrm-label">Customer Name <span style={{ color: 'var(--red)' }}>*</span></div>
+                    <input
+                      className="rrm-input"
+                      type="text"
+                      placeholder="e.g. Sarah Johnson"
+                      value={reviewOverrideName}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setReviewOverrideName(val)
+                        const firstName = val.trim().split(' ')[0] || 'there'
+                        setReviewMessageText((prev) => prev.replace(/^\S+/, firstName || 'there'))
+                      }}
+                    />
+                  </div>
+                  <div className="rrm-field-group">
+                    <div className="rrm-label">Mobile Number <span style={{ color: 'var(--red)' }}>*</span></div>
+                    <input
+                      className="rrm-input"
+                      type="tel"
+                      placeholder="(615) 555-0192"
+                      value={reviewOverridePhone}
+                      onChange={(e) => setReviewOverridePhone(e.target.value)}
+                    />
+                  </div>
+                  <div className="rrm-field-group">
+                    <div className="rrm-label">Email <span style={{ color: 'var(--t3)', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></div>
+                    <input
+                      className="rrm-input"
+                      type="email"
+                      placeholder="sarah@email.com"
+                      value={reviewOverrideEmail}
+                      onChange={(e) => setReviewOverrideEmail(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Send method */}
+              <div style={{ marginBottom: 14 }}>
+                <div className="rrm-label" style={{ marginBottom: 8 }}>Send via</div>
+                <div className="rrm-method-row">
+                  <button className={`rrm-method-btn${reviewMethod === 'text' ? ' active' : ''}${reviewTextSent ? ' rrm-method-sent' : ''}`} onClick={() => setReviewMethod('text')}>
+                    {reviewTextSent ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    ) : (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    )}
+                    {reviewTextSent ? 'Text Sent!' : 'Text'}
+                  </button>
+                  <button className={`rrm-method-btn${reviewMethod === 'email' ? ' active' : ''}${reviewEmailSent ? ' rrm-method-sent' : ''}`} onClick={() => setReviewMethod('email')}>
+                    {reviewEmailSent ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    ) : (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    )}
+                    {reviewEmailSent ? 'Email Sent!' : 'Email'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Message preview */}
+              <div className="rrm-preview-label">
+                Message
+                <span className="rrm-preview-hint">edit before sending</span>
+              </div>
+              <textarea
+                className="rrm-preview-textarea"
+                value={reviewMessageText}
+                onChange={(e) => setReviewMessageText(e.target.value)}
+                rows={4}
+              />
+              {reviewMessageText.includes('[review link]') && (
+                <div className="rrm-link-warn">
+                  Add your Google review link in Account &rarr; Connections to auto-fill this.
+                </div>
+              )}
+
+              {/* Signature */}
+              <div className="rrm-preview-label" style={{ marginTop: 10 }}>
+                Signature
+                <span className="rrm-preview-hint">edit before sending</span>
+              </div>
+              <input
+                className="rrm-input"
+                type="text"
+                value={reviewSignature}
+                onChange={(e) => setReviewSignature(e.target.value)}
+                placeholder="Thanks! Your Company Name"
+              />
+
+              {/* Footer */}
+              <div className="rrm-footer">
+                <button
+                  className="rrm-btn-send"
+                  onClick={handleSendReview}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
+                  {reviewMethod === 'text' ? 'Send via Text' : 'Send via Email'}
+                </button>
+                <button className="rrm-btn-copy" onClick={handleCopyReview}>
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.7">
+                    <rect x="1" y="3.5" width="6" height="6.5" rx="1.2"/><path d="M4 3.5V2A1 1 0 0 1 5 1h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H8"/>
+                  </svg>
+                  {reviewCopied ? 'Copied!' : 'Copy text'}
+                </button>
+              </div>
+              <div className="rrm-footer-note">
+                {reviewMethod === 'text'
+                  ? 'Opens your messaging app — tap Send to deliver.'
+                  : 'Opens your email app — tap Send to deliver.'}
+              </div>
+
+            </div>
+          </div>
         )
       })()}
     </>

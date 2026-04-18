@@ -102,13 +102,13 @@ function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 }
 
-// Assign varied aspect ratios for masonry feel
+// Assign varied aspect ratios for masonry feel (mobile always 4/3 to avoid cropping landscape photos)
 const ASPECT_CLASSES = [
-  'aspect-[4/3]',
-  'aspect-[3/2]',
-  'aspect-[5/4]',
-  'aspect-[16/10]',
-  'aspect-square',
+  'aspect-[4/3] md:aspect-[4/3]',
+  'aspect-[4/3] md:aspect-[3/2]',
+  'aspect-[4/3] md:aspect-[5/4]',
+  'aspect-[4/3] md:aspect-[16/10]',
+  'aspect-[4/3] md:aspect-square',
 ]
 function getAspectClass(index: number): string {
   return ASPECT_CLASSES[index % ASPECT_CLASSES.length]
@@ -373,9 +373,7 @@ function HeroBand({
     <section
       className="relative overflow-hidden"
       style={{
-        height: '75vh',
-        minHeight: '500px',
-        maxHeight: '900px',
+        height: 'clamp(380px, 75vh, 900px)',
         background: 'linear-gradient(160deg, #0f1f17 0%, #0a1610 40%, #080e0b 100%)',
       }}
     >
@@ -408,7 +406,7 @@ function HeroBand({
             src={photo}
             alt={`${orgName} project photo ${i + 1}`}
             fill
-            className="object-cover"
+            className="object-contain md:object-cover"
             sizes="100vw"
             priority={i === 0}
           />
@@ -524,7 +522,7 @@ function HeroBand({
       {/* Photo reel controls: arrows + dots */}
       {photoCount > 1 && (
         <div
-          className={`absolute bottom-6 right-5 sm:bottom-8 sm:right-8 z-[6] flex items-center gap-3 transition-opacity duration-500 ${
+          className={`absolute top-4 right-4 sm:top-auto sm:bottom-8 sm:right-8 z-[6] flex items-center gap-3 transition-opacity duration-500 ${
             heroLoaded ? 'opacity-100' : 'opacity-0'
           }`}
           style={{ transitionDelay: '0.5s' }}
