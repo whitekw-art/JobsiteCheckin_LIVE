@@ -899,13 +899,11 @@ export default function Dashboard() {
 
   const buildReviewMessage = (checkIn: CheckIn, custName: string) => {
     const firstName = custName.trim().split(' ')[0] || 'there'
-    const jobDesc = checkIn.doorType ? `${checkIn.doorType.toLowerCase()} ` : ''
-    const org = orgName || 'our team'
     const linkLine = gbpReviewLink
-      ? `\nLINK to Google Business Reviews: ${gbpReviewLink}`
-      : '\n[review link]'
+      ? `\nGoogle review link: ${gbpReviewLink}`
+      : '\n[paste your Google review link here]'
     const jobUrl = checkIn.isPublic ? `\nView your project photos: ${getPublicUrl(checkIn)}` : ''
-    return `Hi ${firstName}, thanks for choosing ${org}! We just finished your ${jobDesc}installation. Mind leaving us a quick Google review? It takes 1 minute and means a lot to our small team. ⭐${linkLine}${jobUrl}`
+    return `${firstName} — we really appreciated your business. Hope you love the result — but please don't hesitate to call if anything needs attention. If you have a minute, a Google review helps us more than you know:${linkLine}${jobUrl}`
   }
 
   const openReviewModal = (checkIn: CheckIn) => {
