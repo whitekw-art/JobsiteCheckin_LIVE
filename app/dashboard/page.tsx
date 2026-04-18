@@ -454,6 +454,9 @@ export default function Dashboard() {
   const [reviewCopied, setReviewCopied] = useState(false)
   const [reviewTextSent, setReviewTextSent] = useState(false)
   const [reviewEmailSent, setReviewEmailSent] = useState(false)
+  const [reviewSelectedPhotos, setReviewSelectedPhotos] = useState<Set<string>>(new Set())
+  const [reviewSending, setReviewSending] = useState(false)
+  const [supportsWebShare, setSupportsWebShare] = useState(false)
 
   // Photo delete
   const [deletingPhotoKey, setDeletingPhotoKey] = useState<string | null>(null)
@@ -514,6 +517,7 @@ export default function Dashboard() {
         if (d.organization?.gbpReviewLink) setGbpReviewLink(d.organization.gbpReviewLink)
       })
       .catch(() => {})
+    setSupportsWebShare(typeof navigator !== 'undefined' && typeof navigator.share === 'function')
   }, [])
 
   const fetchCheckIns = async () => {
@@ -920,6 +924,8 @@ export default function Dashboard() {
     setReviewOverrideEmail(cust?.emails?.find((e) => e.addr)?.addr || '')
     setReviewMessageText(buildReviewMessage(checkIn, custName))
     setReviewSignature(`Thanks! ${orgName}`)
+    const photos = checkIn.photoUrls || []
+    setReviewSelectedPhotos(new Set(photos.slice(0, 5)))
   }
 
   const getReviewRecipient = (checkIn: CheckIn) => {
@@ -934,28 +940,88 @@ export default function Dashboard() {
     }
   }
 
-  const handleSendReview = () => {
-    if (!reviewModalCheckIn) return
-    const { phone, email } = getReviewRecipient(reviewModalCheckIn)
-    const fullMessage = `${reviewMessageText}\n\n${reviewSignature}`
+  const toggleReviewPhoto = (url: string) => {
+    setReviewSelectedPhotos((prev) => {
+      const next = new Set(prev)
+      if (next.has(url)) {
+        next.delete(url)
+      } else if (next.size < 5) {
+        next.add(url)
+      }
+      return next
+    })
+  }
 
-    const hasPhone = !!phone
-    const hasEmail = !!email
-
-    if (reviewMethod === 'text') {
-      if (!phone) { alert('No phone number saved for this customer. Add it in the Customer Info section.'); return }
+  const doFallbackSend = (method: 'text' | 'email', phone: string, email: string, fullMessage: string, hasPhone: boolean, hasEmail: boolean) => {
+    if (method === 'text') {
       window.open(`sms:${phone}?body=${encodeURIComponent(fullMessage)}`, '_blank')
       setReviewTextSent(true)
       if (!hasEmail) setReviewModalCheckIn(null)
-    }
-
-    if (reviewMethod === 'email') {
-      if (!email) { alert('No email address saved for this customer. Add it in the Customer Info section.'); return }
+    } else {
       const subject = encodeURIComponent('Quick favor — would you leave us a Google review?')
       const body = encodeURIComponent(fullMessage)
       window.open(`mailto:${email}?subject=${subject}&body=${body}`)
       setReviewEmailSent(true)
       if (!hasPhone) setReviewModalCheckIn(null)
+    }
+  }
+
+  const handleSendReview = async () => {
+    if (!reviewModalCheckIn) return
+    const { phone, email } = getReviewRecipient(reviewModalCheckIn)
+    const fullMessage = `${reviewMessageText}\n\n${reviewSignature}`
+    const hasPhone = !!phone
+    const hasEmail = !!email
+
+    if (reviewMethod === 'text' && !phone) {
+      alert('No phone number saved for this customer. Add it in the Customer Info section.')
+      return
+    }
+    if (reviewMethod === 'email' && !email) {
+      alert('No email address saved for this customer. Add it in the Customer Info section.')
+      return
+    }
+
+    const selectedUrls = Array.from(reviewSelectedPhotos)
+
+    if (supportsWebShare) {
+      try {
+        setReviewSending(true)
+        const shareData: ShareData = { text: fullMessage }
+
+        if (selectedUrls.length > 0) {
+          const files: File[] = []
+          for (const url of selectedUrls) {
+            try {
+              const res = await fetch(url)
+              const blob = await res.blob()
+              const ext = blob.type.includes('png') ? 'png' : blob.type.includes('gif') ? 'gif' : 'jpg'
+              files.push(new File([blob], `job-photo.${ext}`, { type: blob.type }))
+            } catch { /* skip failed photo */ }
+          }
+          if (files.length > 0 && navigator.canShare && navigator.canShare({ files })) {
+            shareData.files = files
+          }
+        }
+
+        await navigator.share(shareData)
+
+        if (reviewMethod === 'text') {
+          setReviewTextSent(true)
+          if (!hasEmail) setReviewModalCheckIn(null)
+        } else {
+          setReviewEmailSent(true)
+          if (!hasPhone) setReviewModalCheckIn(null)
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          doFallbackSend(reviewMethod, phone, email, fullMessage, hasPhone, hasEmail)
+        }
+      } finally {
+        setReviewSending(false)
+      }
+    } else {
+      doFallbackSend(reviewMethod, phone, email, fullMessage, hasPhone, hasEmail)
     }
   }
 
@@ -1866,7 +1932,7 @@ export default function Dashboard() {
                         const val = e.target.value
                         setReviewOverrideName(val)
                         const firstName = val.trim().split(' ')[0] || 'there'
-                        setReviewMessageText((prev) => prev.replace(/^Hi \S+/, `Hi ${firstName}`))
+                        setReviewMessageText((prev) => prev.replace(/^\S+/, firstName || 'there'))
                       }}
                     />
                   </div>
@@ -1946,16 +2012,62 @@ export default function Dashboard() {
                 placeholder="Thanks! Your Company Name"
               />
 
+              {/* Photo selection */}
+              {(() => {
+                const photos = ci.photoUrls || []
+                if (photos.length === 0) return null
+                return (
+                  <div style={{ marginTop: 14, marginBottom: 14 }}>
+                    <div className="rrm-preview-label">
+                      Attach Photos
+                      <span className="rrm-preview-hint">{reviewSelectedPhotos.size} of {Math.min(photos.length, 5)} selected (max 5)</span>
+                    </div>
+                    <div className="rrm-photo-grid">
+                      {photos.map((url, i) => {
+                        const isSelected = reviewSelectedPhotos.has(url)
+                        const atCap = reviewSelectedPhotos.size >= 5
+                        const isDisabled = !isSelected && atCap
+                        return (
+                          <button
+                            key={url}
+                            type="button"
+                            className={`rrm-photo-thumb${isSelected ? ' selected' : ''}${isDisabled ? ' disabled' : ''}`}
+                            onClick={() => toggleReviewPhoto(url)}
+                            disabled={isDisabled}
+                            title={isDisabled ? 'Uncheck a photo to swap this one in' : undefined}
+                          >
+                            <img src={url} alt={`Job photo ${i + 1}`} />
+                            {isSelected && (
+                              <div className="rrm-photo-check">
+                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                              </div>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {photos.length > 5 && reviewSelectedPhotos.size >= 5 && (
+                      <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 5 }}>
+                        Uncheck a photo to swap in another
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
               {/* Footer */}
               <div className="rrm-footer">
                 <button
                   className="rrm-btn-send"
                   onClick={handleSendReview}
+                  disabled={reviewSending}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
                   </svg>
-                  {reviewMethod === 'text' ? 'Send via Text' : 'Send via Email'}
+                  {reviewSending ? 'Preparing...' : reviewMethod === 'text' ? 'Send via Text' : 'Send via Email'}
                 </button>
                 <button className="rrm-btn-copy" onClick={handleCopyReview}>
                   <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -1965,9 +2077,11 @@ export default function Dashboard() {
                 </button>
               </div>
               <div className="rrm-footer-note">
-                {reviewMethod === 'text'
-                  ? 'Opens your messaging app — tap Send to deliver.'
-                  : 'Opens your email app — tap Send to deliver.'}
+                {supportsWebShare
+                  ? 'Your share menu will open — pick Messages, Mail, or any app.'
+                  : reviewMethod === 'text'
+                    ? 'Opens your messaging app — tap Send to deliver.'
+                    : 'Opens your email app — tap Send to deliver.'}
               </div>
 
             </div>
