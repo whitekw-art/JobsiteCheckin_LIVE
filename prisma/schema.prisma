@@ -25,6 +25,7 @@ model Organization {
   planTier             String?
   planVersion          Int     @default(1)
   gbpReviewLink        String?
+  email                String?
   Invitations Invitations[]
   users       User[]
   checkIns    CheckIn[]

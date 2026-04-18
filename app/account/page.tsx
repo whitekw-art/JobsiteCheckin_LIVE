@@ -11,6 +11,7 @@ interface OrganizationProfile {
   slug: string | null
   phone: string | null
   website: string | null
+  email: string | null
   gbpReviewLink: string | null
 }
 
@@ -107,6 +108,8 @@ export default function AccountPage() {
   const [portalLoading, setPortalLoading] = useState(false)
   const [showDowngradeWarning, setShowDowngradeWarning] = useState(false)
   const [profile, setProfile] = useState<OrganizationProfile | null>(null)
+  const [orgName, setOrgName] = useState('')
+  const [orgEmail, setOrgEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [website, setWebsite] = useState('')
   const [loading, setLoading] = useState(true)
@@ -160,6 +163,8 @@ export default function AccountPage() {
         const data = await res.json()
         const org: OrganizationProfile = data.organization
         setProfile(org)
+        setOrgName(org.name || '')
+        setOrgEmail(org.email || '')
         setPhone(org.phone || '')
         setWebsite(org.website || '')
         setGbpReviewLinkInput(org.gbpReviewLink || '')
@@ -250,6 +255,8 @@ export default function AccountPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          name: orgName.trim() || undefined,
+          email: orgEmail.trim() || null,
           phone: phone.trim() || null,
           website: website.trim() || null,
         }),
@@ -258,6 +265,8 @@ export default function AccountPage() {
       if (!res.ok) throw new Error(data?.error || 'Failed to update profile')
       const updated: OrganizationProfile = data.organization
       setProfile(updated)
+      setOrgName(updated.name || '')
+      setOrgEmail(updated.email || '')
       setPhone(updated.phone || '')
       setWebsite(updated.website || '')
       setMessage('Business profile updated.')
@@ -294,8 +303,30 @@ export default function AccountPage() {
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label className="db-shell-label">Business Name</label>
-                <div className="db-shell-field-static">{profile.name}</div>
+                <label htmlFor="business-name" className="db-shell-label">Business Name</label>
+                <input
+                  id="business-name"
+                  type="text"
+                  className="db-shell-input"
+                  style={{ width: '100%', minWidth: 0 }}
+                  value={orgName}
+                  onChange={(e) => setOrgName(e.target.value)}
+                  placeholder="Your Company Name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="business-email" className="db-shell-label">Company Email</label>
+                <input
+                  id="business-email"
+                  type="email"
+                  className="db-shell-input"
+                  style={{ width: '100%', minWidth: 0 }}
+                  value={orgEmail}
+                  onChange={(e) => setOrgEmail(e.target.value)}
+                  placeholder="info@yourcompany.com"
+                />
               </div>
 
               <div>
