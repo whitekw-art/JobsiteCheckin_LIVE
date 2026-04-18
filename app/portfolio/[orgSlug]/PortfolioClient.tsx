@@ -102,13 +102,13 @@ function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 }
 
-// Assign varied aspect ratios for masonry feel
+// Assign varied aspect ratios for masonry feel (mobile always 4/3 to avoid cropping landscape photos)
 const ASPECT_CLASSES = [
-  'aspect-[4/3]',
-  'aspect-[3/2]',
-  'aspect-[5/4]',
-  'aspect-[16/10]',
-  'aspect-square',
+  'aspect-[4/3] md:aspect-[4/3]',
+  'aspect-[4/3] md:aspect-[3/2]',
+  'aspect-[4/3] md:aspect-[5/4]',
+  'aspect-[4/3] md:aspect-[16/10]',
+  'aspect-[4/3] md:aspect-square',
 ]
 function getAspectClass(index: number): string {
   return ASPECT_CLASSES[index % ASPECT_CLASSES.length]
