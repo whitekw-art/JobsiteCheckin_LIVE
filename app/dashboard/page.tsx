@@ -1145,7 +1145,7 @@ export default function Dashboard() {
               </Link>
             )}
 
-            <button className="db-nav-item" onClick={() => { setSidebarOpen(false); signOut() }}>
+            <button className="db-nav-item" onClick={() => { setSidebarOpen(false); localStorage.removeItem('gbp_connected'); localStorage.removeItem('gbp_post_mode'); signOut() }}>
               <IcoSignOut />
               Sign Out
             </button>
