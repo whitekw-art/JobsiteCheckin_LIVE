@@ -44,6 +44,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (credentials.isSignUp === 'true') {
+          if (process.env.REGISTRATION_OPEN !== 'true') return null
           if (credentials.password.length < 8) return null
 
           const existingUser = await prisma.user.findUnique({

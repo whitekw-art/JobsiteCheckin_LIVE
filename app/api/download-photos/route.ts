@@ -116,17 +116,32 @@ export async function POST(request: NextRequest) {
       const url = photoUrls[i]
       if (typeof url !== 'string') continue
 
-      const relativePath = url.replace(/^\/+/g, '')
-      if (!relativePath.startsWith('temp-photos/')) {
-        continue
-      }
-
-      const absolutePath = path.join(process.cwd(), 'public', relativePath)
-      const data = await fs.readFile(absolutePath)
-      const ext = path.extname(relativePath) || '.jpg'
+      const ext = url.split('?')[0].split('.').pop() || 'jpg'
       const safeInstaller = (installer || 'checkin').replace(/[^a-z0-9-]/gi, '_')
-      const name = `${safeInstaller || 'checkin'}-${i + 1}${ext}`
-      files.push({ name, data })
+      const name = `${safeInstaller}-${i + 1}.${ext}`
+
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        // Remote URL (Supabase storage) — fetch it
+        try {
+          const res = await fetch(url)
+          if (!res.ok) continue
+          const arrayBuffer = await res.arrayBuffer()
+          files.push({ name, data: Buffer.from(arrayBuffer) })
+        } catch {
+          continue
+        }
+      } else {
+        // Legacy local path (temp-photos/)
+        try {
+          const relativePath = url.replace(/^\/+/g, '')
+          if (!relativePath.startsWith('temp-photos/')) continue
+          const absolutePath = path.join(process.cwd(), 'public', relativePath)
+          const data = await fs.readFile(absolutePath)
+          files.push({ name, data })
+        } catch {
+          continue
+        }
+      }
     }
 
     if (files.length === 0) {

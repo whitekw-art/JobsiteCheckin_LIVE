@@ -89,9 +89,9 @@ if (
     if (token) {
       const userRole = token.role
 
-      // SUPER_ADMIN routes — only SUPER_ADMIN can access /admin
+      // SUPER_ADMIN routes — return 404 so the route's existence isn't revealed
       if (pathname.startsWith('/admin') && userRole !== 'SUPER_ADMIN') {
-        return NextResponse.redirect(new URL('/dashboard', req.url))
+        return new NextResponse(null, { status: 404 })
       }
 
       // USER role can only access check-in
