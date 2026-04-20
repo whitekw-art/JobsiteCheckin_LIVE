@@ -29,6 +29,7 @@ model Organization {
   Invitations Invitations[]
   users       User[]
   checkIns    CheckIn[]
+  photos      Photo[]
 }
 
 model User {
@@ -67,10 +68,12 @@ model CheckIn {
   photoUrls          String?
   isPublic           Boolean        @default(false)
   locationSource     String?
-  homeCustomerName   String?
-  homeCustomerPhone  String?
-  homeCustomerEmail  String?
-  events             CheckInEvent[]
+  homeCustomerName      String?
+  homeCustomerPhone     String?
+  homeCustomerEmail     String?
+  publishedAt           DateTime?      @db.Timestamptz(6)
+  followUpEmailSentAt   DateTime?      @db.Timestamptz(6)
+  events                CheckInEvent[]
 
   @@index([organizationId])
 }
@@ -141,12 +144,21 @@ model Client_Registrations {
   @@map("Client Registrations")
 }
 
+model AdminConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 model Photo {
-  id        String   @id
-  filename  String
-  url       String
-  checkInId String?
-  createdAt DateTime @default(now())
+  id           String        @id @default(uuid())
+  filename     String
+  url          String
+  checkInId    String?
+  orgId        String?
+  organization Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  createdAt    DateTime      @default(now())
 }
 
 model companies {
