@@ -29,6 +29,7 @@ model Organization {
   Invitations Invitations[]
   users       User[]
   checkIns    CheckIn[]
+  photos      Photo[]
 }
 
 model User {
@@ -142,11 +143,13 @@ model Client_Registrations {
 }
 
 model Photo {
-  id        String   @id
-  filename  String
-  url       String
-  checkInId String?
-  createdAt DateTime @default(now())
+  id           String        @id @default(uuid())
+  filename     String
+  url          String
+  checkInId    String?
+  orgId        String?
+  organization Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  createdAt    DateTime      @default(now())
 }
 
 model companies {
