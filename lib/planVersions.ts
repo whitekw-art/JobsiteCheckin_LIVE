@@ -22,6 +22,18 @@ export const PLAN_FEATURES: Record<string, Record<number, string[]>> = {
   },
 }
 
+const MONTHLY_PHOTO_CAPS: Record<string, number> = {
+  free: 50,
+  pro: 500,
+  elite: 2000,
+  titan: Infinity,
+}
+
+export function getMonthlyPhotoCap(planTier: string | null | undefined): number {
+  const tier = (planTier ?? 'free').toLowerCase()
+  return MONTHLY_PHOTO_CAPS[tier] ?? 50
+}
+
 /**
  * Check whether an org has access to a feature.
  * Reads planTier + planVersion together so grandfathered customers
