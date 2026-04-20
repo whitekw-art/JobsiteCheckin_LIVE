@@ -58,7 +58,10 @@ export async function POST(request: NextRequest) {
 
     const updated = await prisma.checkIn.update({
       where: { id: checkIn.id },
-      data: { isPublic },
+      data: {
+        isPublic,
+        publishedAt: isPublic ? new Date() : null,
+      },
     })
 
     return NextResponse.json({
