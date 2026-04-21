@@ -31,6 +31,8 @@ interface JobDetailProps {
   notes: string | null
   timestamp: string | null
   photos: string[]
+  beforePhotoUrl: string | null
+  afterPhotoUrl: string | null
   businessName: string
   businessPhone: string
   normalizedWebsite: string
@@ -143,6 +145,120 @@ const ArrowLeftIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
 )
 
 /* ===================================================================
+   BEFORE / AFTER REVEAL WIDGET
+   =================================================================== */
+
+function BeforeAfterReveal({ beforeUrl, afterUrl }: { beforeUrl: string; afterUrl: string }) {
+  const [pos, setPos] = useState(50)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const dragging = useRef(false)
+
+  const updatePos = (clientX: number) => {
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const pct = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100))
+    setPos(pct)
+  }
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    dragging.current = true
+    updatePos(e.clientX)
+  }
+  const onMouseMove = (e: React.MouseEvent) => { if (dragging.current) updatePos(e.clientX) }
+  const onMouseUp = () => { dragging.current = false }
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    dragging.current = true
+    updatePos(e.touches[0].clientX)
+  }
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (dragging.current) updatePos(e.touches[0].clientX)
+  }
+  const onTouchEnd = () => { dragging.current = false }
+
+  return (
+    <div
+      ref={containerRef}
+      onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
+      onMouseUp={onMouseUp}
+      onMouseLeave={onMouseUp}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      style={{
+        position: 'relative',
+        width: '100%',
+        aspectRatio: '16/9',
+        overflow: 'hidden',
+        cursor: 'ew-resize',
+        borderRadius: 12,
+        userSelect: 'none',
+        background: '#000',
+        touchAction: 'none',
+      }}
+    >
+      {/* After photo (base layer) */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={afterUrl}
+        alt="After"
+        draggable={false}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
+      />
+      {/* Before photo (clipped) */}
+      <div
+        style={{
+          position: 'absolute', inset: 0,
+          clipPath: `inset(0 ${100 - pos}% 0 0)`,
+          pointerEvents: 'none',
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={beforeUrl}
+          alt="Before"
+          draggable={false}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+      </div>
+      {/* Divider line */}
+      <div
+        style={{
+          position: 'absolute', top: 0, bottom: 0,
+          left: `${pos}%`, transform: 'translateX(-50%)',
+          width: 2, background: '#fff',
+          pointerEvents: 'none',
+          boxShadow: '0 0 6px rgba(0,0,0,0.5)',
+        }}
+      />
+      {/* Handle */}
+      <div
+        style={{
+          position: 'absolute', top: '50%',
+          left: `${pos}%`, transform: 'translate(-50%, -50%)',
+          width: 36, height: 36, borderRadius: '50%',
+          background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none',
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M5 4l-3 4 3 4M11 4l3 4-3 4" stroke="#333" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      {/* Labels */}
+      <div style={{ position: 'absolute', top: 10, left: 12, background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: '0.7rem', fontWeight: 700, padding: '3px 8px', borderRadius: 4, letterSpacing: '0.06em', pointerEvents: 'none' }}>
+        BEFORE
+      </div>
+      <div style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: '0.7rem', fontWeight: 700, padding: '3px 8px', borderRadius: 4, letterSpacing: '0.06em', pointerEvents: 'none' }}>
+        AFTER
+      </div>
+    </div>
+  )
+}
+
+/* ===================================================================
    MAIN COMPONENT
    =================================================================== */
 
@@ -157,6 +273,8 @@ export default function JobDetailClient({
   notes,
   timestamp,
   photos,
+  beforePhotoUrl,
+  afterPhotoUrl,
   businessName,
   businessPhone,
   normalizedWebsite,
@@ -361,6 +479,20 @@ export default function JobDetailClient({
           )}
         </div>
       </section>
+
+      {/* ============================================
+          SECTION B2: Before/After Reveal (when both set)
+          ============================================ */}
+      {beforePhotoUrl && afterPhotoUrl && (
+        <section style={{ background: '#080e0b', padding: '0 0 24px' }}>
+          <div className="max-w-[76rem] mx-auto px-5 sm:px-8">
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Before &amp; After — drag to compare
+            </p>
+            <BeforeAfterReveal beforeUrl={beforePhotoUrl} afterUrl={afterPhotoUrl} />
+          </div>
+        </section>
+      )}
 
       {/* ============================================
           SECTION C: Job Details (lighter background)

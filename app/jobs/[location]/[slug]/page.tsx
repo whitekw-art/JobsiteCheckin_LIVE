@@ -105,6 +105,8 @@ export default async function JobPage(
     seoDescription,
     photoUrls,
     organization,
+    beforePhotoUrl,
+    afterPhotoUrl,
   } = checkIn
 
   const effectiveTitle =
@@ -282,6 +284,8 @@ export default async function JobPage(
         notes={checkIn.notes || null}
         timestamp={checkIn.timestamp ? checkIn.timestamp.toISOString() : null}
         photos={photos}
+        beforePhotoUrl={beforePhotoUrl || null}
+        afterPhotoUrl={afterPhotoUrl || null}
         businessName={businessName}
         businessPhone={businessPhone}
         normalizedWebsite={normalizedWebsiteHref}
