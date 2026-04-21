@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { geocodeJobAddress } from '@/lib/geocode'
 import imageCompression from 'browser-image-compression'
 import DashboardShell from '@/components/DashboardShell'
+import BeforeAfterCamera from '@/components/BeforeAfterCamera'
 import '@/styles/checkin.css'
 
 export default function CheckInPage() {
@@ -18,6 +19,8 @@ export default function CheckInPage() {
   const [notes, setNotes] = useState('')
   const [photos, setPhotos] = useState<File[]>([])
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
+  const [photoTags, setPhotoTags] = useState<(null | 'before' | 'after')[]>([])
+  const [showBeforeAfterCamera, setShowBeforeAfterCamera] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
@@ -130,9 +133,12 @@ export default function CheckInPage() {
     const nextPhotos = append ? [...photos, ...supported] : supported
     const newPreviews = supported.map((f) => URL.createObjectURL(f))
     const nextPreviews = append ? [...photoPreviews, ...newPreviews] : newPreviews
+    const newTags: null[] = supported.map(() => null)
+    const nextTags = append ? [...photoTags, ...newTags] : newTags
 
     setPhotos(nextPhotos)
     setPhotoPreviews(nextPreviews)
+    setPhotoTags(nextTags)
 
     // Extract EXIF from the first new photo
     const exif = await extractExifLocation(supported[0])
@@ -161,7 +167,22 @@ export default function CheckInPage() {
     URL.revokeObjectURL(photoPreviews[idx])
     setPhotos((prev) => prev.filter((_, i) => i !== idx))
     setPhotoPreviews((prev) => prev.filter((_, i) => i !== idx))
+    setPhotoTags((prev) => prev.filter((_, i) => i !== idx))
   }
+
+  const setTag = (idx: number, tag: null | 'before' | 'after') => {
+    setPhotoTags((prev) => prev.map((t, i) => i === idx ? tag : t))
+  }
+
+  const handleAfterCameraCapture = (file: File) => {
+    const preview = URL.createObjectURL(file)
+    setPhotos((prev) => [...prev, file])
+    setPhotoPreviews((prev) => [...prev, preview])
+    setPhotoTags((prev) => [...prev, 'after'])
+    setShowBeforeAfterCamera(false)
+  }
+
+  const beforeIndex = photoTags.indexOf('before')
 
   // ── Submit (logic unchanged) ──────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
@@ -226,6 +247,15 @@ export default function CheckInPage() {
         uploadedUrls.push(uploadData.photoUrl)
       }
 
+      const beforePhotoUrl = (() => {
+        const i = photoTags.indexOf('before')
+        return i !== -1 ? (uploadedUrls[i] ?? null) : null
+      })()
+      const afterPhotoUrl = (() => {
+        const i = photoTags.indexOf('after')
+        return i !== -1 ? (uploadedUrls[i] ?? null) : null
+      })()
+
       const res = await fetch('/api/submit-checkin-supabase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -241,6 +271,8 @@ export default function CheckInPage() {
           longitude: resolved.longitude,
           locationSource: resolved.locationSource,
           photoUrls: uploadedUrls,
+          beforePhotoUrl,
+          afterPhotoUrl,
         }),
       })
 
@@ -254,7 +286,7 @@ export default function CheckInPage() {
       setInstaller(isUserRole ? session?.user?.name || '' : '')
       setStreet(''); setCity(''); setState(''); setZip('')
       setDoorType(''); setNotes('')
-      setPhotos([]); setPhotoPreviews([]); setPhotoLocation(null)
+      setPhotos([]); setPhotoPreviews([]); setPhotoTags([]); setPhotoLocation(null)
 
     } catch (err: any) {
       setMessageType('error')
@@ -272,6 +304,14 @@ export default function CheckInPage() {
   ]
 
   return (
+    <>
+    {showBeforeAfterCamera && beforeIndex !== -1 && (
+      <BeforeAfterCamera
+        beforePhotoUrl={photoPreviews[beforeIndex]}
+        onCapture={handleAfterCameraCapture}
+        onClose={() => setShowBeforeAfterCamera(false)}
+      />
+    )}
     <DashboardShell title="New Check-In">
       <div className="ci-card">
         <div className="ci-body">
@@ -408,6 +448,22 @@ export default function CheckInPage() {
                   </svg>
                   From Library
                 </button>
+
+                {/* Take After Photo with ghost overlay — only when a "before" photo is tagged */}
+                {beforeIndex !== -1 && (
+                  <button
+                    type="button"
+                    className="ci-btn-camera"
+                    style={{ background: '#e8a83a', color: '#111', borderColor: '#e8a83a' }}
+                    onClick={() => setShowBeforeAfterCamera(true)}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M1 5.5A1.5 1.5 0 0 1 2.5 4h1.382a1.5 1.5 0 0 0 1.342-.83L6 2h6l.776 1.17A1.5 1.5 0 0 0 14.118 4H15.5A1.5 1.5 0 0 1 17 5.5v9A1.5 1.5 0 0 1 15.5 16h-13A1.5 1.5 0 0 1 1 14.5v-9z"/>
+                      <circle cx="9" cy="10" r="2.5"/>
+                    </svg>
+                    Take After Photo
+                  </button>
+                )}
               </div>
 
               {/* Hidden inputs */}
@@ -450,6 +506,36 @@ export default function CheckInPage() {
                       >
                         ×
                       </button>
+                      {/* Before/After tag buttons */}
+                      <div style={{
+                        position: 'absolute', bottom: 4, left: 4, right: 4,
+                        display: 'flex', gap: 3,
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => setTag(i, photoTags[i] === 'before' ? null : 'before')}
+                          style={{
+                            flex: 1, fontSize: '0.6rem', fontWeight: 700, padding: '2px 0',
+                            border: 'none', borderRadius: 3, cursor: 'pointer',
+                            background: photoTags[i] === 'before' ? '#2563eb' : 'rgba(0,0,0,0.55)',
+                            color: '#fff', letterSpacing: '0.03em',
+                          }}
+                        >
+                          BEFORE
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTag(i, photoTags[i] === 'after' ? null : 'after')}
+                          style={{
+                            flex: 1, fontSize: '0.6rem', fontWeight: 700, padding: '2px 0',
+                            border: 'none', borderRadius: 3, cursor: 'pointer',
+                            background: photoTags[i] === 'after' ? '#16a34a' : 'rgba(0,0,0,0.55)',
+                            color: '#fff', letterSpacing: '0.03em',
+                          }}
+                        >
+                          AFTER
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -471,5 +557,6 @@ export default function CheckInPage() {
         </div>
       </div>
     </DashboardShell>
+    </>
   )
 }

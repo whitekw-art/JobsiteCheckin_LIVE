@@ -73,6 +73,8 @@ model CheckIn {
   homeCustomerEmail     String?
   publishedAt           DateTime?      @db.Timestamptz(6)
   followUpEmailSentAt   DateTime?      @db.Timestamptz(6)
+  beforePhotoUrl        String?
+  afterPhotoUrl         String?
   events                CheckInEvent[]
 
   @@index([organizationId])

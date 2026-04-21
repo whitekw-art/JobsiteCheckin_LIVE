@@ -28,6 +28,8 @@ export async function POST(request: NextRequest) {
       state,
       zip,
       photoUrls = [],
+      beforePhotoUrl = null,
+      afterPhotoUrl = null,
     } = body
 
     if (!installer || !street || !city || !state) {
@@ -91,6 +93,8 @@ export async function POST(request: NextRequest) {
       seoDescription,
       organizationId: currentUser.organizationId,
       userId: currentUser.id,
+      beforePhotoUrl: typeof beforePhotoUrl === 'string' ? beforePhotoUrl : null,
+      afterPhotoUrl: typeof afterPhotoUrl === 'string' ? afterPhotoUrl : null,
     }
     console.log('CHECKIN_CREATE_DATA', dataToCreate)
 
