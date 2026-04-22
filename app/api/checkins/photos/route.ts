@@ -10,7 +10,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!['OWNER', 'ADMIN'].includes(currentUser.role)) {
+    if (!['OWNER', 'ADMIN', 'SUPER_ADMIN'].includes(currentUser.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

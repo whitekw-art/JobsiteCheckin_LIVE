@@ -5,7 +5,7 @@ import { Prisma } from '@prisma/client'
 
 export async function GET() {
   try {
-    const user = await requireRole(['OWNER', 'ADMIN'])
+    const user = await requireRole(['OWNER', 'ADMIN', 'SUPER_ADMIN'])
     
     const members = await prisma.user.findMany({
       where: { organizationId: user.organizationId },
@@ -50,7 +50,7 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const currentUser = await requireRole(['OWNER', 'ADMIN'])
+    const currentUser = await requireRole(['OWNER', 'ADMIN', 'SUPER_ADMIN'])
     const { userId, role } = await request.json()
 
     if (!userId || !role) {
@@ -89,7 +89,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const currentUser = await requireRole(['OWNER', 'ADMIN'])
+    const currentUser = await requireRole(['OWNER', 'ADMIN', 'SUPER_ADMIN'])
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
 
