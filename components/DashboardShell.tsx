@@ -51,6 +51,13 @@ function IcoSignOut() {
     </svg>
   )
 }
+function IcoAdmin() {
+  return (
+    <svg className="db-nav-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M8 1l1.5 3 3.5.5-2.5 2.5.5 3.5L8 9l-3 1.5.5-3.5L3 4.5 6.5 4z"/>
+    </svg>
+  )
+}
 function IcoMoon() {
   return (
     <svg className="db-icon-moon" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -178,6 +185,15 @@ export default function DashboardShell({ title, children, action }: Props) {
             <Link className={navItem('/account')} href="/account" onClick={() => setSidebarOpen(false)}>
               <IcoAccount />
               Account
+            </Link>
+          )}
+
+          {role === 'SUPER_ADMIN' && (
+            <Link className={navItem('/admin')} href="/admin" onClick={() => setSidebarOpen(false)}
+              style={{ color: 'var(--amber, #e8a83a)' }}
+            >
+              <IcoAdmin />
+              Admin
             </Link>
           )}
 
