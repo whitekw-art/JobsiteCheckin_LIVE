@@ -1123,7 +1123,7 @@ export default function Dashboard() {
               Check-In
             </Link>
 
-            <Link className="db-nav-item active" href="/dashboard" onClick={() => setSidebarOpen(false)}>
+            <Link className="db-nav-item active" href={session?.user?.role === 'USER' ? '/my-jobs' : '/dashboard'} onClick={() => setSidebarOpen(false)}>
               <IcoJobs />
               Jobs
             </Link>
