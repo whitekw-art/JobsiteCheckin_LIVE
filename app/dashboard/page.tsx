@@ -198,6 +198,13 @@ function IcoSignOut() {
     </svg>
   )
 }
+function IcoAdmin() {
+  return (
+    <svg className="db-nav-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M8 1l1.5 3 3.5.5-2.5 2.5.5 3.5L8 9l-3 1.5.5-3.5L3 4.5 6.5 4z"/>
+    </svg>
+  )
+}
 function IcoPlus() {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -1143,6 +1150,15 @@ export default function Dashboard() {
               <Link className="db-nav-item" href="/account" onClick={() => setSidebarOpen(false)}>
                 <IcoAccount />
                 Account
+              </Link>
+            )}
+
+            {isOwner && session?.user?.role === 'SUPER_ADMIN' && (
+              <Link className="db-nav-item" href="/admin" onClick={() => setSidebarOpen(false)}
+                style={{ color: '#e8a83a' }}
+              >
+                <IcoAdmin />
+                Admin
               </Link>
             )}
 
