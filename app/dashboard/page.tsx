@@ -402,7 +402,8 @@ function IcoMenu() {
 
 export default function Dashboard() {
   const { data: session } = useSession()
-  const canPublish = session?.user?.role === 'OWNER' || session?.user?.role === 'ADMIN'
+  const isOwner = session?.user?.role === 'OWNER' || session?.user?.role === 'SUPER_ADMIN'
+  const canPublish = isOwner || session?.user?.role === 'ADMIN'
 
   // Data
   const [checkIns, setCheckIns] = useState<CheckIn[]>([])
@@ -1129,7 +1130,7 @@ export default function Dashboard() {
 
             <span className="db-nav-label" style={{ marginTop: 8 }}>Analytics</span>
 
-            {session?.user?.role === 'OWNER' && (
+            {isOwner && (
               <Link className="db-nav-item" href="/reporting" onClick={() => setSidebarOpen(false)}>
                 <IcoReporting />
                 Reporting
@@ -1138,7 +1139,7 @@ export default function Dashboard() {
 
             <span className="db-nav-label" style={{ marginTop: 8 }}>Settings</span>
 
-            {session?.user?.role === 'OWNER' && (
+            {isOwner && (
               <Link className="db-nav-item" href="/account" onClick={() => setSidebarOpen(false)}>
                 <IcoAccount />
                 Account
