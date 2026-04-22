@@ -158,7 +158,11 @@ export default function DashboardShell({ title, children, action }: Props) {
             Check-In
           </Link>
 
-          <Link className={navItem('/dashboard')} href="/dashboard" onClick={() => setSidebarOpen(false)}>
+          <Link
+            className={navItem(role === 'USER' ? '/my-jobs' : '/dashboard')}
+            href={role === 'USER' ? '/my-jobs' : '/dashboard'}
+            onClick={() => setSidebarOpen(false)}
+          >
             <IcoJobs />
             Jobs
           </Link>
@@ -208,7 +212,6 @@ export default function DashboardShell({ title, children, action }: Props) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="db-avatar-name">{userName}</div>
             <div className="db-avatar-plan">{planLabel}</div>
-            <div style={{ fontSize: '0.6rem', color: 'red', opacity: 0.7 }}>{session?.user?.role ?? 'no-role'}</div>
           </div>
           <button
             className="db-theme-toggle"

@@ -94,7 +94,7 @@ if (
         return new NextResponse(null, { status: 404 })
       }
 
-      // USER role can only access check-in
+      // USER role can only access check-in and my-jobs
       if (userRole === 'USER' && (pathname.startsWith('/dashboard') || pathname.startsWith('/team'))) {
         return NextResponse.redirect(new URL('/check-in', req.url))
       }
