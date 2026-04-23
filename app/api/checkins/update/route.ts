@@ -22,6 +22,9 @@ export async function PATCH(request: NextRequest) {
       appendPhotoUrls,
       beforePhotoUrl,
       afterPhotoUrl,
+      homeCustomerName,
+      homeCustomerPhone,
+      homeCustomerEmail,
     } = body as {
       id: string
       installer?: string
@@ -34,6 +37,9 @@ export async function PATCH(request: NextRequest) {
       appendPhotoUrls?: string[]
       beforePhotoUrl?: string | null
       afterPhotoUrl?: string | null
+      homeCustomerName?: string | null
+      homeCustomerPhone?: string | null
+      homeCustomerEmail?: string | null
     }
 
     if (!id) {
@@ -76,6 +82,9 @@ export async function PATCH(request: NextRequest) {
         photoUrls: combined.join(','),
         ...(beforePhotoUrl !== undefined && { beforePhotoUrl }),
         ...(afterPhotoUrl !== undefined && { afterPhotoUrl }),
+        ...(homeCustomerName !== undefined && { homeCustomerName: homeCustomerName?.trim() || null }),
+        ...(homeCustomerPhone !== undefined && { homeCustomerPhone: homeCustomerPhone?.trim() || null }),
+        ...(homeCustomerEmail !== undefined && { homeCustomerEmail: homeCustomerEmail?.trim() || null }),
       },
     })
 
