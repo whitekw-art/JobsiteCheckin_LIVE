@@ -30,6 +30,9 @@ export async function POST(request: NextRequest) {
       photoUrls = [],
       beforePhotoUrl = null,
       afterPhotoUrl = null,
+      homeCustomerName = null,
+      homeCustomerPhone = null,
+      homeCustomerEmail = null,
     } = body
 
     if (!installer || !street || !city || !state) {
@@ -95,6 +98,9 @@ export async function POST(request: NextRequest) {
       userId: currentUser.id,
       beforePhotoUrl: typeof beforePhotoUrl === 'string' ? beforePhotoUrl : null,
       afterPhotoUrl: typeof afterPhotoUrl === 'string' ? afterPhotoUrl : null,
+      homeCustomerName: typeof homeCustomerName === 'string' && homeCustomerName.trim() ? homeCustomerName.trim() : null,
+      homeCustomerPhone: typeof homeCustomerPhone === 'string' && homeCustomerPhone.trim() ? homeCustomerPhone.trim() : null,
+      homeCustomerEmail: typeof homeCustomerEmail === 'string' && homeCustomerEmail.trim() ? homeCustomerEmail.trim() : null,
     }
     console.log('CHECKIN_CREATE_DATA', dataToCreate)
 

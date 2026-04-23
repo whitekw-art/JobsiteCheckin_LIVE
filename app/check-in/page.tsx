@@ -28,6 +28,10 @@ function CheckInContent() {
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
   const [photoLocation, setPhotoLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [homeCustomerName, setHomeCustomerName] = useState('')
+  const [homeCustomerPhone, setHomeCustomerPhone] = useState('')
+  const [homeCustomerEmail, setHomeCustomerEmail] = useState('')
+  const [contactsSupported, setContactsSupported] = useState(false)
   const [existingPhotoUrls, setExistingPhotoUrls] = useState<string[]>([])
   const [existingBeforePhotoUrl, setExistingBeforePhotoUrl] = useState<string | null>(null)
   const [existingAfterPhotoUrl, setExistingAfterPhotoUrl] = useState<string | null>(null)
@@ -41,6 +45,23 @@ function CheckInContent() {
   useEffect(() => {
     if (isUserRole) setInstaller(session?.user?.name || '')
   }, [isUserRole, session?.user?.name])
+
+  // Detect Web Contacts API support (Android Chrome + iOS Safari 14.5+)
+  useEffect(() => {
+    setContactsSupported(typeof navigator !== 'undefined' && 'contacts' in navigator)
+  }, [])
+
+  const handlePickContact = async () => {
+    try {
+      const contacts = await (navigator as any).contacts.select(['name', 'tel', 'email'], { multiple: false })
+      if (contacts && contacts.length > 0) {
+        const c = contacts[0]
+        if (c.name?.[0]) setHomeCustomerName(c.name[0])
+        if (c.tel?.[0]) setHomeCustomerPhone(c.tel[0])
+        if (c.email?.[0]) setHomeCustomerEmail(c.email[0])
+      }
+    } catch { /* user dismissed picker */ }
+  }
 
   // Load check-in data when in edit mode
   useEffect(() => {
@@ -57,6 +78,9 @@ function CheckInContent() {
         setZip(c.zip || '')
         setDoorType(c.doorType || '')
         setNotes(c.notes || '')
+        setHomeCustomerName(c.homeCustomerName || '')
+        setHomeCustomerPhone(c.homeCustomerPhone || '')
+        setHomeCustomerEmail(c.homeCustomerEmail || '')
         setExistingPhotoUrls(c.photoUrls || [])
         setExistingBeforePhotoUrl(c.beforePhotoUrl || null)
         setExistingAfterPhotoUrl(c.afterPhotoUrl || null)
@@ -302,6 +326,9 @@ function CheckInContent() {
               appendPhotoUrls: uploadedUrls,
               beforePhotoUrl: newBeforePhotoUrl ?? existingBeforePhotoUrl,
               afterPhotoUrl: newAfterPhotoUrl ?? existingAfterPhotoUrl,
+              homeCustomerName: homeCustomerName.trim() || null,
+              homeCustomerPhone: homeCustomerPhone.trim() || null,
+              homeCustomerEmail: homeCustomerEmail.trim() || null,
             }),
           })
         : await fetch('/api/submit-checkin-supabase', {
@@ -321,6 +348,9 @@ function CheckInContent() {
               photoUrls: uploadedUrls,
               beforePhotoUrl: newBeforePhotoUrl,
               afterPhotoUrl: newAfterPhotoUrl,
+              homeCustomerName: homeCustomerName.trim() || null,
+              homeCustomerPhone: homeCustomerPhone.trim() || null,
+              homeCustomerEmail: homeCustomerEmail.trim() || null,
             }),
           })
 
@@ -335,6 +365,7 @@ function CheckInContent() {
         setInstaller(isUserRole ? session?.user?.name || '' : '')
         setStreet(''); setCity(''); setState(''); setZip('')
         setDoorType(''); setNotes('')
+        setHomeCustomerName(''); setHomeCustomerPhone(''); setHomeCustomerEmail('')
         setPhotos([]); setPhotoPreviews([]); setPhotoTags([]); setPhotoLocation(null)
       } else {
         setPhotos([]); setPhotoPreviews([]); setPhotoTags([])
@@ -464,6 +495,55 @@ function CheckInContent() {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
+              />
+            </div>
+
+            <div className="ci-divider" />
+
+            {/* Customer Info */}
+            <div className="ci-field">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <label className="ci-label" style={{ marginBottom: 0 }}>Customer Info <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: '0.78rem' }}>(optional)</span></label>
+                {contactsSupported && (
+                  <button
+                    type="button"
+                    onClick={handlePickContact}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '4px 10px', borderRadius: 6,
+                      border: '1px solid var(--border)', background: 'var(--card)',
+                      color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    Pick from Contacts
+                  </button>
+                )}
+              </div>
+              <input
+                className="ci-input"
+                placeholder="Customer name"
+                value={homeCustomerName}
+                onChange={(e) => setHomeCustomerName(e.target.value)}
+                style={{ marginBottom: 6 }}
+              />
+              <input
+                className="ci-input"
+                placeholder="Customer phone"
+                type="tel"
+                value={homeCustomerPhone}
+                onChange={(e) => setHomeCustomerPhone(e.target.value)}
+                style={{ marginBottom: 6 }}
+              />
+              <input
+                className="ci-input"
+                placeholder="Customer email"
+                type="email"
+                value={homeCustomerEmail}
+                onChange={(e) => setHomeCustomerEmail(e.target.value)}
               />
             </div>
 
