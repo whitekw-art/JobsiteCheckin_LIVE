@@ -17,7 +17,8 @@ export default withAuth(
       '/auth/reset-password',
       '/payments/checkout',
     ]
-    const isPublicAssetPath = pathname.startsWith('/temp-photos/')
+    const isPublicAssetPath = pathname.startsWith('/temp-photos/') ||
+      /\.(png|jpg|jpeg|svg|ico|webp|gif)$/i.test(pathname)
 
     // Registration gating — redirect /auth/register to homepage when registration is closed.
     // Invite links (/auth/invite/...) always bypass this gate.
@@ -94,7 +95,7 @@ if (
         return new NextResponse(null, { status: 404 })
       }
 
-      // USER role can only access check-in
+      // USER role can only access check-in and my-jobs
       if (userRole === 'USER' && (pathname.startsWith('/dashboard') || pathname.startsWith('/team'))) {
         return NextResponse.redirect(new URL('/check-in', req.url))
       }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -50,6 +51,13 @@ function IcoSignOut() {
     </svg>
   )
 }
+function IcoAdmin() {
+  return (
+    <svg className="db-nav-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M8 1l1.5 3 3.5.5-2.5 2.5.5 3.5L8 9l-3 1.5.5-3.5L3 4.5 6.5 4z"/>
+    </svg>
+  )
+}
 function IcoMoon() {
   return (
     <svg className="db-icon-moon" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -85,6 +93,7 @@ export default function DashboardShell({ title, children, action }: Props) {
   const pathname = usePathname()
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [dbRole, setDbRole] = useState<string | null>(null)
 
   // Sync theme with localStorage so it persists across pages
   useEffect(() => {
@@ -96,6 +105,14 @@ export default function DashboardShell({ title, children, action }: Props) {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('db-theme', theme)
   }, [theme])
+
+  // Fetch role directly from DB — bypasses JWT caching
+  useEffect(() => {
+    fetch('/api/user/me')
+      .then((r) => r.json())
+      .then((data) => { if (data.role) setDbRole(data.role) })
+      .catch(() => {})
+  }, [])
 
   const userName = session?.user?.name || session?.user?.email || 'User'
   const userInitials = userName
@@ -109,8 +126,9 @@ export default function DashboardShell({ title, children, action }: Props) {
     ? planTier.charAt(0).toUpperCase() + planTier.slice(1) + ' Plan'
     : 'Free Plan'
 
-  const isOwner = session?.user?.role === 'OWNER'
-  const canPublish = isOwner || session?.user?.role === 'ADMIN'
+  const role = dbRole || session?.user?.role
+  const isOwner = role === 'OWNER' || role === 'SUPER_ADMIN'
+  const canPublish = isOwner || role === 'ADMIN'
 
   const navItem = (href: string) =>
     `db-nav-item${pathname === href || pathname?.startsWith(href + '/') ? ' active' : ''}`
@@ -140,7 +158,11 @@ export default function DashboardShell({ title, children, action }: Props) {
             Check-In
           </Link>
 
-          <Link className={navItem('/dashboard')} href="/dashboard" onClick={() => setSidebarOpen(false)}>
+          <Link
+            className={navItem(role === 'USER' ? '/my-jobs' : '/dashboard')}
+            href={role === 'USER' ? '/my-jobs' : '/dashboard'}
+            onClick={() => setSidebarOpen(false)}
+          >
             <IcoJobs />
             Jobs
           </Link>
@@ -167,6 +189,15 @@ export default function DashboardShell({ title, children, action }: Props) {
             <Link className={navItem('/account')} href="/account" onClick={() => setSidebarOpen(false)}>
               <IcoAccount />
               Account
+            </Link>
+          )}
+
+          {role === 'SUPER_ADMIN' && (
+            <Link className={navItem('/admin')} href="/admin" onClick={() => setSidebarOpen(false)}
+              style={{ color: 'var(--amber, #e8a83a)' }}
+            >
+              <IcoAdmin />
+              Admin
             </Link>
           )}
 

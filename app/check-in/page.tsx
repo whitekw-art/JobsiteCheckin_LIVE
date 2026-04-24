@@ -1,14 +1,18 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import { useSearchParams } from 'next/navigation'
 import { geocodeJobAddress } from '@/lib/geocode'
 import imageCompression from 'browser-image-compression'
 import DashboardShell from '@/components/DashboardShell'
+import BeforeAfterCamera from '@/components/BeforeAfterCamera'
 import '@/styles/checkin.css'
 
-export default function CheckInPage() {
+function CheckInContent() {
   const { data: session } = useSession()
+  const searchParams = useSearchParams()
+  const editId = searchParams.get('id')
   const [installer, setInstaller] = useState('')
   const [street, setStreet] = useState('')
   const [city, setCity] = useState('')
@@ -18,10 +22,19 @@ export default function CheckInPage() {
   const [notes, setNotes] = useState('')
   const [photos, setPhotos] = useState<File[]>([])
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
+  const [photoTags, setPhotoTags] = useState<(null | 'before' | 'after')[]>([])
+  const [showBeforeAfterCamera, setShowBeforeAfterCamera] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
   const [photoLocation, setPhotoLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [homeCustomerName, setHomeCustomerName] = useState('')
+  const [homeCustomerPhone, setHomeCustomerPhone] = useState('')
+  const [homeCustomerEmail, setHomeCustomerEmail] = useState('')
+  const [contactsSupported, setContactsSupported] = useState(false)
+  const [existingPhotoUrls, setExistingPhotoUrls] = useState<string[]>([])
+  const [existingBeforePhotoUrl, setExistingBeforePhotoUrl] = useState<string | null>(null)
+  const [existingAfterPhotoUrl, setExistingAfterPhotoUrl] = useState<string | null>(null)
 
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const libraryInputRef = useRef<HTMLInputElement>(null)
@@ -32,6 +45,48 @@ export default function CheckInPage() {
   useEffect(() => {
     if (isUserRole) setInstaller(session?.user?.name || '')
   }, [isUserRole, session?.user?.name])
+
+  // Detect Web Contacts API support (Android Chrome + iOS Safari 14.5+)
+  useEffect(() => {
+    setContactsSupported(typeof navigator !== 'undefined' && 'contacts' in navigator)
+  }, [])
+
+  const handlePickContact = async () => {
+    try {
+      const contacts = await (navigator as any).contacts.select(['name', 'tel', 'email'], { multiple: false })
+      if (contacts && contacts.length > 0) {
+        const c = contacts[0]
+        if (c.name?.[0]) setHomeCustomerName(c.name[0])
+        if (c.tel?.[0]) setHomeCustomerPhone(c.tel[0])
+        if (c.email?.[0]) setHomeCustomerEmail(c.email[0])
+      }
+    } catch { /* user dismissed picker */ }
+  }
+
+  // Load check-in data when in edit mode
+  useEffect(() => {
+    if (!editId) return
+    fetch('/api/my-jobs')
+      .then((r) => r.json())
+      .then((data) => {
+        const c = (data.checkIns || []).find((ci: any) => ci.id === editId)
+        if (!c) return
+        setInstaller(c.installer || '')
+        setStreet(c.street || '')
+        setCity(c.city || '')
+        setState(c.state || '')
+        setZip(c.zip || '')
+        setDoorType(c.doorType || '')
+        setNotes(c.notes || '')
+        setHomeCustomerName(c.homeCustomerName || '')
+        setHomeCustomerPhone(c.homeCustomerPhone || '')
+        setHomeCustomerEmail(c.homeCustomerEmail || '')
+        setExistingPhotoUrls(c.photoUrls || [])
+        setExistingBeforePhotoUrl(c.beforePhotoUrl || null)
+        setExistingAfterPhotoUrl(c.afterPhotoUrl || null)
+      })
+      .catch(() => {})
+  }, [editId])
 
   // ── EXIF GPS extraction (unchanged from original) ─────────────────────────
   const extractExifLocation = (file: File): Promise<{ lat: number; lng: number } | null> => {
@@ -130,9 +185,12 @@ export default function CheckInPage() {
     const nextPhotos = append ? [...photos, ...supported] : supported
     const newPreviews = supported.map((f) => URL.createObjectURL(f))
     const nextPreviews = append ? [...photoPreviews, ...newPreviews] : newPreviews
+    const newTags: null[] = supported.map(() => null)
+    const nextTags = append ? [...photoTags, ...newTags] : newTags
 
     setPhotos(nextPhotos)
     setPhotoPreviews(nextPreviews)
+    setPhotoTags(nextTags)
 
     // Extract EXIF from the first new photo
     const exif = await extractExifLocation(supported[0])
@@ -161,7 +219,22 @@ export default function CheckInPage() {
     URL.revokeObjectURL(photoPreviews[idx])
     setPhotos((prev) => prev.filter((_, i) => i !== idx))
     setPhotoPreviews((prev) => prev.filter((_, i) => i !== idx))
+    setPhotoTags((prev) => prev.filter((_, i) => i !== idx))
   }
+
+  const setTag = (idx: number, tag: null | 'before' | 'after') => {
+    setPhotoTags((prev) => prev.map((t, i) => i === idx ? tag : t))
+  }
+
+  const handleAfterCameraCapture = (file: File) => {
+    const preview = URL.createObjectURL(file)
+    setPhotos((prev) => [...prev, file])
+    setPhotoPreviews((prev) => [...prev, preview])
+    setPhotoTags((prev) => [...prev, 'after'])
+    setShowBeforeAfterCamera(false)
+  }
+
+  const beforeIndex = photoTags.indexOf('before')
 
   // ── Submit (logic unchanged) ──────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
@@ -209,7 +282,9 @@ export default function CheckInPage() {
       }
 
       console.log('PHOTO_LOCATION_AT_SUBMIT', photoLocation)
-      const resolved = await resolveLocation()
+      const resolved = editId
+        ? { latitude: null, longitude: null, locationSource: 'DEVICE' as const }
+        : await resolveLocation()
       console.log('RESOLVE_LOCATION_RESULT', resolved)
 
       const uploadedUrls: string[] = []
@@ -226,23 +301,58 @@ export default function CheckInPage() {
         uploadedUrls.push(uploadData.photoUrl)
       }
 
-      const res = await fetch('/api/submit-checkin-supabase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          installer,
-          street,
-          city,
-          state,
-          zip,
-          doorType,
-          notes,
-          latitude: resolved.latitude,
-          longitude: resolved.longitude,
-          locationSource: resolved.locationSource,
-          photoUrls: uploadedUrls,
-        }),
-      })
+      const newBeforePhotoUrl = (() => {
+        const i = photoTags.indexOf('before')
+        return i !== -1 ? (uploadedUrls[i] ?? null) : null
+      })()
+      const newAfterPhotoUrl = (() => {
+        const i = photoTags.indexOf('after')
+        return i !== -1 ? (uploadedUrls[i] ?? null) : null
+      })()
+
+      const res = editId
+        ? await fetch('/api/checkins/update', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: editId,
+              installer,
+              street,
+              city,
+              state,
+              zip,
+              doorType,
+              notes,
+              appendPhotoUrls: uploadedUrls,
+              beforePhotoUrl: newBeforePhotoUrl ?? existingBeforePhotoUrl,
+              afterPhotoUrl: newAfterPhotoUrl ?? existingAfterPhotoUrl,
+              homeCustomerName: homeCustomerName.trim() || null,
+              homeCustomerPhone: homeCustomerPhone.trim() || null,
+              homeCustomerEmail: homeCustomerEmail.trim() || null,
+            }),
+          })
+        : await fetch('/api/submit-checkin-supabase', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              installer,
+              street,
+              city,
+              state,
+              zip,
+              doorType,
+              notes,
+              latitude: resolved.latitude,
+              longitude: resolved.longitude,
+              locationSource: resolved.locationSource,
+              photoUrls: uploadedUrls,
+              beforePhotoUrl: newBeforePhotoUrl,
+              afterPhotoUrl: newAfterPhotoUrl,
+              homeCustomerName: homeCustomerName.trim() || null,
+              homeCustomerPhone: homeCustomerPhone.trim() || null,
+              homeCustomerEmail: homeCustomerEmail.trim() || null,
+            }),
+          })
 
       if (!res.ok) {
         const errData = await res.json().catch(() => null)
@@ -250,11 +360,16 @@ export default function CheckInPage() {
       }
 
       setMessageType('success')
-      setMessage('Check-in submitted successfully!')
-      setInstaller(isUserRole ? session?.user?.name || '' : '')
-      setStreet(''); setCity(''); setState(''); setZip('')
-      setDoorType(''); setNotes('')
-      setPhotos([]); setPhotoPreviews([]); setPhotoLocation(null)
+      setMessage(editId ? 'Job updated successfully!' : 'Check-in submitted successfully!')
+      if (!editId) {
+        setInstaller(isUserRole ? session?.user?.name || '' : '')
+        setStreet(''); setCity(''); setState(''); setZip('')
+        setDoorType(''); setNotes('')
+        setHomeCustomerName(''); setHomeCustomerPhone(''); setHomeCustomerEmail('')
+        setPhotos([]); setPhotoPreviews([]); setPhotoTags([]); setPhotoLocation(null)
+      } else {
+        setPhotos([]); setPhotoPreviews([]); setPhotoTags([])
+      }
 
     } catch (err: any) {
       setMessageType('error')
@@ -272,7 +387,15 @@ export default function CheckInPage() {
   ]
 
   return (
-    <DashboardShell title="New Check-In">
+    <>
+    {showBeforeAfterCamera && beforeIndex !== -1 && (
+      <BeforeAfterCamera
+        beforePhotoUrl={photoPreviews[beforeIndex]}
+        onCapture={handleAfterCameraCapture}
+        onClose={() => setShowBeforeAfterCamera(false)}
+      />
+    )}
+    <DashboardShell title={editId ? 'Edit Check-In' : 'New Check-In'}>
       <div className="ci-card">
         <div className="ci-body">
           <form className="ci-form" onSubmit={handleSubmit}>
@@ -377,9 +500,94 @@ export default function CheckInPage() {
 
             <div className="ci-divider" />
 
+            {/* Customer Info */}
+            <div className="ci-field">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <label className="ci-label" style={{ marginBottom: 0 }}>Customer Info <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: '0.78rem' }}>(optional)</span></label>
+                {contactsSupported && (
+                  <button
+                    type="button"
+                    onClick={handlePickContact}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '4px 10px', borderRadius: 6,
+                      border: '1px solid var(--border)', background: 'var(--card)',
+                      color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    Pick from Contacts
+                  </button>
+                )}
+              </div>
+              <input
+                className="ci-input"
+                placeholder="Customer name"
+                value={homeCustomerName}
+                onChange={(e) => setHomeCustomerName(e.target.value)}
+                style={{ marginBottom: 6 }}
+              />
+              <input
+                className="ci-input"
+                placeholder="Customer phone"
+                type="tel"
+                value={homeCustomerPhone}
+                onChange={(e) => setHomeCustomerPhone(e.target.value)}
+                style={{ marginBottom: 6 }}
+              />
+              <input
+                className="ci-input"
+                placeholder="Customer email"
+                type="email"
+                value={homeCustomerEmail}
+                onChange={(e) => setHomeCustomerEmail(e.target.value)}
+              />
+            </div>
+
+            <div className="ci-divider" />
+
             {/* Photos */}
             <div className="ci-photo-section">
               <span className="ci-label">Photos</span>
+
+              {/* Existing photos in edit mode */}
+              {existingPhotoUrls.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
+                    Current photos ({existingPhotoUrls.length})
+                  </span>
+                  <div className="ci-preview-grid">
+                    {existingPhotoUrls.map((url, i) => (
+                      <div key={i} className="ci-preview-item">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Photo ${i + 1}`} />
+                        {url === existingBeforePhotoUrl && (
+                          <div style={{
+                            position: 'absolute', bottom: 4, left: 4,
+                            background: '#2563eb', color: '#fff',
+                            fontSize: '0.6rem', fontWeight: 700, padding: '2px 5px',
+                            borderRadius: 3, letterSpacing: '0.03em',
+                          }}>BEFORE</div>
+                        )}
+                        {url === existingAfterPhotoUrl && (
+                          <div style={{
+                            position: 'absolute', bottom: 4, left: 4,
+                            background: '#16a34a', color: '#fff',
+                            fontSize: '0.6rem', fontWeight: 700, padding: '2px 5px',
+                            borderRadius: 3, letterSpacing: '0.03em',
+                          }}>AFTER</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginTop: 6 }}>
+                    Add new photos below:
+                  </span>
+                </div>
+              )}
 
               <div className="ci-photo-buttons">
                 {/* Take Photo — opens live camera, appends */}
@@ -408,6 +616,22 @@ export default function CheckInPage() {
                   </svg>
                   From Library
                 </button>
+
+                {/* Take After Photo with ghost overlay — only when a "before" photo is tagged */}
+                {beforeIndex !== -1 && (
+                  <button
+                    type="button"
+                    className="ci-btn-camera"
+                    style={{ background: '#e8a83a', color: '#111', borderColor: '#e8a83a' }}
+                    onClick={() => setShowBeforeAfterCamera(true)}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M1 5.5A1.5 1.5 0 0 1 2.5 4h1.382a1.5 1.5 0 0 0 1.342-.83L6 2h6l.776 1.17A1.5 1.5 0 0 0 14.118 4H15.5A1.5 1.5 0 0 1 17 5.5v9A1.5 1.5 0 0 1 15.5 16h-13A1.5 1.5 0 0 1 1 14.5v-9z"/>
+                      <circle cx="9" cy="10" r="2.5"/>
+                    </svg>
+                    Take After Photo
+                  </button>
+                )}
               </div>
 
               {/* Hidden inputs */}
@@ -450,6 +674,36 @@ export default function CheckInPage() {
                       >
                         ×
                       </button>
+                      {/* Before/After tag buttons */}
+                      <div style={{
+                        position: 'absolute', bottom: 4, left: 4, right: 4,
+                        display: 'flex', gap: 3,
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => setTag(i, photoTags[i] === 'before' ? null : 'before')}
+                          style={{
+                            flex: 1, fontSize: '0.6rem', fontWeight: 700, padding: '2px 0',
+                            border: 'none', borderRadius: 3, cursor: 'pointer',
+                            background: photoTags[i] === 'before' ? '#2563eb' : 'rgba(0,0,0,0.55)',
+                            color: '#fff', letterSpacing: '0.03em',
+                          }}
+                        >
+                          BEFORE
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTag(i, photoTags[i] === 'after' ? null : 'after')}
+                          style={{
+                            flex: 1, fontSize: '0.6rem', fontWeight: 700, padding: '2px 0',
+                            border: 'none', borderRadius: 3, cursor: 'pointer',
+                            background: photoTags[i] === 'after' ? '#16a34a' : 'rgba(0,0,0,0.55)',
+                            color: '#fff', letterSpacing: '0.03em',
+                          }}
+                        >
+                          AFTER
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -460,7 +714,9 @@ export default function CheckInPage() {
 
             {/* Submit */}
             <button type="submit" className="ci-btn-submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Submitting\u2026' : 'Submit Check-In'}
+              {isSubmitting
+                ? (editId ? 'Saving\u2026' : 'Submitting\u2026')
+                : (editId ? 'Save Changes' : 'Submit Check-In')}
             </button>
 
           </form>
@@ -471,5 +727,14 @@ export default function CheckInPage() {
         </div>
       </div>
     </DashboardShell>
+    </>
+  )
+}
+
+export default function CheckInPage() {
+  return (
+    <Suspense>
+      <CheckInContent />
+    </Suspense>
   )
 }

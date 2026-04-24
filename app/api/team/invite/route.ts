@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       where: { email: session.user.email }
     })
 
-    if (!currentUser || !['OWNER', 'ADMIN'].includes(currentUser.role)) {
+    if (!currentUser || !['OWNER', 'ADMIN', 'SUPER_ADMIN'].includes(currentUser.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

@@ -128,6 +128,7 @@ export const authOptions: NextAuthOptions = {
           include: { organization: true },
         })
         if (dbUser) {
+          token.role = dbUser.role
           token.organizationId = dbUser.organizationId
           token.companyName = dbUser.organization?.name
           token.orgSlug = dbUser.organization?.slug

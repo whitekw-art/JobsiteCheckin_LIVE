@@ -997,8 +997,8 @@ export default function LandingPage({ registrationOpen = false }: { registration
                     <td className="pricing-feature-name">Before/after photo tagging</td>
                     <td className="cell-free"><PDash /></td>
                     <td className="cell-pro"><PDash /></td>
-                    <td className="cell-elite"><CSBadge /></td>
-                    <td className="cell-titan"><CSBadge /></td>
+                    <td className="cell-elite"><PCheck /></td>
+                    <td className="cell-titan"><PCheck /></td>
                   </tr>
 
                   {/* GROUP: Scale */}
