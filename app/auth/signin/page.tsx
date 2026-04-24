@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import '@/styles/register.css'
@@ -92,24 +93,13 @@ export default function SignIn() {
         position: 'relative',
         zIndex: 1,
       }}>
-        {/* Brand mark */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px' }}>
-          <div style={{
-            width: '36px', height: '36px',
-            background: '#0EA5E9',
-            borderRadius: '8px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-              stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
+        {/* Brand mark — links to homepage */}
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px', textDecoration: 'none' }}>
+          <Image src="/logo.png" alt="ProjectCheckin" width={36} height={36} style={{ flexShrink: 0 }} />
           <span style={{ fontSize: '15px', fontWeight: 700, color: '#0C4A6E', letterSpacing: '-0.01em' }}>
             ProjectCheckin
           </span>
-        </div>
+        </Link>
 
         {/* Header */}
         <div className="reg-eyebrow">Welcome back</div>
@@ -196,6 +186,21 @@ export default function SignIn() {
               style={{ fontSize: '13px', color: '#4B7A94', textDecoration: 'none' }}
             >
               Forgot password?
+            </Link>
+          </div>
+
+          {/* Back to site */}
+          <div style={{ textAlign: 'center', marginTop: '12px' }}>
+            <Link
+              href="/"
+              style={{ fontSize: '13px', color: '#4B7A94', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+              Back to site
             </Link>
           </div>
         </form>
