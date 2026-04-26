@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { geocodeJobAddress } from '@/lib/geocode'
 import { slugify } from '@/lib/slugify'
 import OnboardingModal from '@/components/OnboardingModal'
+import { tierHasFeature } from '@/lib/planVersions'
 import '@/styles/dashboard.css'
 
 interface CheckIn {
@@ -1771,7 +1772,7 @@ export default function Dashboard() {
                                   {downloadingId === checkIn.id ? 'Preparing\u2026' : 'Download All'}
                                 </button>
                               )}
-                              {checkIn.isPublic && (
+                              {checkIn.isPublic && tierHasFeature(planTier, 'gbp_post') && (
                                 <button
                                   className="db-btn-ghost"
                                   onClick={(e) => {
@@ -1784,6 +1785,7 @@ export default function Dashboard() {
                                   Post to Google Business
                                 </button>
                               )}
+                              {tierHasFeature(planTier, 'review_request') && (
                               <button
                                 className="db-btn-ghost db-btn-review"
                                 data-tooltip="Texts and/or emails your customer a personalized message and link to leave you a Google review"
@@ -1794,6 +1796,7 @@ export default function Dashboard() {
                                 </svg>
                                 Request Google Review
                               </button>
+                              )}
                               <Link
                                 href={`/check-in?id=${checkIn.id}`}
                                 className="db-btn-ghost"
