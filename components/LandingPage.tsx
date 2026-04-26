@@ -48,7 +48,7 @@ const faqs: FaqItem[] = [
   },
   {
     q: 'Do I need a website to use this?',
-    a: 'No. Every published job gets its own page on our domain \u2014 customers can find you on Google without you having a website at all. If you do have a website, our Pro tier lets you embed those pages directly on your site too.',
+    a: 'No. Every published job gets its own page on our domain \u2014 customers can find you on Google without you having a website at all. Also, our Pro tier gives you the flexibility to publish any jobs or work that you\u2019d like directly to your Google Business Profile.',
   },
   {
     q: 'How many jobs do we need to see results?',
@@ -947,6 +947,20 @@ export default function LandingPage({ registrationOpen = false }: { registration
                   </tr>
                   <tr className="pricing-feature-row">
                     <td className="pricing-feature-name">Each job page built for Google search</td>
+                    <td className="cell-free"><PCheck /></td>
+                    <td className="cell-pro"><PCheck /></td>
+                    <td className="cell-elite"><PCheck /></td>
+                    <td className="cell-titan"><PCheck /></td>
+                  </tr>
+                  <tr className="pricing-feature-row">
+                    <td className="pricing-feature-name">Public portfolio page</td>
+                    <td className="cell-free"><PCheck /></td>
+                    <td className="cell-pro"><PCheck /></td>
+                    <td className="cell-elite"><PCheck /></td>
+                    <td className="cell-titan"><PCheck /></td>
+                  </tr>
+                  <tr className="pricing-feature-row">
+                    <td className="pricing-feature-name">One-tap GBP post from your job notes</td>
                     <td className="cell-free"><PDash /></td>
                     <td className="cell-pro"><PCheck /></td>
                     <td className="cell-elite"><PCheck /></td>
@@ -954,13 +968,6 @@ export default function LandingPage({ registrationOpen = false }: { registration
                   </tr>
                   <tr className="pricing-feature-row">
                     <td className="pricing-feature-name">Traffic dashboard (views, calls, clicks)</td>
-                    <td className="cell-free"><PDash /></td>
-                    <td className="cell-pro"><PCheck /></td>
-                    <td className="cell-elite"><PCheck /></td>
-                    <td className="cell-titan"><PCheck /></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Public portfolio page</td>
                     <td className="cell-free"><PDash /></td>
                     <td className="cell-pro"><PCheck /></td>
                     <td className="cell-elite"><PCheck /></td>
@@ -987,17 +994,24 @@ export default function LandingPage({ registrationOpen = false }: { registration
                     <td className="cell-titan"><CSBadge /></td>
                   </tr>
                   <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Post-job review request texts</td>
+                    <td className="pricing-feature-name">Before/after photo tagging</td>
                     <td className="cell-free"><PDash /></td>
                     <td className="cell-pro"><PDash /></td>
                     <td className="cell-elite"><PCheck /></td>
                     <td className="cell-titan"><PCheck /></td>
                   </tr>
                   <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Before/after photo tagging</td>
+                    <td className="pricing-feature-name">Before/after comparison on published job pages</td>
                     <td className="cell-free"><PDash /></td>
                     <td className="cell-pro"><PDash /></td>
                     <td className="cell-elite"><PCheck /></td>
+                    <td className="cell-titan"><PCheck /></td>
+                  </tr>
+                  <tr className="pricing-feature-row">
+                    <td className="pricing-feature-name">Automated Google review requests</td>
+                    <td className="cell-free"><PDash /></td>
+                    <td className="cell-pro"><PDash /></td>
+                    <td className="cell-elite"><PDash /></td>
                     <td className="cell-titan"><PCheck /></td>
                   </tr>
 
