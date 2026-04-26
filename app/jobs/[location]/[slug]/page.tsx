@@ -290,6 +290,7 @@ export default async function JobPage(
         businessPhone={businessPhone}
         normalizedWebsite={normalizedWebsiteHref}
         orgSlug={orgSlug}
+        orgPlanTier={organization?.planTier ?? null}
         relatedJobs={relatedJobs}
         baseUrl={baseUrl}
       />
