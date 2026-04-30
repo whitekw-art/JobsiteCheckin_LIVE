@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     },
   })
 
-  if (user?.role !== 'OWNER') {
+  if (!['OWNER', 'SUPER_ADMIN'].includes(user?.role ?? '')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

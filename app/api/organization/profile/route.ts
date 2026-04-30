@@ -53,7 +53,7 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    if (currentUser.role !== 'OWNER') {
+    if (!['OWNER', 'SUPER_ADMIN'].includes(currentUser.role)) {
       return NextResponse.json(
         { error: 'Only owners can update organization profile' },
         { status: 403 }

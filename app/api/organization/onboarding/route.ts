@@ -20,7 +20,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'No organization found' }, { status: 404 })
     }
 
-    if (user.role !== 'OWNER') {
+    if (!['OWNER', 'SUPER_ADMIN'].includes(user.role)) {
       return NextResponse.json({ error: 'Only owners can complete onboarding' }, { status: 403 })
     }
 
