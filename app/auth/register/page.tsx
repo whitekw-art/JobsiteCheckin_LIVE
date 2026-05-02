@@ -309,7 +309,7 @@ function RegisterForm() {
                     emailState === 'invalid' ? 'reg-input--error'   : ''
                   }`}
                   style={{ paddingRight: emailState !== 'idle' ? '40px' : '14px' }}
-                  placeholder="tom@wilsonsdoors.com"
+                  placeholder="you@yourbusiness.com"
                   autoComplete="email"
                   value={email}
                   onChange={e => handleEmailChange(e.target.value)}

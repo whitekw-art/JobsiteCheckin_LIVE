@@ -118,7 +118,7 @@ export default function SignIn() {
                 id="si-email"
                 type="email"
                 className="reg-input"
-                placeholder="tom@wilsonsdoors.com"
+                placeholder="you@yourbusiness.com"
                 autoComplete="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
