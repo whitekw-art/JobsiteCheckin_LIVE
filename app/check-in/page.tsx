@@ -7,6 +7,7 @@ import { geocodeJobAddress } from '@/lib/geocode'
 import imageCompression from 'browser-image-compression'
 import DashboardShell from '@/components/DashboardShell'
 import BeforeAfterCamera from '@/components/BeforeAfterCamera'
+import { tierHasFeature } from '@/lib/planVersions'
 import '@/styles/checkin.css'
 
 function CheckInContent() {
@@ -41,6 +42,8 @@ function CheckInContent() {
 
   const userRole = session?.user?.role
   const isUserRole = userRole === 'USER'
+  const planTier = (session?.user as any)?.planTier as string | undefined
+  const canBeforeAfter = tierHasFeature(planTier, 'before_after_tagging')
 
   useEffect(() => {
     if (isUserRole) setInstaller(session?.user?.name || '')
@@ -388,7 +391,7 @@ function CheckInContent() {
 
   return (
     <>
-    {showBeforeAfterCamera && beforeIndex !== -1 && (
+    {canBeforeAfter && showBeforeAfterCamera && beforeIndex !== -1 && (
       <BeforeAfterCamera
         beforePhotoUrl={photoPreviews[beforeIndex]}
         onCapture={handleAfterCameraCapture}
@@ -618,7 +621,7 @@ function CheckInContent() {
                 </button>
 
                 {/* Take After Photo with ghost overlay — only when a "before" photo is tagged */}
-                {beforeIndex !== -1 && (
+                {canBeforeAfter && beforeIndex !== -1 && (
                   <button
                     type="button"
                     className="ci-btn-camera"
@@ -674,8 +677,8 @@ function CheckInContent() {
                       >
                         ×
                       </button>
-                      {/* Before/After tag buttons */}
-                      <div style={{
+                      {/* Before/After tag buttons — Elite/Titan only */}
+                      {canBeforeAfter && <div style={{
                         position: 'absolute', bottom: 4, left: 4, right: 4,
                         display: 'flex', gap: 3,
                       }}>
@@ -703,7 +706,7 @@ function CheckInContent() {
                         >
                           AFTER
                         </button>
-                      </div>
+                      </div>}
                     </div>
                   ))}
                 </div>

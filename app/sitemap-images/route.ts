@@ -17,6 +17,8 @@ export async function GET() {
       state: true,
       doorType: true,
       photoUrls: true,
+      beforePhotoUrl: true,
+      afterPhotoUrl: true,
       organization: { select: { slug: true } },
     },
     orderBy: { timestamp: 'desc' },
@@ -25,10 +27,11 @@ export async function GET() {
   const urlBlocks: string[] = []
 
   for (const checkIn of checkIns) {
-    const photos = (checkIn.photoUrls || '')
-      .split(',')
-      .map((u) => u.trim())
-      .filter(Boolean)
+    const photos = [
+      ...(checkIn.photoUrls || '').split(',').map((u) => u.trim()).filter(Boolean),
+      ...(checkIn.beforePhotoUrl ? [checkIn.beforePhotoUrl] : []),
+      ...(checkIn.afterPhotoUrl ? [checkIn.afterPhotoUrl] : []),
+    ].filter((url, i, arr) => arr.indexOf(url) === i) // dedupe
 
     if (photos.length === 0) continue
 

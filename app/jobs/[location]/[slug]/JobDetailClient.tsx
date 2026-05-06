@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { JobPhoneLink } from '@/components/JobPhoneLink'
 import { JobWebsiteLink } from '@/components/JobWebsiteLink'
+import { tierHasFeature } from '@/lib/planVersions'
 
 /* ===================================================================
    TYPES
@@ -37,6 +38,7 @@ interface JobDetailProps {
   businessPhone: string
   normalizedWebsite: string
   orgSlug: string | null
+  orgPlanTier: string | null
   relatedJobs: RelatedJob[]
   baseUrl: string
 }
@@ -279,9 +281,11 @@ export default function JobDetailClient({
   businessPhone,
   normalizedWebsite,
   orgSlug,
+  orgPlanTier,
   relatedJobs,
   baseUrl,
 }: JobDetailProps) {
+  const canBeforeAfter = tierHasFeature(orgPlanTier, 'before_after_tagging')
   const [featuredIndex, setFeaturedIndex] = useState(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
@@ -483,7 +487,7 @@ export default function JobDetailClient({
       {/* ============================================
           SECTION B2: Before/After Reveal (when both set)
           ============================================ */}
-      {beforePhotoUrl && afterPhotoUrl && (
+      {canBeforeAfter && beforePhotoUrl && afterPhotoUrl && (
         <section style={{ background: '#080e0b', padding: '0 0 24px' }}>
           <div className="max-w-[76rem] mx-auto px-5 sm:px-8">
             <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>

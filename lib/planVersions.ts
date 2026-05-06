@@ -12,13 +12,13 @@ export const PLAN_FEATURES: Record<string, Record<number, string[]>> = {
     1: ['check_in', 'photos_5_per_job', 'job_pages_5'],
   },
   pro: {
-    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard'],
+    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'gbp_post'],
   },
   elite: {
-    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid'],
+    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'gbp_post', 'before_after_tagging'],
   },
   titan: {
-    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'api_access', 'white_label'],
+    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'api_access', 'white_label', 'gbp_post', 'before_after_tagging', 'review_request'],
   },
 }
 
@@ -32,6 +32,18 @@ const MONTHLY_PHOTO_CAPS: Record<string, number> = {
 export function getMonthlyPhotoCap(planTier: string | null | undefined): number {
   const tier = (planTier ?? 'free').toLowerCase()
   return MONTHLY_PHOTO_CAPS[tier] ?? 50
+}
+
+/**
+ * Tier-only check — use in client components where planVersion isn't in session.
+ * Always uses CURRENT_PLAN_VERSION. Orgs with no planTier are treated as free.
+ */
+export function tierHasFeature(
+  planTier: string | null | undefined,
+  feature: string
+): boolean {
+  const tier = (planTier ?? 'free').toLowerCase()
+  return PLAN_FEATURES[tier]?.[CURRENT_PLAN_VERSION]?.includes(feature) ?? false
 }
 
 /**

@@ -224,7 +224,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                   id="ob-web"
                   type="text"
                   style={styles.input}
-                  placeholder="www.wilsonsdoors.com"
+                  placeholder="www.yourbusiness.com"
                   value={bizWebsite}
                   onChange={e => setBizWebsite(e.target.value)}
                 />
