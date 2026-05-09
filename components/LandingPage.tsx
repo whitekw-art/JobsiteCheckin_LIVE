@@ -1,116 +1,90 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import '@/styles/landing.css'
 
-// ── Testimonial data ──────────────────────────────────────────────────────────
-interface Testimonial {
-  index: number
-  initials: string
-  name: string
-  role: string
-  quote: string
-  metric: string
-}
-
-const testimonials: Testimonial[] = [
-  {
-    index: 0,
-    initials: 'JH',
-    name: 'James Holloway',
-    role: 'Roofing Company \u00b7 Nashville, TN',
-    quote:
-      'I used to rely on word-of-mouth. Now my jobs show up when someone in my city searches for a door installer. It takes my guys 30 seconds after every job. That\u2019s it.',
-    metric: '+$2,400 traced to search in 90 days',
-  },
-  {
-    index: 1,
-    initials: 'CR',
-    name: 'Carlos R.',
-    role: 'Entry Door Pro \u00b7 Dallas, TX',
-    quote:
-      'Customers call and say they found us online. We didn\u2019t do anything \u2014 it just happens automatically after each check-in.',
-    metric: '23 job pages indexed across 4 search engines',
-  },
-]
-
 // ── FAQ data ──────────────────────────────────────────────────────────────────
-interface FaqItem {
-  q: string
-  a: string
-}
+interface FaqItem { q: string; a: string }
 
 const faqs: FaqItem[] = [
   {
-    q: 'Does my crew need a smartphone?',
-    a: 'No. Your crew can check in from any smartphone on the job, but it\u2019s not required. Photos can be taken with any camera and uploaded later from a computer. The check-in form runs in any browser \u2014 phone, tablet, or desktop.',
+    q: 'Does my crew need to download an app?',
+    a: 'No download required. Your crew opens a link in a mobile browser, takes photos, adds a description, and submits. Most people are running in under two minutes.',
   },
   {
-    q: 'Do I need a website to use this?',
-    a: 'No. Every published job gets its own page on our domain \u2014 customers can find you on Google without you having a website at all. Also, our Pro tier gives you the flexibility to publish any jobs or work that you\u2019d like directly to your Google Business Profile.',
+    q: 'How does the GBP posting work?',
+    a: 'After each job is published, ProjectCheckin generates a GBP post for you — formatted and ready. You copy it and paste it into your GBP. Takes about 30 seconds. Full auto-posting is coming in a future update.',
   },
   {
-    q: 'How many jobs do we need to see results?',
-    a: 'Consistency matters more than volume. Every check-in creates a permanent, indexed page with your business name and location on it. A job or two a week builds a library of pages that compounds over time \u2014 the more you publish, the stronger your presence grows.',
+    q: 'What trades does this work for?',
+    a: 'Any field service business where the work is done on-site and can be photographed. Roofing, flooring, painting, HVAC, landscaping, plumbing, electrical, remodeling — if your crew goes to a job site, it works.',
+  },
+  {
+    q: "What's the difference between a project page and my portfolio?",
+    a: "Every job gets its own project page — a standalone before/after link you can send in a quote. Your portfolio is the full library of all published jobs as a public-facing showcase.",
+  },
+  {
+    q: 'How is this different from posting on Google myself?',
+    a: "Posting yourself means gathering photos, writing copy, logging in, and doing it after every job. Most contractors try for two weeks and stop. ProjectCheckin makes it one step your crew handles at the job site — so it happens every job, without you thinking about it.",
   },
   {
     q: 'Is there a contract or commitment?',
-    a: 'No contract, no commitment, no cancellation fees. Cancel any time from your account page. You keep every page and every photo you\u2019ve published \u2014 they stay indexed on Google even after you cancel.',
+    a: "No contract, no commitment. Cancel anytime from your account settings. You keep every project page and portfolio entry you've published — they stay live as long as you're a subscriber.",
   },
   {
-    q: 'Can I control which jobs get published?',
-    a: 'Yes. Every job starts private. You review it and publish when you\u2019re ready. You can edit, unpublish, or keep any job internal at any time. Your crew checks in; you decide what goes on Google.',
+    q: "My crew isn't tech-savvy. Will they actually use this?",
+    a: "No app to download, no account to create. You send your crew a link — they open it in their phone browser, take photos, add a quick note, and hit submit. Most crews are doing it on their first job. If they can text, they can do this.",
   },
   {
-    q: 'Can I cancel anytime?',
-    a: 'Yes. Month-to-month. No contracts. No cancellation fees. Cancel any time from your account \u2014 takes 30 seconds.',
+    q: 'How long does it take to get set up?',
+    a: 'Under 10 minutes. Create your account, add your business info, and send your crew the check-in link. Your first job can be published the same day.',
+  },
+  {
+    q: 'How do I get more Google reviews from customers?',
+    a: "The biggest reason contractors don't get reviews is they never ask — or they ask too late. ProjectCheckin sends a personalized review request to your customer automatically after each job is published, while the work is still fresh. Text or email, one tap, pre-written. Most contractors see more review conversations in their first month than they did all year.",
+  },
+  {
+    q: 'How do I get my contracting business to show up on Google?',
+    a: 'Google ranks local businesses that are active, documented, and reviewed. Every job you publish through ProjectCheckin creates a location-specific page Google can index, a Google Business Profile post showing recent activity, and a review request to your customer. Do that consistently and your Google presence builds with every job your crew completes.',
   },
 ]
 
-// ── Check SVG ─────────────────────────────────────────────────────────────────
-function CheckSVG() {
+// ── Arrow SVG ─────────────────────────────────────────────────────────────────
+function ArrowRight() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <circle cx="8" cy="8" r="7.5" stroke="#059669" strokeWidth="1" />
-      <path d="M5 8l2 2 4-4" stroke="#059669" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M2.5 7h9M11.5 7L8 3.5M11.5 7L8 10.5" stroke="white" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
 
-// ── Pricing check SVG ─────────────────────────────────────────────────────────
-function PCheck() {
+// ── Checkmark SVG ─────────────────────────────────────────────────────────────
+function ChkSVG() {
   return (
-    <span className="pcheck">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-        <circle cx="9" cy="9" r="8.5" stroke="#059669" strokeWidth="1" />
-        <path d="M5.5 9l2.5 2.5 5-5" stroke="#059669" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path d="M2 6l2.5 3L10 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+// ── FAQ chevron ────────────────────────────────────────────────────────────────
+function FaqArr() {
+  return (
+    <span className="faq-arr">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </span>
   )
 }
 
-function PDash() {
-  return <span className="pdash">&mdash;</span>
-}
-
-function CSBadge() {
-  return <span className="cs-badge">Coming Soon</span>
-}
-
-// ── Main component ────────────────────────────────────────────────────────────
+// ── Main component ─────────────────────────────────────────────────────────────
 export default function LandingPage({ registrationOpen = false }: { registrationOpen?: boolean }) {
   // Modal state
   const [modalOpen, setModalOpen] = useState(false)
   const [modalEmail, setModalEmail] = useState('')
   const searchParams = useSearchParams()
-
-  // Auto-open modal when ?modal=waitlist is in the URL (e.g. redirected from register-closed page)
-  useEffect(() => {
-    if (searchParams.get('modal') === 'waitlist') {
-      setModalOpen(true)
-    }
-  }, [searchParams])
 
   // Form state
   const [formName, setFormName] = useState('')
@@ -122,50 +96,48 @@ export default function LandingPage({ registrationOpen = false }: { registration
   const [submitted, setSubmitted] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
-  // CTA band email
-  const [ctaEmail, setCtaEmail] = useState('')
-
-  // Nav scroll
+  // Nav state
   const [navScrolled, setNavScrolled] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
 
   // FAQ accordion
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
-  // Testimonials
-  const [showTestimonials, setShowTestimonials] = useState(false)
-  const [activeSlide, setActiveSlide] = useState(0)
+  // Before/after slider refs
+  const sliderRef = useRef<HTMLDivElement>(null)
+  const afterRef = useRef<HTMLDivElement>(null)
+  const lineRef = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLDivElement>(null)
+  const hintRef = useRef<HTMLDivElement>(null)
+
+  // Portfolio tilt ref
+  const browserRef = useRef<HTMLDivElement>(null)
 
   // ── Effects ────────────────────────────────────────────────────────────────
 
-  // Sync prefill email to form
+  // Auto-open modal from URL param
   useEffect(() => {
-    setFormEmail(modalEmail)
-  }, [modalEmail])
+    if (searchParams.get('modal') === 'waitlist') setModalOpen(true)
+  }, [searchParams])
 
-  // Body overflow lock when modal open
+  // Sync prefill email to form
+  useEffect(() => { setFormEmail(modalEmail) }, [modalEmail])
+
+  // Body overflow lock
   useEffect(() => {
-    if (modalOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
-    return () => {
-      document.body.style.overflow = ''
-    }
+    document.body.style.overflow = modalOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
   }, [modalOpen])
 
   // Escape key closes modal
   useEffect(() => {
     if (!modalOpen) return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeWaitlistModal()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeWaitlistModal() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [modalOpen])
 
-  // Nav scroll effect
+  // Nav scroll
   useEffect(() => {
     const onScroll = () => setNavScrolled(window.scrollY > 60)
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -176,86 +148,111 @@ export default function LandingPage({ registrationOpen = false }: { registration
   useEffect(() => {
     if (!navOpen) return
     const onClick = (e: MouseEvent) => {
-      const nav = document.getElementById('nav')
+      const nav = document.getElementById('nav-root')
       if (nav && !nav.contains(e.target as Node)) setNavOpen(false)
     }
     document.addEventListener('click', onClick)
     return () => document.removeEventListener('click', onClick)
   }, [navOpen])
 
-  // Reveal animations (IntersectionObserver)
+  // Reveal animations — targets .r class
   useEffect(() => {
-    const els = document.querySelectorAll('.reveal')
+    const els = document.querySelectorAll('.r')
     const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            e.target.classList.add('in')
-          } else {
-            e.target.classList.remove('in')
-          }
-        })
-      },
-      { rootMargin: '0px 0px -80px 0px', threshold: 0.12 }
+      (entries) => entries.forEach((e) => {
+        if (e.isIntersecting) e.target.classList.add('in')
+      }),
+      { threshold: 0.06 }
     )
     els.forEach((el) => io.observe(el))
     return () => io.disconnect()
   }, [])
 
-  // Stat count-up
+  // Before/After drag slider
   useEffect(() => {
-    function easeOutCubic(t: number) {
-      return 1 - Math.pow(1 - t, 3)
+    const slider = sliderRef.current
+    const after  = afterRef.current
+    const line   = lineRef.current
+    const btn    = btnRef.current
+    const hint   = hintRef.current
+    if (!slider || !after || !line || !btn) return
+
+    let pct = 0.90
+    let dragging = false
+    let hintDismissed = false
+
+    function apply(p: number) {
+      const r = (p * 100).toFixed(1)
+      after!.style.clipPath = `inset(0 0 0 ${r}%)`
+      line!.style.left = r + '%'
+      btn!.style.left  = r + '%'
+      if (hint) hint.style.left = r + '%'
     }
 
-    const statEls = document.querySelectorAll<HTMLElement>('.stat-number[data-target]')
-    const animated = new Set<Element>()
+    function dismissHint() {
+      if (!hintDismissed && hint) {
+        hintDismissed = true
+        hint.classList.add('hidden')
+      }
+    }
 
-    const statObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return
-          const el = entry.target as HTMLElement
-          if (animated.has(el)) return
-          animated.add(el)
+    function setFromEvent(e: MouseEvent | TouchEvent) {
+      const rect = slider!.getBoundingClientRect()
+      const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX
+      pct = Math.min(Math.max((clientX - rect.left) / rect.width, 0.04), 0.96)
+      apply(pct)
+      dismissHint()
+    }
 
-          const target = parseInt(el.getAttribute('data-target') ?? '0', 10)
-          const suffix = el.getAttribute('data-suffix') ?? ''
-          const duration = 1200
-          let startTs: number | null = null
+    const onMouseDown = (e: MouseEvent) => { dragging = true; setFromEvent(e) }
+    const onMouseUp   = () => { dragging = false }
+    const onMouseMove = (e: MouseEvent) => { if (dragging) setFromEvent(e) }
+    const onTouchStart = (e: TouchEvent) => { dragging = true; setFromEvent(e) }
+    const onTouchEnd  = () => { dragging = false }
+    const onTouchMove = (e: TouchEvent) => { if (dragging) setFromEvent(e) }
 
-          function tick(ts: number) {
-            if (!startTs) startTs = ts
-            const elapsed = ts - startTs
-            const progress = Math.min(elapsed / duration, 1)
-            const eased = easeOutCubic(progress)
-            el.textContent = Math.round(eased * target) + suffix
-            if (progress < 1) requestAnimationFrame(tick)
-          }
-          requestAnimationFrame(tick)
-          statObserver.unobserve(el)
-        })
-      },
-      { threshold: 0.3 }
-    )
+    slider.addEventListener('mousedown',  onMouseDown)
+    window.addEventListener('mouseup',    onMouseUp)
+    slider.addEventListener('mousemove',  onMouseMove)
+    slider.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchend',   onTouchEnd)
+    slider.addEventListener('touchmove',  onTouchMove, { passive: true })
 
-    statEls.forEach((el) => statObserver.observe(el))
-    return () => statObserver.disconnect()
-  }, [])
+    apply(pct)
 
-  // Testimonial localStorage + flag
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setShowTestimonials(localStorage.getItem('pc_show_testimonials') === 'true')
+    return () => {
+      slider.removeEventListener('mousedown',  onMouseDown)
+      window.removeEventListener('mouseup',    onMouseUp)
+      slider.removeEventListener('mousemove',  onMouseMove)
+      slider.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchend',   onTouchEnd)
+      slider.removeEventListener('touchmove',  onTouchMove)
     }
   }, [])
 
-  // Testimonial carousel auto-advance
+  // 3D tilt on portfolio browser
   useEffect(() => {
-    if (!showTestimonials) return
-    const t = setInterval(() => setActiveSlide((p) => (p + 1) % testimonials.length), 5000)
-    return () => clearInterval(t)
-  }, [showTestimonials])
+    const el = browserRef.current
+    if (!el) return
+    const MAX_TILT = 6
+    const onMouseMove = (e: MouseEvent) => {
+      const r = el.getBoundingClientRect()
+      const x = (e.clientX - r.left) / r.width  - 0.5
+      const y = (e.clientY - r.top)  / r.height - 0.5
+      el.style.transform = `perspective(900px) rotateX(${-y * MAX_TILT}deg) rotateY(${x * MAX_TILT}deg) scale(1.02)`
+      el.style.boxShadow = `${-x * MAX_TILT * 2}px ${y * MAX_TILT * 2}px 40px rgba(0,0,0,0.18)`
+    }
+    const onMouseLeave = () => {
+      el.style.transform = ''
+      el.style.boxShadow = ''
+    }
+    el.addEventListener('mousemove',  onMouseMove)
+    el.addEventListener('mouseleave', onMouseLeave)
+    return () => {
+      el.removeEventListener('mousemove',  onMouseMove)
+      el.removeEventListener('mouseleave', onMouseLeave)
+    }
+  }, [])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -268,14 +265,8 @@ export default function LandingPage({ registrationOpen = false }: { registration
     setModalOpen(false)
   }
 
-  function toggleFaq(index: number) {
-    setOpenFaq((prev) => (prev === index ? null : index))
-  }
-
-  function toggleTestimonials() {
-    const next = !showTestimonials
-    setShowTestimonials(next)
-    localStorage.setItem('pc_show_testimonials', String(next))
+  function toggleFaq(i: number) {
+    setOpenFaq((prev) => (prev === i ? null : i))
   }
 
   async function handleWaitlistSubmit(e: React.FormEvent) {
@@ -305,6 +296,22 @@ export default function LandingPage({ registrationOpen = false }: { registration
     }
   }
 
+  // CTA helper — opens modal or links to register
+  function primaryCTA(label: string, className: string) {
+    if (registrationOpen) {
+      return (
+        <a href="/auth/register" className={className}>
+          {label} <ArrowRight />
+        </a>
+      )
+    }
+    return (
+      <button className={className} onClick={() => openWaitlistModal()}>
+        {label} <ArrowRight />
+      </button>
+    )
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
@@ -312,996 +319,868 @@ export default function LandingPage({ registrationOpen = false }: { registration
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       <link
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500&family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap"
         rel="stylesheet"
       />
 
-      {/* Skip to main content */}
+      {/* Skip to main */}
       <a
         href="#main-content"
-        style={{
-          position: 'absolute',
-          top: '-40px',
-          left: 0,
-          background: '#0C4A6E',
-          color: '#fff',
-          padding: '8px 16px',
-          zIndex: 999,
-          borderRadius: '0 0 4px 0',
-        }}
-        onFocus={(e) => ((e.currentTarget as HTMLAnchorElement).style.top = '0')}
-        onBlur={(e) => ((e.currentTarget as HTMLAnchorElement).style.top = '-40px')}
+        style={{ position: 'absolute', top: '-40px', left: 0, background: '#0C3D5C', color: '#fff', padding: '8px 16px', zIndex: 999, borderRadius: '0 0 4px 0' }}
+        onFocus={(e) => { (e.currentTarget as HTMLAnchorElement).style.top = '0' }}
+        onBlur={(e)  => { (e.currentTarget as HTMLAnchorElement).style.top = '-40px' }}
       >
         Skip to main content
       </a>
 
-      {/* NAV */}
-      <nav id="nav" className={navScrolled ? 'scrolled' : ''}>
+      {/* ── NAV ── */}
+      <nav id="nav-root" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: 'rgba(255,255,255,0.94)', backdropFilter: 'blur(16px)', borderBottom: '1px solid #E5E7EB' }}>
         <div className="nav-inner">
-          <a href="#" className="nav-logo">
+          <a href="/" className="logo">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="ProjectCheckin logo" />
+            <img src="/logo.png" className="logo-img" alt="ProjectCheckin logo" />
             ProjectCheckin
           </a>
-          <ul className={`nav-links${navOpen ? ' open' : ''}`}>
-            <li><a href="#how" onClick={() => setNavOpen(false)}>How It Works</a></li>
-            <li><a href="#pricing" onClick={() => setNavOpen(false)}>Pricing</a></li>
-            <li><a href="/auth/signin" onClick={() => setNavOpen(false)}>{registrationOpen ? 'Sign In / Register' : 'Sign In'}</a></li>
-            {!registrationOpen && (
-              <li>
-                <a
-                  href="#"
-                  className="btn-nav"
-                  onClick={(e) => { e.preventDefault(); setNavOpen(false); openWaitlistModal() }}
-                >
-                  Join the Waitlist
-                </a>
-              </li>
+          <div className={`nav-right${navOpen ? ' open' : ''}`}>
+            <a href="#how-it-works" className="nav-link" onClick={() => setNavOpen(false)}>How It Works</a>
+            <a href="#pricing" className="nav-link" onClick={() => setNavOpen(false)}>Pricing</a>
+            <a href="/auth/signin" className="nav-link" onClick={() => setNavOpen(false)}>
+              {registrationOpen ? 'Sign In / Register' : 'Sign In'}
+            </a>
+            {registrationOpen ? (
+              <a href="/auth/register" className="btn-sm-link" onClick={() => setNavOpen(false)}>Get Started</a>
+            ) : (
+              <button className="btn-sm" onClick={() => { setNavOpen(false); openWaitlistModal() }}>
+                Get Early Access
+              </button>
             )}
-          </ul>
+          </div>
           <button
             className={`nav-hamburger${navOpen ? ' open' : ''}`}
-            aria-label={navOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-label={navOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={navOpen}
-            aria-controls="nav-links"
-            onClick={() => setNavOpen(o => !o)}
+            onClick={() => setNavOpen((o) => !o)}
           >
-            <span />
-            <span />
-            <span />
+            <span /><span /><span />
           </button>
         </div>
       </nav>
 
-      {/* HERO */}
-      <section className="hero" id="main-content" role="main">
+      {/* ── HERO ── */}
+      <section className="hero" id="main-content">
         <div className="hero-inner">
-
-          {/* Left column */}
-          <div className="hero-left">
-            <span className="hero-badge reveal">EARLY ACCESS &mdash; ONLY 20 SPOTS</span>
-            <p className="hero-descriptor reveal">The job-tracking app that markets your business automatically.</p>
-            <h1 className="hero-h1 reveal">Turn your job history into a lead machine.</h1>
-            <p className="hero-sub reveal">
-              Every job your team completes automatically shows up on Google, builds your reputation online, and brings in calls &mdash; without you writing a word or running a single ad.
+          <h1 className="hero-h1 r">
+            <span className="h1-line1">Show your best work.</span>
+            <span className="h1-line2"><em>Win your best clients.</em></span>
+          </h1>
+          <div className="hero-bottom r d2">
+            <p className="hero-sub">
+              Turn every completed job into a marketing presence that finds your next customer — without any extra effort.
             </p>
-            <ul className="hero-bullets reveal">
-              <li>No agency retainers.</li>
-              <li>No writing. No content work.</li>
-              <li>Just do the work &mdash; we turn it into leads.</li>
-            </ul>
-
-            {/* Primary CTA */}
-            <div id="waitlist" className="hero-form-wrap reveal">
+            <div className="hero-cta-col">
               {registrationOpen ? (
-                <a href="/auth/register" className="btn-waitlist-hero">
-                  Get Started
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                <a href="/auth/register" className="btn-primary">
+                  Get Started <ArrowRight />
                 </a>
               ) : (
-                <button className="btn-waitlist-hero" onClick={() => openWaitlistModal()}>
-                  Join the Waitlist
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                <button className="btn-primary" onClick={() => openWaitlistModal()}>
+                  Get Early Access <ArrowRight />
                 </button>
+              )}
+              {!registrationOpen && (
+                <div className="spots-note">
+                  <span className="spots-dot"></span>
+                  20 founding spots remaining
+                </div>
+              )}
+              <div className="trust-row">
+                <span className="trust-i"><ChkSVG />No agency fees</span>
+                <span className="trust-i"><ChkSVG />Cancel anytime</span>
+                <span className="trust-i"><ChkSVG />Any trade</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── HERO VISUAL — perspective tilt dashboard ── */}
+      <div className="hero-visual-wrap r">
+        <div className="hero-visual-inner">
+          <div className="dash-ui">
+            <div className="dash-side">
+              <div className="ds-brand">
+                <div className="ds-brand-dot"></div>
+                ProjectCheckin
+              </div>
+              <div className="ds-item">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><rect x="1" y="1" width="4" height="4" rx="1" fill="currentColor"/><rect x="7" y="1" width="4" height="4" rx="1" fill="currentColor" opacity=".4"/><rect x="1" y="7" width="4" height="4" rx="1" fill="currentColor" opacity=".4"/><rect x="7" y="7" width="4" height="4" rx="1" fill="currentColor" opacity=".4"/></svg>
+                Overview
+              </div>
+              <div className="ds-item active">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1l1.6 3.5H12L8.7 7l1.2 4L6 8.8 2.1 11 3.3 7 0 4.5h4.4L6 1Z" fill="currentColor"/></svg>
+                My Jobs
+              </div>
+              <div className="ds-item">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.3" fill="none"/></svg>
+                Portfolio
+              </div>
+              <div className="ds-item">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M1 9l3-3 2.5 2 4-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
+                Reports
+              </div>
+            </div>
+            <div className="dash-main">
+              <div className="dm-header">
+                <div>
+                  <div className="dm-title">Completed Jobs</div>
+                  <div className="dm-sub">Nashville, TN &middot; All trades</div>
+                </div>
+                <button className="dm-btn">+ New Check-In</button>
+              </div>
+              <div className="jobs-g">
+                <div className="jcard">
+                  <div className="jcard-img">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/lp-door-craftsman.png" alt="" />
+                    <span className="jtag">Live</span>
+                  </div>
+                  <div className="jcard-body">
+                    <div className="jcard-t">Door Install — Craftsman</div>
+                    <div className="jcard-m">Nashville, TN &middot; Apr 28</div>
+                    <div className="jcard-chips"><span className="chip cp">Page</span><span className="chip cg">GBP Post</span><span className="chip cr">Review</span></div>
+                  </div>
+                </div>
+                <div className="jcard">
+                  <div className="jcard-img">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/lp-finished-door.png" alt="" />
+                    <span className="jtag">Live</span>
+                  </div>
+                  <div className="jcard-body">
+                    <div className="jcard-t">Entry Door — Brentwood</div>
+                    <div className="jcard-m">Brentwood, TN &middot; Apr 26</div>
+                    <div className="jcard-chips"><span className="chip cp">Page</span><span className="chip cg">GBP Post</span><span className="chip cr">Review</span></div>
+                  </div>
+                </div>
+                <div className="jcard">
+                  <div className="jcard-img">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/lp-hero-roof-home.png" alt="" style={{ objectPosition: 'center 60%' }} />
+                    <span className="jtag">Live</span>
+                  </div>
+                  <div className="jcard-body">
+                    <div className="jcard-t">Roof Replacement</div>
+                    <div className="jcard-m">Green Hills, TN &middot; Apr 22</div>
+                    <div className="jcard-chips"><span className="chip cp">Page</span><span className="chip cg">GBP Post</span><span className="chip cr">Review</span></div>
+                  </div>
+                </div>
+                <div className="jcard">
+                  <div className="jcard-img">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/lp-hero-paint-home.png" alt="" />
+                    <span className="jtag">Live</span>
+                  </div>
+                  <div className="jcard-body">
+                    <div className="jcard-t">Exterior Paint</div>
+                    <div className="jcard-m">Nashville, TN &middot; Apr 19</div>
+                    <div className="jcard-chips"><span className="chip cp">Page</span><span className="chip cg">GBP Post</span><span className="chip cr">Review</span></div>
+                  </div>
+                </div>
+              </div>
+              <div className="activity">
+                <div className="act-title">Recent Activity</div>
+                <div className="act-row"><span className="act-dot"></span><span className="act-text">Review request sent &mdash; Sarah M., Door Install</span><span className="act-time">2m ago</span></div>
+                <div className="act-row"><span className="act-dot"></span><span className="act-text">GBP post ready &mdash; Entry Door, Brentwood</span><span className="act-time">1h ago</span></div>
+                <div className="act-row"><span className="act-dot"></span><span className="act-text">New project page published &mdash; Roof Replacement</span><span className="act-time">3h ago</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="hero-visual-fade"></div>
+
+      {/* ── STATS ── */}
+      <section className="stats">
+        <div className="stats-inner">
+          <div className="stat r">
+            <span className="stat-n">54%</span>
+            <div className="stat-lbl">of homeowners struggle to find a qualified contractor</div>
+            <div className="stat-src">Angi, 2025</div>
+          </div>
+          <div className="stat r d1">
+            <span className="stat-n">81%</span>
+            <div className="stat-lbl">of customers check Google before calling a contractor</div>
+            <div className="stat-src">BrightLocal, 2024</div>
+          </div>
+          <div className="stat r d2">
+            <span className="stat-n">42%</span>
+            <div className="stat-lbl">more direction requests when businesses post photos to Google</div>
+            <div className="stat-src">Google Business Profile data</div>
+          </div>
+          <div className="stat r d3">
+            <span className="stat-n">88%</span>
+            <div className="stat-lbl">of local searches lead to a business contact within 24 hours</div>
+            <div className="stat-src">Think with Google</div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── BENTO ── */}
+      <section className="bento-section">
+        <div className="bento-head">
+          <span className="section-label r">What ProjectCheckin creates</span>
+          <h2 className="section-h2 r d1">Your jobs, working for you.</h2>
+        </div>
+        <div className="bento-grid">
+
+          {/* LEFT COLUMN */}
+          <div className="bento-col bento-col-left">
+
+            {/* Portfolio page card */}
+            <div className="bc bc-main r d1">
+              <span className="bc-label">Shareable Project Page</span>
+              <div className="bc-title">A live portfolio page for your business</div>
+              <div className="bc-desc">Your own portfolio of your best work, branded for your business. We build the page, you control the content. Send it in quotes. Share it with prospects. Post it to Google Business. Indexed, linkable, and a permanent record of your crew&apos;s work.</div>
+              <div className="bc-bullets">
+                <ul className="bc-blist">
+                  <li>Live, branded URL with your business name</li>
+                  <li>Direct links to your website &amp; contact info for leads &amp; SEO</li>
+                  <li>Zero effort to set up or create</li>
+                </ul>
+                <ul className="bc-blist">
+                  <li>Fully editable. Update with a click.</li>
+                  <li>Optimized for Google Search, ChatGPT, and Gemini so customers find you</li>
+                </ul>
+              </div>
+              <div className="bc-browser" ref={browserRef}>
+                <div className="bcb-chrome">
+                  <div className="bcb-dots"><span></span><span></span><span></span></div>
+                  <div className="bcb-bar">projectcheckin.com/portfolio/YOUR-COMPANY-HERE</div>
+                </div>
+                <div className="bcb-viewport">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <iframe
+                    src="https://jobsite-checkin-staging.vercel.app/portfolio/wave-advisory-3e10"
+                    className="bcb-frame"
+                    scrolling="no"
+                    frameBorder="0"
+                    title="Portfolio page preview"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Before/After text card */}
+            <div className="bc bc-bac-text r d4">
+              <span className="bc-label">Before / After</span>
+              <div className="bc-title">Drag-to-reveal proof of the transformation</div>
+              <div className="bc-desc">Every job page includes an interactive before/after comparison your prospects can drag and explore. Proof they can feel, not just read.</div>
+              <ul className="bc-blist" style={{ marginBottom: '16px' }}>
+                <li>Built into every published job page automatically</li>
+                <li>Shareable — send it in quotes, texts, or emails</li>
+                <li>Visible on your portfolio and in Google search results</li>
+              </ul>
+              <div className="bac-ghost">
+                <div className="bac-ghost-bar">
+                  <span className="bac-ghost-label">Ghost Camera — in the field</span>
+                  <span className="bac-ghost-dot"></span>
+                </div>
+                <div className="bac-ghost-body">
+                  <div className="bac-ghost-phone">
+                    <div className="bac-ghost-overlay"></div>
+                    <div className="bac-ghost-viewfinder"></div>
+                  </div>
+                  <div className="bac-ghost-copy">
+                    <p><strong>Add a photo later?</strong> The ghost camera overlays the before photo semi-transparently in your viewfinder so your crew lines up the same angle every time — no guessing.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* RIGHT COLUMN */}
+          <div className="bento-col bento-col-right">
+
+            {/* GBP card */}
+            <div className="bc bc-gbp r d2">
+              <span className="bc-label">Google Business Profile Post</span>
+              <div className="bc-title">Connect to GBP — Approve and Post in a click</div>
+              <div className="bc-desc">Formatted with your photos, job description, and location. You can edit &amp; revise, copy and paste, or with a click auto-post to GBP*.</div>
+              <div className="gbp-preview">
+                <div className="gbp-source">
+                  <div className="gbp-g"></div>
+                  <span className="gbp-name">Your Business on Google</span>
+                </div>
+                <div className="gbp-text">&ldquo;Completed a custom door installation in Brentwood today. New craftsman-style entry with updated hardware. Before and after photos below...&rdquo;</div>
+                <button className="gbp-copy-btn">Copy Post Text</button>
+              </div>
+              <p style={{ fontSize: '11px', color: 'rgba(15,23,42,0.45)', marginTop: '10px', marginBottom: 0 }}>*GBP auto-post coming soon!</p>
+            </div>
+
+            {/* Review card */}
+            <div className="bc bc-review r d3">
+              <span className="bc-label">Review Request</span>
+              <div className="bc-title">Pre-written and ready to send</div>
+              <div className="bc-desc">A personalized text and/or email to your customer. Edit if you&apos;d like, one tap to send from your phone or email. Logs &ldquo;Sent on&rdquo; dates so you&apos;ll never forget.</div>
+              <div className="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+              <div className="rev-preview">
+                <div className="rev-msg">&ldquo;Sarah &mdash; we really appreciated your business. Hope you love the new door. If you have a minute, a Google review helps us more than you know: [review link]&rdquo;</div>
+                <div className="rev-photo-strip">
+                  <div className="rev-photo-stack">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/lp-door-stone-home.png" alt="" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/lp-finished-door.png" alt="" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/lp-door-craftsman.png" alt="" />
+                  </div>
+                </div>
+                <div className="rev-actions">
+                  <button className="rev-btn rb-text">Send Text</button>
+                  <button className="rev-btn rb-email">Send Email</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Before/After slider card */}
+            <div className="bc bc-bac-slider r d5">
+              <div className="bac-slider" ref={sliderRef}>
+                <div className="bac-img bac-img-before" aria-hidden="true"></div>
+                <div className="bac-img bac-img-after"  aria-hidden="true" ref={afterRef}></div>
+                <span className="bac-tag bac-tag-b">BEFORE</span>
+                <span className="bac-tag bac-tag-a">AFTER</span>
+                <div className="bac-line" ref={lineRef}></div>
+                <div className="bac-btn"  ref={btnRef}>
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="7 4 3 10 7 16"/><polyline points="13 4 17 10 13 16"/>
+                  </svg>
+                </div>
+                <div className="bac-hint" ref={hintRef}>&larr; drag</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ── HOW IT WORKS ── */}
+      <section className="how" id="how-it-works">
+        <div className="how-inner">
+          <div className="how-head">
+            <span className="section-label r">How It Works</span>
+          </div>
+          <div className="how-steps">
+
+            {/* Step 01 */}
+            <div className="how-step r">
+              <div className="hs-copy">
+                <div className="hs-step-n">01 &mdash; At the job site</div>
+                <h3>Your crew submits a quick check-in on-site.</h3>
+                <p>They snap photos of the job and add a quick note on the work — they&apos;ve done it at every job. Now instead of disappearing into a camera roll, they click submit and the job is logged, organized, and ready to work for you.</p>
+                <div className="hs-bullets">
+                  <div className="hs-b"><span className="hs-b-dot"></span>Before and after shots captured</div>
+                  <div className="hs-b"><span className="hs-b-dot"></span>Job address and trade notes logged</div>
+                  <div className="hs-b"><span className="hs-b-dot"></span>Customer info saved for a one-tap review request</div>
+                </div>
+              </div>
+              <div className="hs-visual">
+                <div className="step-photo-wrap">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/images/lp-contractor-checkin.png" alt="Contractor checking in at job site" />
+                  <div className="step-photo-badge">
+                    <span className="spb-dot"></span>
+                    <div>
+                      <div className="spb-text">Check-In Submitted</div>
+                      <div className="spb-sub">4 photos &middot; Nashville, TN</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 02 */}
+            <div className="how-step flip r">
+              <div className="hs-copy">
+                <div className="hs-step-n">02 &mdash; In your dashboard</div>
+                <h3>Each job lands organized and ready to go.</h3>
+                <p>Every submission shows up in one clean place — a location-specific job page, a portfolio entry, a formatted Google Business post, and a review message with your customer&apos;s name already in it. Review it, edit if you want, and publish. It takes about 30 seconds.</p>
+              </div>
+              <div className="hs-visual">
+                <div className="dash-mockup">
+                  <div className="dm-chrome">
+                    <div className="dm-logo">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/logo.png" className="dm-logo-img" alt="" />
+                      <span className="dm-logo-text">ProjectCheckin</span>
+                    </div>
+                    <button className="dm-new-btn">+ New Check-In</button>
+                  </div>
+                  <div className="dm-status-bar">
+                    <span className="dm-status-dot"></span>
+                    Your public portfolio is live &mdash; 5 jobs indexed on Google
+                    <span className="dm-view-portfolio">View Portfolio &#8599;</span>
+                  </div>
+                  <div className="dm-job-header">
+                    <div className="dm-date">
+                      <div className="dm-date-mon">APR</div>
+                      <div className="dm-date-day">18</div>
+                    </div>
+                    <div className="dm-job-meta">
+                      <div className="dm-job-addr">412 Maple Creek Dr., Brentwood, TN 37027</div>
+                      <div className="dm-job-type">Wood Door &middot; <span className="dm-photos-link">4 photos</span></div>
+                    </div>
+                    <div className="dm-live-wrap">
+                      <span className="dm-live-dot"></span>
+                      <span className="dm-live-text">Live</span>
+                    </div>
+                    <button className="dm-unpublish-btn">Unpublish</button>
+                  </div>
+                  <div className="dm-job-body">
+                    <div className="dm-col-left">
+                      <div className="dm-section">
+                        <div className="dm-section-label">Customer <span className="dm-edit-link">Edit</span></div>
+                        <div className="dm-customer-name">Jennifer Jones</div>
+                        <div className="dm-field-row"><span className="dm-field-lbl">Phone</span>(615) 555-0100</div>
+                        <div className="dm-field-row"><span className="dm-field-lbl">Email</span>j.jones@example.com</div>
+                      </div>
+                      <div className="dm-section">
+                        <div className="dm-section-label">Address</div>
+                        <div className="dm-addr-text">412 Maple Creek Dr.<br />Brentwood, TN 37027</div>
+                        <div className="dm-maps-link">Open in Maps &#8599;</div>
+                      </div>
+                      <div className="dm-section">
+                        <div className="dm-section-label">Job Info</div>
+                        <div className="dm-info-row"><span className="dm-info-lbl">Installer</span>Paul</div>
+                        <div className="dm-info-row"><span className="dm-info-lbl">Type</span>Wood Door</div>
+                        <div className="dm-info-row"><span className="dm-info-lbl">Date</span>April 18, 2026</div>
+                      </div>
+                      <div className="dm-section">
+                        <div className="dm-section-label">Notes</div>
+                        <div className="dm-notes-wrap">
+                          <div className="dm-notes-text">Replaced existing steel entry door with solid mahogany 3/0 x 6/8 with sidelights. Customer requested matte black hardware throughout. Installed new threshold and weatherstripping.</div>
+                          <div className="dm-notes-fade"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="dm-col-right">
+                      <div className="dm-photos-grid">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/dm-job-photo-1.png" alt="" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/dm-job-photo-2.png" alt="" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/dm-job-photo-3.png" alt="" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/dm-job-photo-4.png" alt="" />
+                      </div>
+                      <div className="dm-actions">
+                        <button className="dm-action-btn"><span className="dm-action-icon">&#128279;</span>Copy Job Link</button>
+                        <button className="dm-action-btn dm-action-gbp"><span className="dm-action-icon">&#128205;</span>Post to Google Business</button>
+                        <button className="dm-action-btn dm-action-review"><span className="dm-action-icon">&#11088;</span>Request Google Review</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="dm-user-badge">
+                    <div className="dm-user-avatar"></div>
+                    <span className="dm-user-plan">Titan Plan</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 03 */}
+            <div className="how-step r">
+              <div className="hs-copy">
+                <div className="hs-step-n">03 &mdash; Over time</div>
+                <h3>Every job adds to a library that wins future work</h3>
+                <p>After 30 jobs you have 30 shareable project pages. Your history of finished work becomes the most credible sales tool your business has. These pages are location-specific, tell Google &ldquo;I was here,&rdquo; increase your online footprint, and can drive traffic and leads to your business.</p>
+                <div className="hs-bullets">
+                  <div className="hs-b"><span className="hs-b-dot"></span>Portfolio grows without extra effort</div>
+                  <div className="hs-b"><span className="hs-b-dot"></span>Send project links in quotes and proposals</div>
+                  <div className="hs-b"><span className="hs-b-dot"></span>Google presence builds with each published job</div>
+                </div>
+              </div>
+              <div className="hs-visual">
+                <div className="dash-mockup">
+                  <div className="dm-wrapper">
+                    <div className="dm-sidebar">
+                      <div className="dm-sidebar-logo">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/logo.png" className="dm-logo-img" alt="" />
+                        <span className="dm-logo-text">ProjectCheckin</span>
+                      </div>
+                      <div className="dm-nav">
+                        <div className="dm-nav-section-lbl">Workspace</div>
+                        <div className="dm-nav-item">Check-In</div>
+                        <div className="dm-nav-item active">Jobs</div>
+                        <div className="dm-nav-item">Team</div>
+                        <div className="dm-nav-section-lbl">Analytics</div>
+                        <div className="dm-nav-item">Reporting</div>
+                        <div className="dm-nav-section-lbl">Settings</div>
+                        <div className="dm-nav-item">Account</div>
+                        <div className="dm-nav-item">Sign Out</div>
+                      </div>
+                      <div className="dm-sidebar-user">
+                        <div className="dm-user-avatar"></div>
+                        <span className="dm-user-plan">Titan Plan</span>
+                      </div>
+                    </div>
+                    <div className="dm-main">
+                      <div className="dm-main-header">
+                        <span className="dm-main-title">Jobs</span>
+                        <button className="dm-new-btn">+ New Check-In</button>
+                      </div>
+                      <div className="dm-stats-bar">
+                        <div className="dm-stat"><div className="dm-stat-n">34</div><div className="dm-stat-l">Total Jobs</div></div>
+                        <div className="dm-stat"><div className="dm-stat-n">3</div><div className="dm-stat-l">Today</div></div>
+                        <div className="dm-stat"><div className="dm-stat-n">28</div><div className="dm-stat-l">Published</div></div>
+                        <div className="dm-stat"><div className="dm-stat-n">6</div><div className="dm-stat-l">Active Installers</div></div>
+                      </div>
+                      <div className="dm-status-bar">
+                        <span className="dm-status-dot"></span>
+                        Your public portfolio is live &mdash; 28 jobs indexed on Google
+                        <span className="dm-view-portfolio">View Portfolio &#8599;</span>
+                      </div>
+                      <div className="dm-filters">
+                        <div className="dm-tabs">
+                          <div className="dm-tab active">All <span className="dm-tab-count">34</span></div>
+                          <div className="dm-tab">Live <span className="dm-tab-count">28</span></div>
+                          <div className="dm-tab">Draft <span className="dm-tab-count">6</span></div>
+                        </div>
+                      </div>
+                      <div className="dm-job-list">
+                        {[
+                          { mon: 'APR', day: 23, addr: '1847 Willowmist Crossing Dr, Franklin, TN 37064', type: 'Fiberglass Front Door · 4 photos', live: false },
+                          { mon: 'APR', day: 22, addr: '3214 Copperbend Hollow Ln, Brentwood, TN 37027', type: 'Barn Door · 3 photos', live: true },
+                          { mon: 'APR', day: 22, addr: '509 Fernbrook Hollow Ct, Murfreesboro, TN 37129', type: 'Barn Door · 5 photos', live: false },
+                          { mon: 'APR', day: 21, addr: '721 Stonewick Meadows Dr, Spring Hill, TN 37174', type: 'Barn Door · 2 photos', live: true },
+                          { mon: 'APR', day: 18, addr: '412 Maple Creek Dr, Brentwood, TN 37027', type: 'Wood Door · 4 photos', live: true },
+                          { mon: 'APR', day: 10, addr: '2816 Bluegrass Summit Ave, Nashville, TN 37211', type: 'Iron Door · 2 photos', live: false },
+                        ].map((row, i) => (
+                          <div className="dm-list-row" key={i}>
+                            <div className="dm-list-date">
+                              <div className="dm-list-date-mon">{row.mon}</div>
+                              <div className="dm-list-date-day">{row.day}</div>
+                            </div>
+                            <div className="dm-list-meta">
+                              <div className="dm-list-addr">{row.addr}</div>
+                              <div className="dm-list-type">{row.type}</div>
+                            </div>
+                            <div className="dm-list-right">
+                              {row.live ? (
+                                <>
+                                  <div className="dm-list-live"><span className="dm-list-dot live"></span>Live</div>
+                                  <button className="dm-list-unpublish">Unpublish</button>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="dm-list-draft"><span className="dm-list-dot draft"></span>Draft</div>
+                                  <button className="dm-list-publish">Publish</button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ── ASPIRATION ── */}
+      <section className="asp">
+        <div className="asp-inner">
+          <div className="asp-copy">
+            <span className="section-label r">90 Days In</span>
+            <h2 className="r d1">What your business looks like when the work is documented</h2>
+            <p className="r d2">Document every job and it adds up fast. By month three, the jobs keep working for you long after you&apos;ve moved on &mdash; sending prospects proof before they even call.</p>
+          </div>
+          <div className="asp-metrics r d2">
+            <div className="asp-m">
+              <div className="asp-m-num">30<span>+</span></div>
+              <div>
+                <div className="asp-m-t">Published project pages</div>
+                <div className="asp-m-s">Shareable proof for every job your crew completed</div>
+              </div>
+            </div>
+            <div className="asp-m">
+              <div className="asp-m-num">30<span>+</span></div>
+              <div>
+                <div className="asp-m-t">GBP posts ready</div>
+                <div className="asp-m-s">Consistent posting signals an active, trusted business</div>
+              </div>
+            </div>
+            <div className="asp-m">
+              <div className="asp-m-num">4<span>x</span></div>
+              <div>
+                <div className="asp-m-t">More review conversations started</div>
+                <div className="asp-m-s">Follow-up goes out after every published job, no manual effort</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── PRICING ── */}
+      <section className="pricing" id="pricing">
+        <div className="pricing-inner">
+          <div className="pricing-head">
+            <h2 className="r">Founder pricing, locked in for life</h2>
+            <p className="r d1">First 20 businesses get 50% off &mdash; for life. Prices go up when spots fill.</p>
+          </div>
+          <div className="pricing-grid">
+
+            {/* FREE */}
+            <div className="pc-card r">
+              <div className="pc-tier">Free</div>
+              <div className="pc-price">$0</div>
+              <div className="pc-note">No credit card</div>
+              <div className="pc-div"></div>
+              <div className="pc-feats">
+                <div className="pf"><span className="pf-ck">&#10003;</span>Try it free on your next 5 jobs</div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>5 photos per job</div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Owner publish controls</div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Each job page built for Google search</div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Public portfolio page</div>
+              </div>
+              {registrationOpen ? (
+                <a href="/auth/register" className="btn-pc-ghost">Start Free</a>
+              ) : (
+                <button className="btn-pc-ghost" onClick={() => openWaitlistModal()}>Start Free</button>
               )}
             </div>
 
-            <div className="trust-row reveal">
-              <span className="trust-item">
-                <CheckSVG />
-                Join now &mdash; lock in 50% off forever
-              </span>
-              <span className="trust-item">
-                <CheckSVG />
-                Limited spots available
-              </span>
-            </div>
-          </div>
-
-          {/* Right column — browser mockup */}
-          <div className="hero-mockup-wrap reveal">
-            <div className="browser-shell">
-              <div className="browser-bar">
-                <div className="browser-dots">
-                  <div className="dot dot-r"></div>
-                  <div className="dot dot-y"></div>
-                  <div className="dot dot-g"></div>
-                </div>
-                <div className="browser-url">projectcheckin.com/jobs/huntsville-al/steel-door-replacement</div>
+            {/* PRO */}
+            <div className="pc-card r d1">
+              <div className="pc-tier">Pro</div>
+              <div className="pc-price">$49.50</div>
+              <div className="pc-note">/ month &mdash; founding rate</div>
+              <div className="pc-div"></div>
+              <div className="pc-feats">
+                <div className="pf-inherit">Everything in Free, plus:</div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Unlimited published job pages</div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Unlimited photos per job</div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>One-tap GBP post from your job notes</div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Traffic dashboard (views, calls, clicks)</div>
               </div>
-              <div className="browser-content">
-                <div className="job-header">
-                  <div className="job-header-label">Completed Job</div>
-                  <div className="job-title">Steel Entry Door Replacement &mdash; Huntsville, AL</div>
-                  <div className="job-meta">
-                    <span className="job-chip">
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                        <path d="M5 1C3.3 1 2 2.3 2 4c0 2.6 3 5 3 5s3-2.4 3-5c0-1.7-1.3-3-3-3z" fill="rgba(255,255,255,0.8)" />
-                      </svg>
-                      Huntsville, AL
-                    </span>
-                    <span className="job-chip">
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                        <rect x="1" y="2" width="8" height="6" rx="1" stroke="rgba(255,255,255,0.8)" strokeWidth="1.2" />
-                        <path d="M3 2V1M7 2V1" stroke="rgba(255,255,255,0.8)" strokeWidth="1.2" strokeLinecap="round" />
-                      </svg>
-                      Mar 6, 2026
-                    </span>
-                    <span className="job-chip">3 Photos</span>
-                  </div>
-                </div>
-                <div className="job-body">
-                  <div className="job-photos-row">
-                    <div className="job-photo-thumb">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/images/lp-finished-door.png" alt="Finished door installation" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', objectPosition: 'center center' }} />
-                    </div>
-                    <div className="job-photo-thumb">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/images/lp-door-stone-home.png" alt="Elegant stone home entrance" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', objectPosition: 'center center' }} />
-                    </div>
-                    <div className="job-photo-thumb">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/images/lp-door-craftsman.png" alt="Craftsman home entrance" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', objectPosition: 'center center' }} />
-                    </div>
-                  </div>
-                  <div className="job-structured">
-                    <div className="structured-row">
-                      <span className="structured-key">Service</span>
-                      <span className="structured-val">Steel Door Replacement</span>
-                    </div>
-                    <div className="structured-row">
-                      <span className="structured-key">Location</span>
-                      <span className="structured-val">Huntsville, AL 35801</span>
-                    </div>
-                    <div className="structured-row">
-                      <span className="structured-key">Crew</span>
-                      <span className="structured-val">Torres Door &amp; Window</span>
-                    </div>
-                    <div className="structured-row">
-                      <span className="structured-key">Status</span>
-                      <span className="structured-val" style={{ color: '#059669', fontWeight: 600 }}>Completed &middot; Indexed</span>
-                    </div>
-                  </div>
-                  <div className="search-snippet">
-                    <div className="snippet-label">How it appears in search</div>
-                    <div className="snippet-url">projectcheckin.com &rsaquo; jobs &rsaquo; huntsville-al &rsaquo; steel-door</div>
-                    <div className="snippet-title">Steel Door Replacement in Huntsville, AL &mdash; Torres Door &amp; Window</div>
-                    <div className="snippet-desc">Completed Mar 6, 2026. Photos included. Licensed contractor serving Huntsville area. Entry door, storm door, security door installation&hellip;</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <p style={{ fontSize: '12px', color: '#4A7FA0', textAlign: 'center', marginTop: '8px', fontStyle: 'italic' }}>
-              Example of how a published job page appears in Google search results
-            </p>
-          </div>
-
-        </div>
-      </section>
-
-      {/* FULL-BLEED PHOTO */}
-      <div className="hero-fullbleed-wrap">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/lp-contractor-photo-wide.png" alt="Contractor photographing completed door installation at suburban home" />
-        <div className="hero-fullbleed-caption">30 seconds. Job done. Page live on Google.</div>
-      </div>
-
-      {/* SOCIAL PROOF STRIP */}
-      <div className="proof-strip">
-        <div className="proof-strip-inner">
-          <span className="proof-strip-label">Built for field service teams in</span>
-          <div className="proof-cities">
-            <span className="proof-city">Huntsville, AL</span><span className="proof-city-sep">&middot;</span>
-            <span className="proof-city">Phoenix, AZ</span><span className="proof-city-sep">&middot;</span>
-            <span className="proof-city">Dallas, TX</span><span className="proof-city-sep">&middot;</span>
-            <span className="proof-city">Memphis, TN</span><span className="proof-city-sep">&middot;</span>
-            <span className="proof-city">Nashville, TN</span><span className="proof-city-sep">&middot;</span>
-            <span className="proof-city">Denver, CO</span>
-          </div>
-        </div>
-      </div>
-
-      {/* STATS */}
-      <section className="stats" id="stats">
-        <div className="stats-grid">
-          <div className="stat-col reveal">
-            <span className="stat-number" data-target="81" data-suffix="%">0%</span>
-            <div className="stat-label">use Google to evaluate local businesses</div>
-            <div className="stat-source">BrightLocal 2024</div>
-          </div>
-          <div className="stat-col reveal">
-            <span className="stat-number" data-target="88" data-suffix="%">0%</span>
-            <div className="stat-label">of local mobile searches lead to a call or visit within 24 hours</div>
-            <div className="stat-source">Think with Google</div>
-          </div>
-          <div className="stat-col reveal">
-            <span className="stat-number" data-target="54" data-suffix="%">0%</span>
-            <div className="stat-label">hired a contractor they&rsquo;d never heard of, online</div>
-            <div className="stat-source">Angi 2025</div>
-          </div>
-        </div>
-      </section>
-
-      {/* RESULTS PREVIEW */}
-      <section className="results" id="results-section">
-        <div className="results-inner">
-          <div className="results-header reveal">
-            <span className="section-label">Platform Results</span>
-            <h2 className="results-h2">What 90 days of check-ins looks like</h2>
-            <p className="results-sub">Every completed job automatically builds your search presence. Here&rsquo;s the data your dashboard tracks from day one.</p>
-          </div>
-
-          <div className="results-body">
-
-            {/* Left: dashboard window */}
-            <div className="results-dashboard reveal">
-              <div className="results-dash-header">
-                <div className="results-dash-dots">
-                  <div className="results-dash-dot rdd-red"></div>
-                  <div className="results-dash-dot rdd-amber"></div>
-                  <div className="results-dash-dot rdd-green"></div>
-                </div>
-                <span className="results-dash-title">Your Results Dashboard &mdash; Month 3</span>
-              </div>
-              <div className="results-dash-body">
-                <span className="results-dash-period">30-day rolling window</span>
-
-                <div className="rdash-metric">
-                  <span className="rdash-label">Page Views</span>
-                  <div className="rdash-right">
-                    <div className="rdash-spark">
-                      <div className="rdash-bar" style={{ height: '7px' }}></div>
-                      <div className="rdash-bar" style={{ height: '10px' }}></div>
-                      <div className="rdash-bar" style={{ height: '9px' }}></div>
-                      <div className="rdash-bar" style={{ height: '14px' }}></div>
-                      <div className="rdash-bar" style={{ height: '13px' }}></div>
-                      <div className="rdash-bar" style={{ height: '18px' }}></div>
-                      <div className="rdash-bar peak" style={{ height: '24px' }}></div>
-                    </div>
-                    <span className="rdash-val">312</span>
-                  </div>
-                </div>
-
-                <div className="rdash-metric">
-                  <span className="rdash-label">Phone Taps</span>
-                  <div className="rdash-right">
-                    <div className="rdash-spark">
-                      <div className="rdash-bar" style={{ height: '5px' }}></div>
-                      <div className="rdash-bar" style={{ height: '7px' }}></div>
-                      <div className="rdash-bar" style={{ height: '7px' }}></div>
-                      <div className="rdash-bar" style={{ height: '10px' }}></div>
-                      <div className="rdash-bar" style={{ height: '12px' }}></div>
-                      <div className="rdash-bar" style={{ height: '15px' }}></div>
-                      <div className="rdash-bar peak" style={{ height: '20px' }}></div>
-                    </div>
-                    <span className="rdash-val">14</span>
-                  </div>
-                </div>
-
-                <div className="rdash-metric">
-                  <span className="rdash-label">Website Clicks</span>
-                  <div className="rdash-right">
-                    <div className="rdash-spark">
-                      <div className="rdash-bar" style={{ height: '5px' }}></div>
-                      <div className="rdash-bar" style={{ height: '8px' }}></div>
-                      <div className="rdash-bar" style={{ height: '7px' }}></div>
-                      <div className="rdash-bar" style={{ height: '11px' }}></div>
-                      <div className="rdash-bar" style={{ height: '10px' }}></div>
-                      <div className="rdash-bar" style={{ height: '15px' }}></div>
-                      <div className="rdash-bar peak" style={{ height: '21px' }}></div>
-                    </div>
-                    <span className="rdash-val">27</span>
-                  </div>
-                </div>
-
-                <span className="results-trend">&#8593; Trending up each month</span>
-
-                <div className="results-indexed-row">
-                  <div>
-                    <div className="results-indexed-label">Job Pages on Google</div>
-                    <div className="results-indexed-sub">3 check-ins/week &times; 13 weeks</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div className="results-indexed-val">39</div>
-                    <div className="results-indexed-unit">pages indexed</div>
-                  </div>
-                </div>
-              </div>
+              {registrationOpen ? (
+                <a href="/auth/register" className="btn-pc-ghost">Get Started</a>
+              ) : (
+                <button className="btn-pc-ghost" onClick={() => openWaitlistModal()}>Get Early Access</button>
+              )}
             </div>
 
-            {/* Right: outcome cards */}
-            <div className="results-right">
-              <div className="results-outcome reveal">
-                <div className="results-outcome-icon roi-icon-search">
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0EA5E9" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-                  </svg>
-                </div>
-                <div className="results-outcome-title">Every job becomes a search result</div>
-                <div className="results-outcome-body">Each check-in creates a Google-indexed page for that job location, service type, and city &mdash; automatically. No writing, no tech work required.</div>
+            {/* ELITE — featured */}
+            <div className="pc-card feat r d2">
+              <div className="feat-tag">Recommended</div>
+              <div className="pc-tier">Elite</div>
+              <div className="pc-price">$74.50</div>
+              <div className="pc-note">/ month &mdash; founding rate</div>
+              <div className="pc-div"></div>
+              <div className="pc-feats">
+                <div className="pf-inherit">Everything in Pro, plus:</div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Google Business Profile auto-posts <span className="soon-badge">Soon</span></div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Before/after photo tagging</div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Before/after comparison on published pages</div>
               </div>
+              {registrationOpen ? (
+                <a href="/auth/register" className="btn-pc-main">Get Started</a>
+              ) : (
+                <button className="btn-pc-main" onClick={() => openWaitlistModal()}>Get Early Access</button>
+              )}
+            </div>
 
-              <div className="results-outcome reveal">
-                <div className="results-outcome-icon roi-icon-phone">
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.67A2 2 0 012 .18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z" />
-                  </svg>
-                </div>
-                <div className="results-outcome-title">Track every call that comes from search</div>
-                <div className="results-outcome-body">Phone taps and website clicks from your job pages are tracked in real time. You see exactly where leads are coming from &mdash; no guessing, no attribution headaches.</div>
+            {/* TITAN */}
+            <div className="pc-card r d3">
+              <div className="pc-tier">Titan</div>
+              <div className="pc-price">$149.50</div>
+              <div className="pc-note">/ month &mdash; founding rate</div>
+              <div className="pc-div"></div>
+              <div className="pc-feats">
+                <div className="pf-inherit">Everything in Elite, plus:</div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>AI copywriting agent <span className="soon-badge">Soon</span></div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>AI review request agent <span className="soon-badge">Soon</span></div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Automated Google review requests</div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Geo-grid rank tracking heatmap <span className="soon-badge">Soon</span></div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>CRM &amp; QuickBooks integration <span className="soon-badge">Soon</span></div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Website integration <span className="soon-badge">Soon</span></div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Priority support + strategy calls</div>
               </div>
-
-              <div className="results-outcome reveal">
-                <div className="results-outcome-icon roi-icon-chart">
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
-                  </svg>
-                </div>
-                <div className="results-outcome-title">More jobs = compounding reach</div>
-                <div className="results-outcome-body">Each new page adds to your search footprint permanently. 39 pages at month 3 becomes 150+ by year&rsquo;s end &mdash; every one still ranking and driving leads.</div>
-              </div>
+              {registrationOpen ? (
+                <a href="/auth/register" className="btn-pc-ghost">Get Started</a>
+              ) : (
+                <button className="btn-pc-ghost" onClick={() => openWaitlistModal()}>Get Early Access</button>
+              )}
             </div>
 
           </div>
-          <p className="results-disclaimer reveal">Numbers shown are projections based on 3 check-ins/week for 90 days. Actual results vary by market, trade, and activity level.</p>
-        </div>
-      </section>
-
-      {/* TESTIMONIALS — visibility controlled by showTestimonials */}
-      {showTestimonials && (
-        <section className="testimonials" id="testimonials-section">
-          <div className="testimonials-inner">
-
-            <div className="section-header reveal">
-              <span className="section-label">What our beta users say</span>
-            </div>
-
-            {/* Featured */}
-            <div className="featured-testi reveal">
-              <div>
-                <div className="testi-quote-mark">&ldquo;</div>
-                <p className="testi-quote-text">I got 4 calls last month from people who found my work online. Never paid for ads once.</p>
-                <div className="testi-author">
-                  <div className="avatar">MT</div>
-                  <div>
-                    <div className="testi-name">Mike Torres</div>
-                    <div className="testi-role">Door &amp; Window Service &middot; Phoenix, AZ</div>
-                  </div>
-                </div>
-              </div>
-              <div className="featured-metric">
-                <span className="featured-metric-number">+4 leads<br />/month</span>
-                <div className="featured-metric-label">from search traffic</div>
-              </div>
-            </div>
-
-            {/* Two smaller cards — carousel on mobile */}
-            <div className="testi-cards" id="testi-carousel">
-              {testimonials.map((t) => (
-                <div
-                  key={t.index}
-                  className={`testi-card reveal${activeSlide === t.index ? ' carousel-active' : ''}`}
-                  data-carousel-index={t.index}
-                >
-                  <p className="testi-card-quote">&ldquo;{t.quote}&rdquo;</p>
-                  <div className="testi-card-footer">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                      <div className="avatar" style={{ width: '36px', height: '36px', fontSize: '12px' }}>{t.initials}</div>
-                      <div>
-                        <div className="testi-name">{t.name}</div>
-                        <div className="testi-role">{t.role}</div>
-                      </div>
-                    </div>
-                    <div className="testi-card-metric">{t.metric}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Carousel dots (mobile only) */}
-            <div className="carousel-dots" id="carousel-dots">
-              {testimonials.map((t) => (
-                <div
-                  key={t.index}
-                  className={`carousel-dot${activeSlide === t.index ? ' active' : ''}`}
-                  data-dot={t.index}
-                  onClick={() => setActiveSlide(t.index)}
-                />
-              ))}
-            </div>
-
-          </div>
-        </section>
-      )}
-
-      {/* HOW IT WORKS */}
-      <section className="how" id="how">
-        <div className="how-inner">
-          <h2 className="how-h2 reveal">How It Works</h2>
-
-          {/* Scene photo */}
-          <div className="how-scene-wrap reveal">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/lp-crew-arriving.png" alt="Contractor crew arriving at suburban home job site with work van" />
-            <div className="how-scene-overlay">Your crew shows up. They do great work. That&apos;s all they need to do.</div>
-          </div>
-
-          <div className="how-grid">
-            <div className="how-step reveal">
-              <div className="how-number">01</div>
-              <div className="how-title">Check In</div>
-              <p className="how-body">Your crew takes photos and checks in after every job. Takes 30 seconds on any phone.</p>
-            </div>
-            <div className="how-step reveal">
-              <div className="how-number">02</div>
-              <div className="how-title">We Build the Page</div>
-              <p className="how-body">We generate a job page that&apos;s optimized for Google in your service area. No writing. No tech work. You control what gets published &mdash; approve, edit, or unpublish any job page at any time. Keep internal or low-quality jobs private, only showcase your best work.</p>
-            </div>
-            <div className="how-step reveal">
-              <div className="how-number">03</div>
-              <div className="how-title">Customers Find You</div>
-              <p className="how-body">Owners and managers approve, edit, or unpublish any job page. More jobs = dozens or even hundreds of pages over time. Customers searching your area find your work on Google. They call you.</p>
-            </div>
-          </div>
-
-          {/* Phone mockup */}
-          <div className="phone-mockup-outer reveal" style={{ display: 'block' }}>
-            <div className="phone-mockup-screen">
-              <div className="phone-status-bar">
-                <div className="phone-dot" style={{ background: '#38BDF8' }}></div>
-                <div className="phone-dot" style={{ background: '#0EA5E9' }}></div>
-                <div className="phone-dot" style={{ background: '#0C4A6E' }}></div>
-              </div>
-              <div className="phone-screen-title">Job Check-In</div>
-              <div>
-                <div className="phone-field-label">Job Type</div>
-                <div className="phone-field-input">Steel door installation</div>
-              </div>
-              <div>
-                <div className="phone-field-label">Location</div>
-                <div className="phone-field-input">Huntsville, AL</div>
-              </div>
-              <div>
-                <div className="phone-field-label">Photos</div>
-                <div className="phone-photos-row">
-                  <div className="phone-photo-thumb" style={{ background: '#0EA5E9' }}></div>
-                  <div className="phone-photo-thumb" style={{ background: '#38BDF8' }}></div>
-                  <div className="phone-photo-thumb" style={{ background: '#7DD3FC' }}></div>
-                </div>
-              </div>
-              <div className="phone-submit-btn">Submit Check-In &#10003;</div>
-              <div className="phone-submit-note">Takes 30 seconds</div>
-            </div>
-          </div>
-
-          {/* Callout */}
-          <div className="how-callout reveal" style={{ marginTop: '48px', color: '#0C4A6E' }}>
-            The more jobs your crew does, the more pages build up on Google &mdash; automatically. Heavy users end up with dozens or even hundreds of searchable job pages across their city.
-          </div>
-
-        </div>
-      </section>
-
-      {/* PROOF STATEMENT */}
-      <section className="proof-statement">
-        <div className="proof-statement-inner">
-          <div className="proof-statement-text reveal">
-            <span className="proof-statement-label">How it actually works</span>
-            <h2 className="proof-statement-headline">Your crew does the work.<br /><em>That work becomes your marketing.</em></h2>
-            <p className="proof-statement-body">Every page ProjectCheckin publishes is built from a real job your team completed. Your photos. Your location. Your business name. Google indexes the actual work &mdash; not a blog post, not a stock photo, not a description someone wrote about your industry. The job itself is the content.</p>
-            <hr className="proof-statement-rule" />
-            <p className="proof-statement-closer">No one writes this for you. Your crew does &mdash; every time they check in.</p>
-          </div>
-          <div className="proof-statement-photo reveal">
-            <img src="/images/lp-contractor-results.png" alt="Contractor reviewing job results on phone" />
-          </div>
-        </div>
-      </section>
-
-      {/* PRICING */}
-      <section className="pricing" id="pricing">
-        <div className="pricing-inner">
-          <span className="pricing-eyebrow reveal">FOUNDING MEMBER PRICING</span>
-          <h2 className="pricing-h2 reveal">Lock in 50% off &mdash; for life.</h2>
-          <p className="pricing-sub reveal">Be one of 20 founding members. Half off every month, forever. Waitlist closes when spots fill.</p>
-          <div className="urgency-bar-wrap reveal">
-            <div className="urgency-bar">&#9889; Only 20 founding member spots &mdash; join the waitlist to lock in your rate</div>
-          </div>
-
-          <p className="pricing-scroll-hint">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-              <path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Swipe to compare all plans
+          <p className="pricing-footnote r">
+            Cancel anytime. No contracts.&nbsp;&nbsp;&middot;&nbsp;&nbsp;
+            <a href="/pricing" style={{ color: 'var(--orange)', fontWeight: 700, textDecoration: 'none' }}>
+              See full feature comparison &rarr;
+            </a>
           </p>
-          <div className="pricing-table-outer">
-            <div className="pricing-table-wrap reveal">
-              <table className="pricing-table" role="table">
-                <colgroup>
-                  <col style={{ width: '28%' }} />
-                  <col style={{ width: '18%' }} />
-                  <col style={{ width: '18%' }} />
-                  <col style={{ width: '18%' }} />
-                  <col style={{ width: '18%' }} />
-                </colgroup>
-                <thead>
-                  <tr className="pricing-thead-row">
-                    <th className="pricing-th pricing-th-feature" scope="col">Features</th>
-                    {/* FREE */}
-                    <th className="pricing-th pricing-th-free" scope="col">
-                      <span className="th-tier-label">FREE</span>
-                      <span className="th-price-strike">&nbsp;</span>
-                      <span className="th-price-amount" style={{ color: 'var(--navy)' }}>$0</span>
-                      <span className="th-price-sub">/forever</span>
-                      <span className="th-founder-note">&nbsp;</span>
-                      {registrationOpen
-                        ? <a href="/auth/register" className="btn-ghost" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>Get Started</a>
-                        : <button onClick={() => openWaitlistModal()} className="btn-ghost" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', width: '100%' }}>Join Waitlist</button>
-                      }
-                    </th>
-                    {/* PRO */}
-                    <th className="pricing-th pricing-th-pro" scope="col">
-                      <div className="th-badge th-badge-popular">MOST POPULAR</div>
-                      <span className="th-tier-label">PRO</span>
-                      <span className="th-price-strike">$99/mo</span>
-                      <span className="th-price-amount" style={{ color: '#0EA5E9' }}>$49.50<span style={{ fontSize: '16px', fontWeight: 500 }}>/mo</span></span>
-                      <span className="th-price-sub">founding member rate</span>
-                      <span className="th-founder-note" style={{ color: '#0EA5E9' }}>locked in for life</span>
-                      {registrationOpen
-                        ? <a href="/auth/register" className="btn-primary-full" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', width: '100%' }}>Get Started</a>
-                        : <button onClick={() => openWaitlistModal()} className="btn-primary-full" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
-                      }
-                    </th>
-                    {/* ELITE */}
-                    <th className="pricing-th pricing-th-elite" scope="col">
-                      <div className="th-badge th-badge-value">BEST VALUE</div>
-                      <span className="th-tier-label">ELITE</span>
-                      <span className="th-price-strike">$149/mo</span>
-                      <span className="th-price-amount" style={{ color: '#0C4A6E' }}>$74.50<span style={{ fontSize: '16px', fontWeight: 500 }}>/mo</span></span>
-                      <span className="th-price-sub">founding member rate</span>
-                      <span className="th-founder-note" style={{ color: '#0C4A6E' }}>locked in for life</span>
-                      {registrationOpen
-                        ? <a href="/auth/register" className="btn-ghost-navy" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', width: '100%' }}>Get Started</a>
-                        : <button onClick={() => openWaitlistModal()} className="btn-ghost-navy" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
-                      }
-                    </th>
-                    {/* TITAN */}
-                    <th className="pricing-th pricing-th-titan" scope="col">
-                      <div className="th-badge th-badge-titan">FULL SUITE</div>
-                      <span className="th-tier-label">TITAN</span>
-                      <span className="th-price-strike">$299/mo</span>
-                      <span className="th-price-amount" style={{ color: '#F59E0B' }}>$149.50<span style={{ fontSize: '16px', fontWeight: 500 }}>/mo</span></span>
-                      <span className="th-price-sub">founding member rate</span>
-                      <span className="th-founder-note" style={{ color: '#92400E' }}>locked in for life</span>
-                      {registrationOpen
-                        ? <a href="/auth/register" className="btn-ghost-amber" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', width: '100%' }}>Get Started</a>
-                        : <button onClick={() => openWaitlistModal()} className="btn-ghost-amber" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
-                      }
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* GROUP: Core Platform */}
-                  <tr className="pricing-group-row">
-                    <td>Core Platform</td>
-                    <td className="cell-free"></td><td className="cell-pro"></td><td className="cell-elite"></td><td className="cell-titan"></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Published job pages</td>
-                    <td className="cell-free"><span className="ptext" style={{ color: '#4A7FA0' }}>Up to 5</span></td>
-                    <td className="cell-pro"><span className="ptext">Unlimited</span></td>
-                    <td className="cell-elite"><span className="ptext" style={{ color: 'var(--navy)' }}>Unlimited</span></td>
-                    <td className="cell-titan"><span className="ptext" style={{ color: '#92400E' }}>Unlimited</span></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Mobile check-in app</td>
-                    <td className="cell-free"><PCheck /></td>
-                    <td className="cell-pro"><PCheck /></td>
-                    <td className="cell-elite"><PCheck /></td>
-                    <td className="cell-titan"><PCheck /></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Photos per job</td>
-                    <td className="cell-free"><span className="ptext" style={{ color: '#4A7FA0' }}>5</span></td>
-                    <td className="cell-pro"><span className="ptext">Unlimited</span></td>
-                    <td className="cell-elite"><span className="ptext" style={{ color: 'var(--navy)' }}>Unlimited</span></td>
-                    <td className="cell-titan"><span className="ptext" style={{ color: '#92400E' }}>Unlimited</span></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Owner publish controls</td>
-                    <td className="cell-free"><PCheck /></td>
-                    <td className="cell-pro"><PCheck /></td>
-                    <td className="cell-elite"><PCheck /></td>
-                    <td className="cell-titan"><PCheck /></td>
-                  </tr>
-
-                  {/* GROUP: Visibility & SEO */}
-                  <tr className="pricing-group-row">
-                    <td>Visibility &amp; SEO</td>
-                    <td className="cell-free"></td><td className="cell-pro"></td><td className="cell-elite"></td><td className="cell-titan"></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Each job page built for Google search</td>
-                    <td className="cell-free"><PCheck /></td>
-                    <td className="cell-pro"><PCheck /></td>
-                    <td className="cell-elite"><PCheck /></td>
-                    <td className="cell-titan"><PCheck /></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Public portfolio page</td>
-                    <td className="cell-free"><PCheck /></td>
-                    <td className="cell-pro"><PCheck /></td>
-                    <td className="cell-elite"><PCheck /></td>
-                    <td className="cell-titan"><PCheck /></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">One-tap GBP post from your job notes</td>
-                    <td className="cell-free"><PDash /></td>
-                    <td className="cell-pro"><PCheck /></td>
-                    <td className="cell-elite"><PCheck /></td>
-                    <td className="cell-titan"><PCheck /></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Traffic dashboard (views, calls, clicks)</td>
-                    <td className="cell-free"><PDash /></td>
-                    <td className="cell-pro"><PCheck /></td>
-                    <td className="cell-elite"><PCheck /></td>
-                    <td className="cell-titan"><PCheck /></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Cancel any time</td>
-                    <td className="cell-free"><PDash /></td>
-                    <td className="cell-pro"><PCheck /></td>
-                    <td className="cell-elite"><PCheck /></td>
-                    <td className="cell-titan"><PCheck /></td>
-                  </tr>
-
-                  {/* GROUP: Growth */}
-                  <tr className="pricing-group-row">
-                    <td>Growth <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: '9px' }}>(Elite &amp; above)</span></td>
-                    <td className="cell-free"></td><td className="cell-pro"></td><td className="cell-elite"></td><td className="cell-titan"></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Google Business Profile auto-posts</td>
-                    <td className="cell-free"><PDash /></td>
-                    <td className="cell-pro"><PDash /></td>
-                    <td className="cell-elite"><CSBadge /></td>
-                    <td className="cell-titan"><CSBadge /></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Before/after photo tagging</td>
-                    <td className="cell-free"><PDash /></td>
-                    <td className="cell-pro"><PDash /></td>
-                    <td className="cell-elite"><PCheck /></td>
-                    <td className="cell-titan"><PCheck /></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Before/after comparison on published job pages</td>
-                    <td className="cell-free"><PDash /></td>
-                    <td className="cell-pro"><PDash /></td>
-                    <td className="cell-elite"><PCheck /></td>
-                    <td className="cell-titan"><PCheck /></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Automated Google review requests</td>
-                    <td className="cell-free"><PDash /></td>
-                    <td className="cell-pro"><PDash /></td>
-                    <td className="cell-elite"><PDash /></td>
-                    <td className="cell-titan"><PCheck /></td>
-                  </tr>
-
-                  {/* GROUP: Scale */}
-                  <tr className="pricing-group-row">
-                    <td>Scale <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: '9px' }}>(Titan only)</span></td>
-                    <td className="cell-free"></td><td className="cell-pro"></td><td className="cell-elite"></td><td className="cell-titan"></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Geo-grid rank tracking heatmap</td>
-                    <td className="cell-free"><PDash /></td>
-                    <td className="cell-pro"><PDash /></td>
-                    <td className="cell-elite"><PDash /></td>
-                    <td className="cell-titan"><CSBadge /></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">CRM &amp; QuickBooks integration</td>
-                    <td className="cell-free"><PDash /></td>
-                    <td className="cell-pro"><PDash /></td>
-                    <td className="cell-elite"><PDash /></td>
-                    <td className="cell-titan"><CSBadge /></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Website integration</td>
-                    <td className="cell-free"><PDash /></td>
-                    <td className="cell-pro"><PDash /></td>
-                    <td className="cell-elite"><PDash /></td>
-                    <td className="cell-titan"><CSBadge /></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Multi-location support</td>
-                    <td className="cell-free"><PDash /></td>
-                    <td className="cell-pro"><PDash /></td>
-                    <td className="cell-elite"><PDash /></td>
-                    <td className="cell-titan"><PCheck /></td>
-                  </tr>
-                  <tr className="pricing-feature-row">
-                    <td className="pricing-feature-name">Priority support + strategy calls</td>
-                    <td className="cell-free"><PDash /></td>
-                    <td className="cell-pro"><PDash /></td>
-                    <td className="cell-elite"><PDash /></td>
-                    <td className="cell-titan"><PCheck /></td>
-                  </tr>
-
-                  {/* CTA ROW */}
-                  <tr className="pricing-cta-row">
-                    <td className="pricing-feature-name"></td>
-                    <td className="cell-free">
-                      {registrationOpen
-                        ? <a href="/auth/register" className="btn-ghost" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>Get Started</a>
-                        : <button onClick={() => openWaitlistModal()} className="btn-ghost" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', width: '100%' }}>Join Waitlist</button>
-                      }
-                    </td>
-                    <td className="cell-pro">
-                      {registrationOpen
-                        ? <a href="/auth/register" className="btn-primary-full" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', width: '100%' }}>Get Started</a>
-                        : <button onClick={() => openWaitlistModal()} className="btn-primary-full" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
-                      }
-                    </td>
-                    <td className="cell-elite">
-                      {registrationOpen
-                        ? <a href="/auth/register" className="btn-ghost-navy" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', width: '100%' }}>Get Started</a>
-                        : <button onClick={() => openWaitlistModal()} className="btn-ghost-navy" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
-                      }
-                    </td>
-                    <td className="cell-titan">
-                      {registrationOpen
-                        ? <a href="/auth/register" className="btn-ghost-amber" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', width: '100%' }}>Get Started</a>
-                        : <button onClick={() => openWaitlistModal()} className="btn-ghost-amber" style={{ height: '40px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', width: '100%' }}>Join Waitlist</button>
-                      }
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>{/* /pricing-table-outer */}
-          <p className="pricing-footnote reveal">At founding member rates, one extra job in 90 days pays for the whole year.</p>
-          <p className="pricing-footnote-2 reveal">Founding member pricing locks in the day you join. It never goes up.</p>
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="faq-section" id="faq">
+      {/* ── FAQ ── */}
+      <section className="faq" id="faq">
         <div className="faq-inner">
-          <h2 className="faq-h2 reveal">Common questions</h2>
-          <div className="faq-list">
-            {faqs.map((faq, i) => (
-              <div key={i} className="faq-item reveal">
-                <button
-                  className="faq-q"
-                  onClick={() => toggleFaq(i)}
-                  aria-expanded={openFaq === i}
-                >
-                  {faq.q}
-                  <svg className="faq-chevron" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                    <path d="M4.5 7l4.5 4.5L13.5 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <div className={`faq-a${openFaq === i ? ' open' : ''}`}>
-                  {faq.a}
-                </div>
-              </div>
-            ))}
+          <div className="faq-head">
+            <h2 className="r">Questions we hear a lot</h2>
           </div>
+          {faqs.map((faq, i) => (
+            <div key={i} className={`faq-item${openFaq === i ? ' open' : ''}`}>
+              <button
+                className="faq-q"
+                onClick={() => toggleFaq(i)}
+                aria-expanded={openFaq === i}
+              >
+                {faq.q}
+                <FaqArr />
+              </button>
+              <div className="faq-a">{faq.a}</div>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* CTA BAND */}
-      <section className="cta-band" id="cta">
-        <div className="cta-band-inner">
-          <h2 className="cta-h2 reveal">Turn your next job into<br />your next customer.</h2>
-          <p className="cta-sub reveal">Free to join. Founding members get 50% off for life.</p>
-          <div className="cta-form reveal">
-            <label htmlFor="cta-email" style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
-              Email address
-            </label>
-            <input
-              type="email"
-              id="cta-email"
-              className="cta-input"
-              placeholder="Your email"
-              value={ctaEmail}
-              onChange={(e) => setCtaEmail(e.target.value)}
-            />
-            <button
-              type="button"
-              className="btn-cta-orange"
-              onClick={() => {
-                if (registrationOpen) {
-                  window.location.href = `/auth/register${ctaEmail ? `?email=${encodeURIComponent(ctaEmail)}` : ''}`
-                } else {
-                  openWaitlistModal(ctaEmail)
-                }
-              }}
-            >
-              {registrationOpen ? 'Get Started' : 'Join the Waitlist'}
+      {/* ── FINAL CTA ── */}
+      <section className="final">
+        <div className="final-inner">
+          <h2 className="r">Your next job could start building your business. Or it could just be another job.</h2>
+          <p className="r d1">Every project your crew completes is either documented and working for you, or it disappears when the truck drives away. ProjectCheckin makes sure the work you&apos;re most proud of doesn&apos;t go to waste.</p>
+          {registrationOpen ? (
+            <a href="/auth/register" className="btn-primary r d2" style={{ margin: '0 auto' }}>
+              Start Documenting Jobs Free <ArrowRight />
+            </a>
+          ) : (
+            <button className="btn-primary r d2" style={{ margin: '0 auto' }} onClick={() => openWaitlistModal()}>
+              Start Documenting Jobs Free <ArrowRight />
             </button>
-          </div>
+          )}
+          <p className="final-sub r d3">No credit card required &middot; Cancel anytime</p>
         </div>
       </section>
 
-      {/* FOOTER */}
+      {/* ── FOOTER ── */}
       <footer>
         <div className="footer-inner">
-          <span className="footer-brand">ProjectCheckin</span>
-          <span className="footer-tagline">Built for the trades.</span>
-          <div className="footer-legal-links">
-            <a href="/privacy" className="footer-legal-link">Privacy Policy</a>
-            <span className="footer-legal-sep">&middot;</span>
-            <a href="/terms" className="footer-legal-link">Terms of Service</a>
-            <span className="footer-legal-sep">&middot;</span>
-            <a href="mailto:support@projectcheckin.com" className="footer-legal-link">Contact</a>
+          <a href="/" className="footer-logo">
+            <div className="footer-mark">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="ProjectCheckin" />
+            </div>
+            ProjectCheckin
+          </a>
+          <div className="footer-links">
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms of Service</a>
+            <a href="mailto:support@projectcheckin.com">Contact</a>
           </div>
-          <span className="footer-copy">&copy; 2026 ProjectCheckin</span>
         </div>
+        <p className="footer-copy">&copy; 2026 ProjectCheckin. All rights reserved.</p>
       </footer>
 
-      {/* WAITLIST MODAL — only rendered when registration is closed */}
-      {!registrationOpen && <div
-        className={`modal-overlay${modalOpen ? ' open' : ''}`}
-        id="waitlist-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="modal-heading"
-        onClick={(e) => { if (e.target === e.currentTarget) closeWaitlistModal() }}
-      >
-        <div className="modal-card">
-          <button className="modal-close" onClick={closeWaitlistModal} aria-label="Close">
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-              <path d="M1 1l9 9M10 1L1 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-          </button>
+      {/* ── WAITLIST MODAL ── */}
+      {!registrationOpen && (
+        <div
+          className={`modal-overlay${modalOpen ? ' open' : ''}`}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-heading"
+          onClick={(e) => { if (e.target === e.currentTarget) closeWaitlistModal() }}
+        >
+          <div className="modal-card">
+            <button className="modal-close" onClick={closeWaitlistModal} aria-label="Close">
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                <path d="M1 1l9 9M10 1L1 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
 
-          {!submitted ? (
-            <div id="modal-form-state">
-              <span className="modal-eyebrow">Early Access &mdash; 20 Spots</span>
-              <h2 className="modal-h" id="modal-heading">Claim your spot on the waitlist</h2>
-              <p className="modal-sub">Free to join. No credit card. No commitment.<br />First 20 members lock in 50% off forever when we launch.</p>
+            {!submitted ? (
+              <>
+                <span className="modal-eyebrow">Early Access &mdash; 20 Spots</span>
+                <h2 className="modal-h" id="modal-heading">Claim your spot on the waitlist</h2>
+                <p className="modal-sub">Free to join. No credit card. No commitment.<br />First 20 members lock in 50% off forever when we launch.</p>
 
-              <form onSubmit={handleWaitlistSubmit} noValidate>
-                <div className="modal-field">
-                  <label htmlFor="modal-name">Full name <span style={{ color: '#dc2626' }} aria-hidden="true">*</span></label>
-                  <input
-                    type="text"
-                    id="modal-name"
-                    name="name"
-                    placeholder="Your full name"
-                    required
-                    autoComplete="name"
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                  />
+                <form onSubmit={handleWaitlistSubmit} noValidate>
+                  <div className="modal-field">
+                    <label htmlFor="modal-name">Full name <span style={{ color: '#dc2626' }} aria-hidden="true">*</span></label>
+                    <input type="text" id="modal-name" name="name" placeholder="Your full name" required autoComplete="name" value={formName} onChange={(e) => setFormName(e.target.value)} />
+                  </div>
+                  <div className="modal-field">
+                    <label htmlFor="modal-email">Email address <span style={{ color: '#dc2626' }} aria-hidden="true">*</span></label>
+                    <input type="email" id="modal-email" name="email" placeholder="you@yourbusiness.com" required autoComplete="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
+                  </div>
+                  <div className="modal-field">
+                    <label htmlFor="modal-business" style={{ fontWeight: 500 }}>
+                      Business name <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span>
+                    </label>
+                    <input type="text" id="modal-business" name="businessName" placeholder="Your company name" autoComplete="organization" value={formBusiness} onChange={(e) => setFormBusiness(e.target.value)} />
+                  </div>
+                  <div className="modal-field">
+                    <label htmlFor="modal-trade" style={{ fontWeight: 500 }}>
+                      What does your team do? <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span>
+                    </label>
+                    <select id="modal-trade" name="trade" value={formTrade} onChange={(e) => setFormTrade(e.target.value)}>
+                      <option value="">Select your trade...</option>
+                      <option value="doors-windows">Doors &amp; Windows</option>
+                      <option value="roofing">Roofing</option>
+                      <option value="hvac">HVAC</option>
+                      <option value="plumbing">Plumbing</option>
+                      <option value="electrical">Electrical</option>
+                      <option value="landscaping">Landscaping / Lawn Care</option>
+                      <option value="painting">Painting</option>
+                      <option value="flooring">Flooring</option>
+                      <option value="general-contractor">General Contractor</option>
+                      <option value="other">Other field service</option>
+                    </select>
+                  </div>
+                  <div className="modal-field">
+                    <label htmlFor="modal-plan" style={{ fontWeight: 500 }}>
+                      Which plan interests you most? <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span>
+                    </label>
+                    <select id="modal-plan" name="planInterest" value={formPlan} onChange={(e) => setFormPlan(e.target.value)}>
+                      <option value="">Not sure yet...</option>
+                      <option value="free">Free &mdash; just getting started</option>
+                      <option value="pro">Pro ($49.50/mo founding rate)</option>
+                      <option value="elite">Elite ($74.50/mo founding rate)</option>
+                      <option value="titan">Titan ($149.50/mo founding rate)</option>
+                    </select>
+                  </div>
+                  {submitError && (
+                    <p style={{ color: '#dc2626', fontSize: '13px', marginBottom: '8px' }}>{submitError}</p>
+                  )}
+                  <button type="submit" className="modal-submit" disabled={submitting}>
+                    {submitting ? 'Submitting...' : 'Join the Waitlist →'}
+                  </button>
+                </form>
+                <p className="modal-disclaimer">
+                  No spam. No credit card. Just your spot in line.&nbsp;
+                  <a href="/privacy" style={{ color: 'var(--blue)', textDecoration: 'underline' }}>Privacy Policy</a>
+                </p>
+              </>
+            ) : (
+              <div className="modal-success">
+                <div className="modal-success-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
                 </div>
-                <div className="modal-field">
-                  <label htmlFor="modal-email">Email address <span style={{ color: '#dc2626' }} aria-hidden="true">*</span></label>
-                  <input
-                    type="email"
-                    id="modal-email"
-                    name="email"
-                    placeholder="you@yourbusiness.com"
-                    required
-                    autoComplete="email"
-                    value={formEmail}
-                    onChange={(e) => setFormEmail(e.target.value)}
-                  />
-                </div>
-                <div className="modal-field">
-                  <label htmlFor="modal-business" style={{ fontWeight: 500 }}>
-                    Business name <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="modal-business"
-                    name="businessName"
-                    placeholder="Your company name"
-                    autoComplete="organization"
-                    value={formBusiness}
-                    onChange={(e) => setFormBusiness(e.target.value)}
-                  />
-                </div>
-                <div className="modal-field">
-                  <label htmlFor="modal-trade" style={{ fontWeight: 500 }}>
-                    What does your team do? <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span>
-                  </label>
-                  <select
-                    id="modal-trade"
-                    name="trade"
-                    value={formTrade}
-                    onChange={(e) => setFormTrade(e.target.value)}
-                  >
-                    <option value="">Select your trade...</option>
-                    <option value="doors-windows">Doors &amp; Windows</option>
-                    <option value="roofing">Roofing</option>
-                    <option value="hvac">HVAC</option>
-                    <option value="plumbing">Plumbing</option>
-                    <option value="electrical">Electrical</option>
-                    <option value="landscaping">Landscaping / Lawn Care</option>
-                    <option value="painting">Painting</option>
-                    <option value="flooring">Flooring</option>
-                    <option value="general-contractor">General Contractor</option>
-                    <option value="other">Other field service</option>
-                  </select>
-                </div>
-                <div className="modal-field">
-                  <label htmlFor="modal-plan" style={{ fontWeight: 500 }}>
-                    Which plan interests you most? <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span>
-                  </label>
-                  <select
-                    id="modal-plan"
-                    name="planInterest"
-                    value={formPlan}
-                    onChange={(e) => setFormPlan(e.target.value)}
-                  >
-                    <option value="">Not sure yet...</option>
-                    <option value="free">Free &mdash; just getting started</option>
-                    <option value="pro">Pro ($49.50/mo founding rate)</option>
-                    <option value="elite">Elite ($74.50/mo founding rate)</option>
-                    <option value="titan">Titan ($149.50/mo founding rate)</option>
-                  </select>
-                </div>
-                {submitError && (
-                  <p style={{ color: '#dc2626', fontSize: '13px', marginBottom: '8px' }}>{submitError}</p>
-                )}
-                <button type="submit" className="modal-submit" disabled={submitting}>
-                  {submitting ? 'Submitting...' : 'Join the Waitlist \u2192'}
-                </button>
-              </form>
-              <p className="modal-disclaimer">
-                No spam. No credit card. Just your spot in line. &nbsp;
-                <a href="/privacy" style={{ color: '#4A7FA0', textDecoration: 'underline' }}>Privacy Policy</a>
-              </p>
-            </div>
-          ) : (
-            <div className="modal-success">
-              <div className="modal-success-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
+                <div className="modal-success-h">You&rsquo;re on the list.</div>
+                <p className="modal-success-sub">Check your inbox &mdash; we&rsquo;ll confirm your spot.<br />You&rsquo;ll hear from us before launch.</p>
               </div>
-              <div className="modal-success-h">You&rsquo;re on the list.</div>
-              <p className="modal-success-sub">Check your inbox &mdash; we&rsquo;ll confirm your spot.<br />You&rsquo;ll hear from us before launch.</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>}
-
-      {/* ADMIN TOGGLE PANEL — hidden until super-admin page is built.
-          When building the super-admin page, move testimonials toggle control there.
-          The toggleTestimonials() function and showTestimonials state are still wired up
-          and ready — just need a UI surface to call them from. */}
+      )}
     </>
   )
 }
