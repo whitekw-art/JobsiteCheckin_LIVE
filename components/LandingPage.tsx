@@ -341,19 +341,32 @@ export default function LandingPage({ registrationOpen = false }: { registration
             <img src="/logo.png" className="logo-img" alt="ProjectCheckin logo" />
             ProjectCheckin
           </a>
-          <div className={`nav-right${navOpen ? ' open' : ''}`}>
-            <a href="#how-it-works" className="nav-link" onClick={() => setNavOpen(false)}>How It Works</a>
-            <a href="#pricing" className="nav-link" onClick={() => setNavOpen(false)}>Pricing</a>
-            <a href="/auth/signin" className="nav-link" onClick={() => setNavOpen(false)}>
-              {registrationOpen ? 'Sign In / Register' : 'Sign In'}
-            </a>
-            {registrationOpen ? (
-              <a href="/auth/register" className="btn-sm-link" onClick={() => setNavOpen(false)}>Get Started</a>
-            ) : (
-              <button className="btn-sm" onClick={() => { setNavOpen(false); openWaitlistModal() }}>
-                Get Early Access
+          <ul className={`nav-links${navOpen ? ' open' : ''}`}>
+            <li><a href="#how-it-works" className="nav-link" onClick={() => setNavOpen(false)}>How It Works</a></li>
+            <li className="nav-feat-wrap">
+              <button className="nav-feat-btn nav-link">
+                Features
+                <svg className="feat-arrow" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="2,3.5 5,6.5 8,3.5" />
+                </svg>
               </button>
-            )}
+              <div className="feat-drop">
+                <div className="feat-section-label">Features</div>
+                <a href="/features/job-check-in" className="feat-item" onClick={() => setNavOpen(false)}>Job Check-In</a>
+                <a href="/features/gbp-posts" className="feat-item" onClick={() => setNavOpen(false)}>GBP Post Generator</a>
+                <a href="/features/before-after" className="feat-item" onClick={() => setNavOpen(false)}>Before &amp; After</a>
+                <a href="/features/review-requests" className="feat-item" onClick={() => setNavOpen(false)}>Review Requests</a>
+                <a href="/features/portfolio" className="feat-item" onClick={() => setNavOpen(false)}>Portfolio &amp; Dashboard</a>
+                <div className="feat-divider" />
+                <div className="feat-section-label">AI Agents <span className="feat-soon">Soon</span></div>
+                <a href="/features/ai-agents/ai-copywriter" className="feat-item sub" onClick={() => setNavOpen(false)}>AI Copywriter Agent</a>
+                <a href="/features/ai-agents/ai-review-request" className="feat-item sub" onClick={() => setNavOpen(false)}>AI Review Request Agent</a>
+              </div>
+            </li>
+            <li><a href="/pricing" className="nav-link" onClick={() => setNavOpen(false)}>Pricing</a></li>
+          </ul>
+          <div className={`nav-right${navOpen ? ' open' : ''}`}>
+            <a href="/auth/signin" className="btn-ghost nav-signin" onClick={() => setNavOpen(false)}>Sign In</a>
           </div>
           <button
             className={`nav-hamburger${navOpen ? ' open' : ''}`}

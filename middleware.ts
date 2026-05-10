@@ -39,6 +39,8 @@ if (
   !token &&
   !pathname.startsWith('/jobs/') &&
   !pathname.startsWith('/portfolio/') &&
+  !pathname.startsWith('/features/') &&
+  !pathname.startsWith('/mockups/') &&
   !pathname.startsWith('/sitemap') &&
   pathname !== '/robots.txt' &&
   pathname !== '/pricing' &&
