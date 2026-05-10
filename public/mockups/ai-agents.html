@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Agents — ProjectCheckin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink:        #0D1B2A;
+      --navy:       #0C3D5C;
+      --navy-d:     #071E2C;
+      --orange:     #F97316;
+      --orange-dim: #EA6C0A;
+      --bg:         #FDFDFD;
+      --bg-soft:    #F7F7F5;
+      --mid:        #6B7280;
+      --border:     #E5E7EB;
+      --green:      #10B981;
+      --purple:     #7C3AED;
+      --font-d:     'Playfair Display', Georgia, serif;
+      --font-b:     'Plus Jakarta Sans', system-ui, sans-serif;
+      --r:          12px;
+      --rl:         20px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-b);
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ─── NAV ─── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(7,30,44,0.96);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding: 0 clamp(20px,5vw,80px);
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: #fff;
+      font-family: var(--font-d);
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .nav-brand img { height: 32px; width: 32px; object-fit: contain; }
+
+    nav ul {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      list-style: none;
+    }
+
+    nav ul a, .nav-feat-btn {
+      text-decoration: none;
+      color: rgba(255,255,255,0.55);
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: color .2s;
+    }
+
+    nav ul a:hover, .nav-feat-btn:hover,
+    nav ul a.active { color: #fff; }
+
+    .nav-feat-wrap { position: relative; }
+
+    .nav-feat-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      font-family: var(--font-b);
+      color: rgba(255,255,255,0.80);
+    }
+
+    .feat-arrow {
+      width: 10px;
+      height: 10px;
+      flex-shrink: 0;
+      transition: transform .2s;
+    }
+
+    .nav-feat-wrap:hover .feat-arrow { transform: rotate(180deg); }
+
+    .feat-drop {
+      position: absolute;
+      top: calc(100% + 16px);
+      left: 50%;
+      width: 480px;
+      background: #fff;
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(13,27,42,.18);
+      padding: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-50%) translateY(-8px);
+      transition: opacity .18s, transform .18s;
+    }
+
+    .feat-drop::before {
+      content: '';
+      position: absolute;
+      top: -20px;
+      left: 0;
+      right: 0;
+      height: 20px;
+    }
+
+    .nav-feat-wrap:hover .feat-drop {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .feat-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 11px;
+      padding: 12px;
+      border-radius: 10px;
+      text-decoration: none;
+      transition: background .15s;
+    }
+
+    .feat-item:hover { background: var(--bg-soft); }
+
+    .feat-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .feat-icon svg { width: 17px; height: 17px; }
+
+    .feat-title {
+      font-size: 0.81rem;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      line-height: 1.2;
+    }
+
+    .feat-soon-sm {
+      display: inline-block;
+      background: rgba(249,115,22,.12);
+      color: var(--orange);
+      font-size: 0.55rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .feat-desc {
+      font-size: 0.73rem;
+      color: var(--mid);
+      line-height: 1.45;
+    }
+
+    .nav-right { display: flex; align-items: center; gap: 16px; }
+
+    .btn-ghost {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,.6);
+      font-family: var(--font-b);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: color .2s;
+    }
+
+    .btn-ghost:hover { color: #fff; }
+
+    .btn-orange {
+      background: var(--orange);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-family: var(--font-b);
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: background .15s, transform .1s;
+    }
+
+    .btn-orange:hover { background: var(--orange-dim); transform: translateY(-1px); }
+
+    @media (max-width: 640px) { nav ul { display: none; } }
+
+    /* ─── HERO ─── */
+    .hero {
+      background: var(--navy-d);
+      padding: clamp(72px,9vw,120px) clamp(20px,5vw,80px) clamp(60px,7vw,96px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 70% 60% at 60% 40%, rgba(124,58,237,0.18), transparent 70%),
+                  radial-gradient(ellipse 50% 40% at 20% 80%, rgba(14,165,233,0.12), transparent 60%);
+      pointer-events: none;
+    }
+
+    .hero-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    @media (max-width: 800px) {
+      .hero-inner { grid-template-columns: 1fr; gap: 40px; }
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(249,115,22,0.15);
+      border: 1px solid rgba(249,115,22,0.3);
+      color: #FDBA74;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      border-radius: 100px;
+      margin-bottom: 20px;
+    }
+
+    .hero-badge .dot {
+      width: 5px;
+      height: 5px;
+      background: var(--orange);
+      border-radius: 50%;
+    }
+
+    .hero h1 {
+      font-family: var(--font-d);
+      font-size: clamp(2.2rem, 4.5vw, 3.4rem);
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.1;
+      margin-bottom: 20px;
+    }
+
+    .hero h1 em {
+      font-style: italic;
+      color: #FDBA74;
+    }
+
+    .hero-sub {
+      font-size: 1rem;
+      color: rgba(255,255,255,0.6);
+      line-height: 1.7;
+      margin-bottom: 32px;
+      max-width: 480px;
+    }
+
+    .hero-cta-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn-titan {
+      background: var(--orange);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 13px 28px;
+      font-family: var(--font-b);
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: background .15s, transform .1s;
+    }
+
+    .btn-titan:hover { background: var(--orange-dim); transform: translateY(-1px); }
+
+    .hero-fine {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.35);
+    }
+
+    /* AI PREVIEW CARD */
+    .ai-preview {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 20px;
+      padding: 24px;
+      position: relative;
+    }
+
+    .ai-preview-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.3);
+      margin-bottom: 16px;
+    }
+
+    .ai-photos {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .ai-photo-thumb {
+      flex: 1;
+      aspect-ratio: 4/3;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .ai-photo-thumb.before-tag::after {
+      content: 'BEFORE';
+      position: absolute;
+      bottom: 6px;
+      left: 6px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 0.45rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    .ai-photo-thumb.after-tag::after {
+      content: 'AFTER';
+      position: absolute;
+      bottom: 6px;
+      left: 6px;
+      background: rgba(16,185,129,0.8);
+      color: #fff;
+      font-size: 0.45rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    .ai-arrow-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .ai-arrow-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(124,58,237,0.4), rgba(249,115,22,0.4));
+    }
+
+    .ai-arrow-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(124,58,237,0.15);
+      border: 1px solid rgba(124,58,237,0.3);
+      border-radius: 100px;
+      padding: 5px 12px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #C4B5FD;
+      letter-spacing: .03em;
+      white-space: nowrap;
+    }
+
+    .ai-output {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .ai-output-heading {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: 8px;
+    }
+
+    .ai-output p {
+      font-size: 0.75rem;
+      line-height: 1.65;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .ai-output p strong {
+      color: rgba(255,255,255,0.75);
+      font-weight: 600;
+    }
+
+    .ai-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 12px;
+      background: var(--orange);
+      vertical-align: middle;
+      margin-left: 2px;
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* ─── SECTION: AGENTS OVERVIEW ─── */
+    .section-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--orange);
+      margin-bottom: 12px;
+    }
+
+    .agents-overview {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: clamp(64px,7vw,96px) clamp(20px,5vw,80px);
+    }
+
+    .ao-header {
+      max-width: 600px;
+      margin-bottom: 56px;
+    }
+
+    .ao-header h2 {
+      font-family: var(--font-d);
+      font-size: clamp(1.9rem,3.5vw,2.8rem);
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1.12;
+      margin-bottom: 16px;
+    }
+
+    .ao-header p {
+      font-size: 0.98rem;
+      color: var(--mid);
+      line-height: 1.7;
+    }
+
+    .agents-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 700px) { .agents-grid { grid-template-columns: 1fr; } }
+
+    .agent-card {
+      background: var(--bg-soft);
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      position: relative;
+      transition: box-shadow .2s;
+    }
+
+    .agent-card:hover { box-shadow: 0 8px 32px rgba(13,27,42,.07); }
+
+    .agent-icon-wrap {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .agent-num {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--mid);
+      margin-bottom: 6px;
+    }
+
+    .agent-name {
+      font-family: var(--font-d);
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--ink);
+      margin-bottom: 12px;
+      line-height: 1.2;
+    }
+
+    .agent-desc {
+      font-size: 0.875rem;
+      color: var(--mid);
+      line-height: 1.7;
+      margin-bottom: 24px;
+    }
+
+    .agent-bullets {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .agent-bullets li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.82rem;
+      color: var(--ink);
+      line-height: 1.45;
+    }
+
+    .ab-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--orange);
+      flex-shrink: 0;
+      margin-top: 6px;
+    }
+
+    .agent-soon-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(249,115,22,0.08);
+      border: 1px solid rgba(249,115,22,0.2);
+      color: var(--orange);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 100px;
+      position: absolute;
+      top: 24px;
+      right: 24px;
+    }
+
+    /* ─── SECTION: AGENT 1 DETAIL ─── */
+    .agent-detail {
+      padding: clamp(56px,6vw,88px) clamp(20px,5vw,80px);
+      position: relative;
+      z-index: 1;
+    }
+
+    .agent-detail.alt { background: var(--bg-soft); }
+
+    .agent-detail-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 72px;
+      align-items: center;
+    }
+
+    @media (max-width: 800px) {
+      .agent-detail-inner { grid-template-columns: 1fr; gap: 40px; }
+    }
+
+    .agent-detail-inner.flip { direction: rtl; }
+    .agent-detail-inner.flip > * { direction: ltr; }
+
+    .detail-copy h2 {
+      font-family: var(--font-d);
+      font-size: clamp(1.6rem,3vw,2.2rem);
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1.15;
+      margin-bottom: 16px;
+    }
+
+    .detail-copy h2 em {
+      font-style: italic;
+      color: var(--orange);
+    }
+
+    .detail-copy p {
+      font-size: 0.92rem;
+      color: var(--mid);
+      line-height: 1.75;
+      margin-bottom: 20px;
+    }
+
+    .detail-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 24px;
+    }
+
+    .step {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--navy);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .step-text {
+      font-size: 0.875rem;
+      color: var(--ink);
+      line-height: 1.5;
+      padding-top: 4px;
+    }
+
+    .step-text strong { font-weight: 700; }
+
+    /* Visual panel for Agent 1 */
+    .a1-visual {
+      background: var(--navy-d);
+      border-radius: 20px;
+      padding: 28px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .a1-vis-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.3);
+      margin-bottom: 14px;
+    }
+
+    .a1-photos {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 18px;
+    }
+
+    .a1-photo {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .a1-process {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .a1-process-line { flex: 1; height: 1px; background: rgba(255,255,255,0.08); }
+
+    .a1-process-node {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(124,58,237,0.2);
+      border: 1px solid rgba(124,58,237,0.35);
+      border-radius: 100px;
+      padding: 5px 12px;
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: #C4B5FD;
+      white-space: nowrap;
+    }
+
+    .a1-output-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .a1-job-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .a1-job-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.85);
+    }
+
+    .a1-publish-btn {
+      background: var(--orange);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 4px 12px;
+      font-size: 0.62rem;
+      font-weight: 700;
+      cursor: default;
+    }
+
+    .a1-copy {
+      font-size: 0.73rem;
+      line-height: 1.65;
+      color: rgba(255,255,255,0.45);
+    }
+
+    .a1-copy strong { color: rgba(255,255,255,0.7); font-weight: 600; }
+
+    .a1-meta {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .a1-tag {
+      background: rgba(14,165,233,0.12);
+      border: 1px solid rgba(14,165,233,0.2);
+      color: #7DD3FC;
+      font-size: 0.58rem;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 100px;
+    }
+
+    /* Visual panel for Agent 2 */
+    .a2-visual {
+      background: #fff;
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 4px 24px rgba(13,27,42,.06);
+    }
+
+    .a2-vis-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--mid);
+      margin-bottom: 14px;
+    }
+
+    .a2-trigger {
+      background: var(--bg-soft);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .a2-trigger-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: rgba(16,185,129,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .a2-trigger-text strong {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 2px;
+    }
+
+    .a2-trigger-text span {
+      font-size: 0.7rem;
+      color: var(--mid);
+    }
+
+    .a2-arrow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .a2-arrow-line { flex: 1; height: 1px; background: var(--border); }
+
+    .a2-ai-node {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(124,58,237,0.07);
+      border: 1px solid rgba(124,58,237,0.2);
+      border-radius: 100px;
+      padding: 5px 12px;
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--purple);
+      white-space: nowrap;
+    }
+
+    .a2-message {
+      background: var(--bg-soft);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .a2-msg-from {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--mid);
+      margin-bottom: 8px;
+    }
+
+    .a2-bubble {
+      background: var(--navy);
+      color: rgba(255,255,255,0.88);
+      border-radius: 14px 14px 14px 3px;
+      padding: 12px 14px;
+      font-size: 0.78rem;
+      line-height: 1.6;
+    }
+
+    .a2-bubble strong { color: #fff; }
+
+    .a2-send-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .a2-send-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-family: var(--font-b);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: default;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .a2-send-btn.text { background: var(--green); color: #fff; }
+    .a2-send-btn.email { background: var(--bg-soft); color: var(--ink); border: 1.5px solid var(--border); }
+
+    /* ─── SECTION: DIFFERENTIATION ─── */
+    .diff-section {
+      background: var(--navy-d);
+      padding: clamp(64px,7vw,96px) clamp(20px,5vw,80px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .diff-section::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 60% at 80% 30%, rgba(124,58,237,0.15), transparent 65%);
+      pointer-events: none;
+    }
+
+    .diff-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .diff-header {
+      max-width: 580px;
+      margin-bottom: 48px;
+    }
+
+    .diff-header h2 {
+      font-family: var(--font-d);
+      font-size: clamp(1.8rem,3.5vw,2.6rem);
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.12;
+      margin-bottom: 14px;
+    }
+
+    .diff-header h2 em { font-style: italic; color: #FDBA74; }
+
+    .diff-header p {
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.55);
+      line-height: 1.7;
+    }
+
+    .diff-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 640px) { .diff-compare { grid-template-columns: 1fr; } }
+
+    .diff-col {
+      border-radius: 16px;
+      padding: 28px;
+    }
+
+    .diff-col.theirs {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .diff-col.ours {
+      background: rgba(124,58,237,0.1);
+      border: 1px solid rgba(124,58,237,0.25);
+    }
+
+    .diff-col-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    .diff-col.theirs .diff-col-label { color: rgba(255,255,255,0.3); }
+    .diff-col.ours .diff-col-label { color: #C4B5FD; }
+
+    .diff-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .diff-row:last-child { margin-bottom: 0; }
+
+    .diff-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+      font-size: 0.7rem;
+    }
+
+    .diff-icon.x { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.3); }
+    .diff-icon.chk { background: rgba(124,58,237,0.25); color: #C4B5FD; }
+
+    .diff-row-text {
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+
+    .diff-col.theirs .diff-row-text { color: rgba(255,255,255,0.4); }
+    .diff-col.ours .diff-row-text { color: rgba(255,255,255,0.8); }
+
+    .diff-row-text strong {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .diff-col.theirs .diff-row-text strong { color: rgba(255,255,255,0.5); }
+    .diff-col.ours .diff-row-text strong { color: #fff; }
+
+    /* ─── TITAN CTA ─── */
+    .titan-cta {
+      background: var(--bg);
+      padding: clamp(64px,7vw,96px) clamp(20px,5vw,80px);
+    }
+
+    .titan-cta-inner {
+      max-width: 680px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .titan-plan-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(124,58,237,0.08);
+      border: 1px solid rgba(124,58,237,0.2);
+      color: var(--purple);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 100px;
+      margin-bottom: 20px;
+    }
+
+    .titan-cta h2 {
+      font-family: var(--font-d);
+      font-size: clamp(1.8rem,3.5vw,2.6rem);
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1.15;
+      margin-bottom: 14px;
+    }
+
+    .titan-cta p {
+      font-size: 0.95rem;
+      color: var(--mid);
+      line-height: 1.7;
+      margin-bottom: 32px;
+    }
+
+    .cta-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-titan-lg {
+      background: var(--orange);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 16px 44px;
+      font-family: var(--font-b);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: background .15s, transform .1s;
+    }
+
+    .btn-titan-lg:hover { background: var(--orange-dim); transform: translateY(-1px); }
+
+    .cta-fine {
+      font-size: 0.78rem;
+      color: var(--mid);
+    }
+
+    .cta-plan-note {
+      font-size: 0.78rem;
+      color: var(--mid);
+      margin-top: 4px;
+    }
+
+    .cta-plan-note a {
+      color: var(--navy);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    /* ─── FOOTER ─── */
+    footer {
+      background: var(--ink);
+      border-top: 1px solid rgba(255,255,255,.05);
+      padding: 24px clamp(20px,5vw,80px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .foot-brand {
+      font-family: var(--font-d);
+      font-size: 0.88rem;
+      color: rgba(255,255,255,.38);
+    }
+
+    .foot-links { display: flex; gap: 24px; }
+
+    .foot-links a {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,.32);
+      text-decoration: none;
+      transition: color .2s;
+    }
+
+    .foot-links a:hover { color: rgba(255,255,255,.65); }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="/" class="nav-brand">
+      <img src="../../public/images/logo.png" alt="ProjectCheckin" onerror="this.style.display='none'">
+      ProjectCheckin
+    </a>
+    <ul>
+      <li><a href="/#how-it-works">How It Works</a></li>
+      <li class="nav-feat-wrap">
+        <button class="nav-feat-btn">
+          Features
+          <svg class="feat-arrow" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="2,3.5 5,6.5 8,3.5"/>
+          </svg>
+        </button>
+        <div class="feat-drop">
+          <a href="ai-agents.html" class="feat-item">
+            <div class="feat-icon" style="background:rgba(249,115,22,.10)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a4 4 0 0 1 4 4v1h1a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-1v1a4 4 0 0 1-8 0v-1H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1V6a4 4 0 0 1 4-4z"/>
+                <circle cx="9" cy="10" r="1" fill="#F97316" stroke="none"/><circle cx="15" cy="10" r="1" fill="#F97316" stroke="none"/>
+              </svg>
+            </div>
+            <div>
+              <div class="feat-title">AI Agents <span class="feat-soon-sm">Soon</span></div>
+              <div class="feat-desc">AI writes job descriptions from your photos and sends personalized review requests automatically.</div>
+            </div>
+          </a>
+          <a href="#" class="feat-item">
+            <div class="feat-icon" style="background:rgba(16,185,129,.10)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 12l2 2 4-4"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 20 8"/>
+              </svg>
+            </div>
+            <div>
+              <div class="feat-title">Job Check-In</div>
+              <div class="feat-desc">Crew checks in from the job site — photos, address, and notes in seconds. No app download.</div>
+            </div>
+          </a>
+          <a href="#" class="feat-item">
+            <div class="feat-icon" style="background:rgba(14,165,233,.10)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#0EA5E9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+              </svg>
+            </div>
+            <div>
+              <div class="feat-title">GBP Post Generator</div>
+              <div class="feat-desc">Every job generates a formatted Google Business Profile post ready to copy in one click.</div>
+            </div>
+          </a>
+          <a href="#" class="feat-item">
+            <div class="feat-icon" style="background:rgba(139,92,246,.10)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/>
+              </svg>
+            </div>
+            <div>
+              <div class="feat-title">Before &amp; After</div>
+              <div class="feat-desc">Tag photos as before or after. Published pages show a drag-to-reveal comparison widget.</div>
+            </div>
+          </a>
+          <a href="#" class="feat-item">
+            <div class="feat-icon" style="background:rgba(234,179,8,.10)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#CA8A04" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            </div>
+            <div>
+              <div class="feat-title">Review Requests</div>
+              <div class="feat-desc">One tap sends a personalized review request from your own number — no third-party service.</div>
+            </div>
+          </a>
+          <a href="#" class="feat-item">
+            <div class="feat-icon" style="background:rgba(13,27,42,.06)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#0C3D5C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+              </svg>
+            </div>
+            <div>
+              <div class="feat-title">Portfolio &amp; Dashboard</div>
+              <div class="feat-desc">A public portfolio automatically built from every job your crew completes.</div>
+            </div>
+          </a>
+        </div>
+      </li>
+      <li><a href="/pricing">Pricing</a></li>
+    </ul>
+    <div class="nav-right">
+      <a href="/auth/signin" class="btn-ghost">Sign In</a>
+      <a href="/register" class="btn-orange">Get Started</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <div class="hero-badge">
+          <span class="dot"></span>
+          Titan plan · Coming soon
+        </div>
+        <h1>AI agents that work while your crew works the<em> job.</em></h1>
+        <p class="hero-sub">
+          Two AI agents built for field service contractors. One writes your job pages automatically from photos. One sends personalized review requests to every customer — with zero extra effort from you.
+        </p>
+        <div class="hero-cta-row">
+          <a href="/register" class="btn-titan">Start Free — See It in Action</a>
+          <span class="hero-fine">AI agents ship to Titan plan</span>
+        </div>
+      </div>
+      <div>
+        <div class="ai-preview">
+          <div class="ai-preview-label">AI Job Description Writer · Agent 1</div>
+          <div class="ai-photos">
+            <div class="ai-photo-thumb before-tag" style="background:rgba(99,102,241,0.08)">🏠</div>
+            <div class="ai-photo-thumb" style="background:rgba(99,102,241,0.08)">🔨</div>
+            <div class="ai-photo-thumb after-tag" style="background:rgba(16,185,129,0.08)">✨</div>
+          </div>
+          <div class="ai-arrow-row">
+            <div class="ai-arrow-line"></div>
+            <div class="ai-arrow-badge">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <path d="M12 2a4 4 0 0 1 4 4v1h1a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-1v1a4 4 0 0 1-8 0v-1H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1V6a4 4 0 0 1 4-4z"/>
+              </svg>
+              Analyzing photos with AI
+            </div>
+            <div class="ai-arrow-line"></div>
+          </div>
+          <div class="ai-output">
+            <div class="ai-output-heading">Generated job page — ready to review &amp; publish</div>
+            <p>
+              <strong>Full roof replacement — Cedar Park, TX.</strong> This 3,200 sq ft home had original 25-year shingles showing significant granule loss and two active leak points above the master suite. We removed the existing layer, replaced damaged decking, and installed <strong>CertainTeed Landmark Pro in Heather Blend</strong> with full ice-and-water shield to the eaves. Ridge venting upgraded to continuous roll. Job completed in one day.<span class="ai-cursor"></span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AGENTS OVERVIEW -->
+  <section class="agents-overview">
+    <div class="ao-header">
+      <div class="section-label">Two agents. Zero extra work.</div>
+      <h2>Your business runs on the jobs your crew completes. Now those jobs work for you.</h2>
+      <p>AI agents handle the writing and the follow-up — the two things contractors know they should do but never have time for.</p>
+    </div>
+    <div class="agents-grid">
+
+      <!-- Agent 1 -->
+      <div class="agent-card">
+        <span class="agent-soon-badge">Coming to Titan</span>
+        <div class="agent-icon-wrap" style="background:rgba(249,115,22,0.1)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3z"/>
+            <polyline points="15 3 15 9 21 9"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="12" y1="12" x2="12" y2="18"/>
+          </svg>
+        </div>
+        <div class="agent-num">Agent 1</div>
+        <div class="agent-name">AI Job Description Writer</div>
+        <p class="agent-desc">Your crew submits photos. AI analyzes every image — trade type, what was repaired, before and after detail — and writes a complete, keyword-rich job description. You review, edit if needed, and publish. No typing required.</p>
+        <ul class="agent-bullets">
+          <li><span class="ab-dot"></span>Reads your photos to understand what was actually done</li>
+          <li><span class="ab-dot"></span>Writes location-specific, SEO-optimized descriptions</li>
+          <li><span class="ab-dot"></span>Every job page gets professional copy — even from a 3-photo check-in</li>
+          <li><span class="ab-dot"></span>Consistent quality regardless of who submitted the job</li>
+        </ul>
+      </div>
+
+      <!-- Agent 2 -->
+      <div class="agent-card">
+        <span class="agent-soon-badge">Coming to Titan</span>
+        <div class="agent-icon-wrap" style="background:rgba(16,185,129,0.1)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </div>
+        <div class="agent-num">Agent 2</div>
+        <div class="agent-name">AI Review Request Agent</div>
+        <p class="agent-desc">After a job is published, the AI drafts a personalized review request that references the specific work done, the homeowner's name, and the location. Not a template — an actual message about their actual job. You send it in one tap.</p>
+        <ul class="agent-bullets">
+          <li><span class="ab-dot"></span>Personalizes every message to the specific job</li>
+          <li><span class="ab-dot"></span>References real details — address, trade, what was installed</li>
+          <li><span class="ab-dot"></span>Pre-populates in the review request modal — one tap to send</li>
+          <li><span class="ab-dot"></span>Sends from your own number — no third-party service required</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- AGENT 1 DETAIL -->
+  <section class="agent-detail alt">
+    <div class="agent-detail-inner">
+      <div class="detail-copy">
+        <div class="section-label">Agent 1 · AI Job Description Writer</div>
+        <h2>Photos go in.<br><em>Published job pages</em> come out.</h2>
+        <p>Most contractors have great photos and nothing written about them. AI changes that ratio. Every check-in, no matter how minimal, gets a full description that Google can index and homeowners can read.</p>
+        <div class="detail-steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-text"><strong>Crew submits photos on check-in</strong> — address, trade, a few photos. No description required.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-text"><strong>AI reads each photo</strong> — identifies what was done, materials visible, before and after state.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-text"><strong>Draft appears on your dashboard</strong> — review, edit anything you want, then publish.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-text"><strong>Live job page goes up</strong> — indexed by Google, tied to the job address, shareable immediately.</div>
+          </div>
+        </div>
+      </div>
+      <div class="a1-visual">
+        <div class="a1-vis-label">Dashboard · Job Description Writer</div>
+        <div class="a1-photos">
+          <div class="a1-photo" style="background:rgba(99,102,241,0.07)">🏚️</div>
+          <div class="a1-photo" style="background:rgba(99,102,241,0.07)">🔧</div>
+          <div class="a1-photo" style="background:rgba(16,185,129,0.07)">🏠</div>
+        </div>
+        <div class="a1-process">
+          <div class="a1-process-line"></div>
+          <div class="a1-process-node">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+            </svg>
+            Generating description…
+          </div>
+          <div class="a1-process-line"></div>
+        </div>
+        <div class="a1-output-card">
+          <div class="a1-job-header">
+            <div class="a1-job-title">147 Clearwater Dr · Roof Replacement</div>
+            <div class="a1-publish-btn">Publish</div>
+          </div>
+          <p class="a1-copy">
+            <strong>Full shingle replacement on a 2,800 sq ft Colonial in Cedar Park.</strong> The existing 3-tab shingles showed heavy curling and granule loss across the south-facing slope. We removed two layers, replaced 4 sheets of damaged OSB, and installed <strong>CertainTeed Landmark Pro in Heather Blend</strong> with continuous ridge vent and ice-and-water shield to all eaves. Completed in one day, full cleanup included.
+          </p>
+          <div class="a1-meta">
+            <span class="a1-tag">Cedar Park, TX</span>
+            <span class="a1-tag">Roofing</span>
+            <span class="a1-tag">Shingle Replacement</span>
+            <span class="a1-tag">CertainTeed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AGENT 2 DETAIL -->
+  <section class="agent-detail">
+    <div class="agent-detail-inner flip">
+      <div class="detail-copy">
+        <div class="section-label">Agent 2 · AI Review Request Agent</div>
+        <h2>A message that sounds like <em>you wrote it</em> — because it knows your job.</h2>
+        <p>Generic review request templates get ignored. A message that says "Thanks for trusting us with the roof at 147 Clearwater" gets read — and acted on. The AI writes that message for every job, automatically.</p>
+        <div class="detail-steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-text"><strong>Job is published</strong> — address, customer name, and job details are on file.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-text"><strong>AI drafts a personalized message</strong> — references the actual work, the customer's name, the location.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-text"><strong>Review request modal opens pre-filled</strong> — edit anything, or send as-is. One tap.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-text"><strong>Sends from your own phone</strong> — no third-party number, no platform fee per text.</div>
+          </div>
+        </div>
+      </div>
+      <div class="a2-visual">
+        <div class="a2-vis-label">Review Request · AI Draft</div>
+        <div class="a2-trigger">
+          <div class="a2-trigger-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
+            </svg>
+          </div>
+          <div class="a2-trigger-text">
+            <strong>Job published — 147 Clearwater Dr</strong>
+            <span>Customer: Mike &amp; Sandra Peterson · Roofing</span>
+          </div>
+        </div>
+        <div class="a2-arrow">
+          <div class="a2-arrow-line"></div>
+          <div class="a2-ai-node">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M12 2a4 4 0 0 1 4 4v1h1a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-1v1a4 4 0 0 1-8 0v-1H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1V6a4 4 0 0 1 4-4z"/>
+            </svg>
+            AI personalizing message
+          </div>
+          <div class="a2-arrow-line"></div>
+        </div>
+        <div class="a2-message">
+          <div class="a2-msg-from">Draft · To: Mike Peterson</div>
+          <div class="a2-bubble">
+            <strong>Mike</strong> — really appreciated the trust you put in us for the roof at Clearwater. Hope you love the result. If you have a moment, a Google review goes a long way for a small business: [review link]<br><br>
+            Any questions at all, don't hesitate.<br>
+            — Ridgeline Roofing
+          </div>
+        </div>
+        <div class="a2-send-row">
+          <div class="a2-send-btn text">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            Send Text
+          </div>
+          <div class="a2-send-btn email">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+            </svg>
+            Send Email
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIFFERENTIATION: WHY OUR AI IS DIFFERENT -->
+  <section class="diff-section">
+    <div class="diff-inner">
+      <div class="diff-header">
+        <div class="section-label" style="color:#C4B5FD">Not generic AI.</div>
+        <h2>AI that knows <em>your jobs</em> — not just the industry.</h2>
+        <p>Generic AI chatbots write generic content. ProjectCheckin's AI has access to every job your crew has completed — addresses, photos, trades, materials, customer names. That context changes everything.</p>
+      </div>
+      <div class="diff-compare">
+        <div class="diff-col theirs">
+          <div class="diff-col-label">Generic AI tools (ChatGPT, Podium AI, etc.)</div>
+          <div class="diff-row">
+            <div class="diff-icon x">✕</div>
+            <div class="diff-row-text">
+              <strong>Writes about roofing in general</strong>
+              Doesn't know your jobs, your customers, or your service area.
+            </div>
+          </div>
+          <div class="diff-row">
+            <div class="diff-icon x">✕</div>
+            <div class="diff-row-text">
+              <strong>Generic review request templates</strong>
+              "Hi [Name], we hope you loved your recent service with us…"
+            </div>
+          </div>
+          <div class="diff-row">
+            <div class="diff-icon x">✕</div>
+            <div class="diff-row-text">
+              <strong>Requires copy-paste and editing</strong>
+              You still have to describe the job to the AI — adding work, not removing it.
+            </div>
+          </div>
+          <div class="diff-row">
+            <div class="diff-icon x">✕</div>
+            <div class="diff-row-text">
+              <strong>No photos → output connection</strong>
+              Can't read your job photos. Descriptions are invented, not observed.
+            </div>
+          </div>
+        </div>
+        <div class="diff-col ours">
+          <div class="diff-col-label">ProjectCheckin AI</div>
+          <div class="diff-row">
+            <div class="diff-icon chk">✓</div>
+            <div class="diff-row-text">
+              <strong>Writes about your specific jobs</strong>
+              147 Clearwater Dr · Cedar Park · CertainTeed Landmark Pro · 2,800 sq ft.
+            </div>
+          </div>
+          <div class="diff-row">
+            <div class="diff-icon chk">✓</div>
+            <div class="diff-row-text">
+              <strong>Personalized review requests per job</strong>
+              References the actual work done, the customer's name, and the address.
+            </div>
+          </div>
+          <div class="diff-row">
+            <div class="diff-icon chk">✓</div>
+            <div class="diff-row-text">
+              <strong>Zero extra input from your crew</strong>
+              Photos go in, publish-ready copy comes out. No prompting, no editing required.
+            </div>
+          </div>
+          <div class="diff-row">
+            <div class="diff-icon chk">✓</div>
+            <div class="diff-row-text">
+              <strong>Reads your photos to write the description</strong>
+              AI Vision analyzes what was actually done — from the images, not from a form field.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TITAN CTA -->
+  <section class="titan-cta">
+    <div class="titan-cta-inner">
+      <div class="titan-plan-badge">Titan Plan</div>
+      <h2>Start free. Upgrade when AI agents ship.</h2>
+      <p>AI agents are coming to the Titan plan. Start with a free account today — your job history, photos, and customer data will all be ready to power the agents the moment they launch.</p>
+      <div class="cta-stack">
+        <a href="/register" class="btn-titan-lg">Start Free — No Credit Card</a>
+        <div class="cta-fine">Free plan · No contract · Upgrade anytime</div>
+        <div class="cta-plan-note">Already have an account? <a href="/pricing">See all plans →</a></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="foot-brand">ProjectCheckin &copy; 2025</div>
+    <div class="foot-links">
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/terms">Terms of Service</a>
+    </div>
+  </footer>
+
+</body>
+</html>
