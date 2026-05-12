@@ -68,7 +68,7 @@ export default function PricingPage() {
   }
 
   return (
-    <>
+    <div className="pc-pricing">
       {/* NAV */}
       <nav>
         <Link href="/" className="nav-brand">
@@ -471,6 +471,6 @@ export default function PricingPage() {
           <Link href="/terms">Terms of Service</Link>
         </div>
       </footer>
-    </>
+    </div>
   )
 }
