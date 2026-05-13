@@ -27,19 +27,8 @@ body {
   overflow-x: hidden;
 }
 
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image: url('/images/lp-texture-ostrich.png');
-  background-size: 800px 800px;
-  opacity: 0.13;
-}
-
 /* ─── NAV ─── */
-nav {
+.pc-pricing nav {
   position: sticky;
   top: 0;
   z-index: 100;
@@ -53,7 +42,7 @@ nav {
   justify-content: space-between;
 }
 
-.nav-brand {
+.pc-pricing .nav-brand {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -66,16 +55,16 @@ nav {
   min-width: 0;
 }
 
-.nav-brand img { height: 32px; width: 32px; object-fit: contain; }
+.pc-pricing .nav-brand img { height: 32px; width: 32px; object-fit: contain; }
 
-nav ul {
+.pc-pricing nav ul {
   display: flex;
   align-items: center;
   gap: 32px;
   list-style: none;
 }
 
-nav ul a {
+.pc-pricing nav ul a {
   text-decoration: none;
   color: var(--mid);
   font-size: 0.875rem;
@@ -85,8 +74,8 @@ nav ul a {
   min-width: 0;
 }
 
-nav ul a:hover,
-nav ul a.active { color: var(--ink); }
+.pc-pricing nav ul a:hover,
+.pc-pricing nav ul a.active { color: var(--ink); }
 
 .nav-right {
   display: flex;
@@ -133,7 +122,7 @@ nav ul a.active { color: var(--ink); }
 }
 
 /* ─── HERO ─── */
-.hero {
+.pc-pricing .hero {
   text-align: center;
   padding: clamp(56px,7vw,104px) clamp(20px,5vw,80px) clamp(36px,4vw,56px);
   max-width: 680px;
@@ -142,7 +131,7 @@ nav ul a.active { color: var(--ink); }
   z-index: 1;
 }
 
-.badge {
+.pc-pricing .badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -157,14 +146,14 @@ nav ul a.active { color: var(--ink); }
   margin-bottom: 24px;
 }
 
-.badge .dot {
+.pc-pricing .badge .dot {
   width: 5px;
   height: 5px;
   background: var(--orange);
   border-radius: 50%;
 }
 
-.hero h1 {
+.pc-pricing .hero h1 {
   font-family: var(--font-d);
   font-size: clamp(2.2rem,4.5vw,3.2rem);
   font-weight: 800;
@@ -172,13 +161,13 @@ nav ul a.active { color: var(--ink); }
   margin-bottom: 16px;
 }
 
-.hero-trust {
+.pc-pricing .hero-trust {
   font-size: 0.9rem;
   color: var(--mid);
   margin-bottom: 10px;
 }
 
-.hero-fine {
+.pc-pricing .hero-fine {
   font-size: 0.78rem;
   color: var(--mid);
   opacity: .65;
@@ -484,7 +473,7 @@ nav ul a.active { color: var(--ink); }
   box-shadow: 0 2px 16px rgba(13,27,42,.04);
 }
 
-table {
+.pc-pricing table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
@@ -492,14 +481,14 @@ table {
   background: #fff;
 }
 
-thead {
+.pc-pricing thead {
   position: sticky;
   top: 64px;
   z-index: 10;
   background: #fff;
 }
 
-thead th {
+.pc-pricing thead th {
   padding: 14px 16px;
   text-align: center;
   font-size: 0.68rem;
@@ -510,18 +499,18 @@ thead th {
   box-shadow: inset 0 -1.5px 0 var(--border);
 }
 
-thead th:first-child { text-align: left; }
-thead th.th-elite { color: var(--orange); box-shadow: inset 0 -2px 0 var(--orange); }
+.pc-pricing thead th:first-child { text-align: left; }
+.pc-pricing thead th.th-elite { color: var(--orange); box-shadow: inset 0 -2px 0 var(--orange); }
 
 .col-feat { width: 40%; }
 .col-t    { width: 15%; }
 
-tbody td { border-bottom: 1px solid rgba(13,27,42,.05); }
-tbody tr:last-child td { border-bottom: none; }
+.pc-pricing tbody td { border-bottom: 1px solid rgba(13,27,42,.05); }
+.pc-pricing tbody tr:last-child td { border-bottom: none; }
 
-tbody tr.cat { background: var(--bg-soft); }
+.pc-pricing tbody tr.cat { background: var(--bg-soft); }
 
-tbody tr.cat td {
+.pc-pricing tbody tr.cat td {
   padding: 9px 16px 5px;
   font-size: 0.65rem;
   font-weight: 700;
@@ -531,16 +520,16 @@ tbody tr.cat td {
   border-bottom: none;
 }
 
-tbody tr:not(.cat):hover { background: var(--bg-soft); }
+.pc-pricing tbody tr:not(.cat):hover { background: var(--bg-soft); }
 
-tbody td {
+.pc-pricing tbody td {
   padding: 11px 16px;
   font-size: 0.84rem;
   color: var(--ink);
   vertical-align: middle;
 }
 
-tbody td:not(:first-child) { text-align: center; }
+.pc-pricing tbody td:not(:first-child) { text-align: center; }
 
 .cv  { font-size: 0.78rem; font-weight: 600; }
 .ck  { color: var(--green); font-weight: 700; }
@@ -590,7 +579,7 @@ tbody td:not(:first-child) { text-align: center; }
   z-index: 1;
 }
 
-.faq h2 {
+.pc-pricing .faq h2 {
   font-family: var(--font-d);
   font-size: clamp(1.4rem,2.5vw,1.9rem);
   font-weight: 800;
@@ -635,7 +624,7 @@ tbody td:not(:first-child) { text-align: center; }
 .faq-item.open .faq-a { display: block; }
 
 /* ─── FINAL CTA BAND ─── */
-.cta-band {
+.pc-pricing .cta-band {
   background: var(--ink);
   color: #fff;
   text-align: center;
@@ -644,7 +633,7 @@ tbody td:not(:first-child) { text-align: center; }
   z-index: 1;
 }
 
-.cta-band h2 {
+.pc-pricing .cta-band h2 {
   font-family: var(--font-d);
   font-size: clamp(1.7rem,3.5vw,2.6rem);
   font-weight: 800;
@@ -652,7 +641,7 @@ tbody td:not(:first-child) { text-align: center; }
   line-height: 1.15;
 }
 
-.cta-band p {
+.pc-pricing .cta-band p {
   font-size: 0.95rem;
   opacity: .65;
   margin-bottom: 28px;
@@ -661,20 +650,20 @@ tbody td:not(:first-child) { text-align: center; }
   margin-right: auto;
 }
 
-.cta-band .btn-orange {
+.pc-pricing .cta-band .btn-orange {
   padding: 15px 36px;
   font-size: 0.95rem;
   border-radius: 10px;
 }
 
-.cta-band .fine {
+.pc-pricing .cta-band .fine {
   font-size: 0.75rem;
   opacity: .4;
   margin-top: 12px;
 }
 
 /* ─── FOOTER ─── */
-footer {
+.pc-pricing footer {
   background: var(--ink);
   border-top: 1px solid rgba(255,255,255,.05);
   padding: 24px clamp(20px,5vw,80px);
@@ -897,7 +886,7 @@ footer {
 
 /* ─── MOBILE ─── */
 @media (max-width: 640px) {
-  nav ul { display: none; }
+  .pc-pricing nav ul { display: none; }
 }
 
 @media (max-width: 400px) {
