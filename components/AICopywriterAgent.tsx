@@ -73,8 +73,9 @@ export default function AICopywriterAgent() {
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
   useEffect(() => {
-    const el = opTextRef.current
-    if (!el) return
+    const maybeEl = opTextRef.current
+    if (!maybeEl) return
+    const el = maybeEl
 
     const CHAR_SPEED  = 32
     const PAUSE_MS    = 520
