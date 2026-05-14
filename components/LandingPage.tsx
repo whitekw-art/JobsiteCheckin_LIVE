@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
+import MarketingNav from '@/components/MarketingNav'
 import '@/styles/landing.css'
 
 // ── FAQ data ──────────────────────────────────────────────────────────────────
@@ -96,10 +97,6 @@ export default function LandingPage({ registrationOpen = false }: { registration
   const [submitted, setSubmitted] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
-  // Nav state
-  const [navScrolled, setNavScrolled] = useState(false)
-  const [navOpen, setNavOpen] = useState(false)
-
   // FAQ accordion
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
@@ -136,24 +133,6 @@ export default function LandingPage({ registrationOpen = false }: { registration
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [modalOpen])
-
-  // Nav scroll
-  useEffect(() => {
-    const onScroll = () => setNavScrolled(window.scrollY > 60)
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
-  // Close mobile nav on outside click
-  useEffect(() => {
-    if (!navOpen) return
-    const onClick = (e: MouseEvent) => {
-      const nav = document.getElementById('nav-root')
-      if (nav && !nav.contains(e.target as Node)) setNavOpen(false)
-    }
-    document.addEventListener('click', onClick)
-    return () => document.removeEventListener('click', onClick)
-  }, [navOpen])
 
   // Reveal animations — targets .r class
   useEffect(() => {
@@ -314,7 +293,7 @@ export default function LandingPage({ registrationOpen = false }: { registration
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <>
+    <div className="lp-root">
       {/* Google Fonts */}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
@@ -334,50 +313,7 @@ export default function LandingPage({ registrationOpen = false }: { registration
       </a>
 
       {/* ── NAV ── */}
-      <nav id="nav-root" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: 'rgba(255,255,255,0.94)', backdropFilter: 'blur(16px)', borderBottom: '1px solid #E5E7EB' }}>
-        <div className="nav-inner">
-          <a href="/" className="logo">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" className="logo-img" alt="ProjectCheckin logo" />
-            ProjectCheckin
-          </a>
-          <ul className={`nav-links${navOpen ? ' open' : ''}`}>
-            <li><a href="#how-it-works" className="nav-link" onClick={() => setNavOpen(false)}>How It Works</a></li>
-            <li className="nav-feat-wrap">
-              <button className="nav-feat-btn nav-link">
-                Features
-                <svg className="feat-arrow" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="2,3.5 5,6.5 8,3.5" />
-                </svg>
-              </button>
-              <div className="feat-drop">
-                <div className="feat-section-label">Features</div>
-                <a href="/features/job-check-in" className="feat-item" onClick={() => setNavOpen(false)}>Job Check-In</a>
-                <a href="/features/gbp-posts" className="feat-item" onClick={() => setNavOpen(false)}>GBP Post Generator</a>
-                <a href="/features/before-after" className="feat-item" onClick={() => setNavOpen(false)}>Before &amp; After</a>
-                <a href="/features/review-requests" className="feat-item" onClick={() => setNavOpen(false)}>Review Requests</a>
-                <a href="/features/portfolio" className="feat-item" onClick={() => setNavOpen(false)}>Portfolio &amp; Dashboard</a>
-                <div className="feat-divider" />
-                <div className="feat-section-label">AI Agents <span className="feat-soon">Soon</span></div>
-                <a href="/features/ai-agents/ai-copywriter" className="feat-item sub" onClick={() => setNavOpen(false)}>AI Copywriter Agent</a>
-                <a href="/features/ai-agents/ai-review-request" className="feat-item sub" onClick={() => setNavOpen(false)}>AI Review Request Agent</a>
-              </div>
-            </li>
-            <li><a href="/pricing" className="nav-link" onClick={() => setNavOpen(false)}>Pricing</a></li>
-          </ul>
-          <div className={`nav-right${navOpen ? ' open' : ''}`}>
-            <a href="/auth/signin" className="btn-ghost nav-signin" onClick={() => setNavOpen(false)}>Sign In</a>
-          </div>
-          <button
-            className={`nav-hamburger${navOpen ? ' open' : ''}`}
-            aria-label={navOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={navOpen}
-            onClick={() => setNavOpen((o) => !o)}
-          >
-            <span /><span /><span />
-          </button>
-        </div>
-      </nav>
+      <MarketingNav />
 
       {/* ── HERO ── */}
       <section className="hero" id="main-content">
@@ -1194,6 +1130,6 @@ export default function LandingPage({ registrationOpen = false }: { registration
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }
