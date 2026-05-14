@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import MarketingNav from '@/components/MarketingNav'
+import '@/styles/features.css'
 import '@/styles/pricing.css'
 
 function Ck() {
@@ -68,49 +70,9 @@ export default function PricingPage() {
   }
 
   return (
-    <div className="pc-pricing">
-      {/* NAV */}
-      <nav>
-        <Link href="/" className="nav-brand">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.png"
-            alt="ProjectCheckin"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-          />
-          ProjectCheckin
-        </Link>
-        <ul>
-          <li><Link href="/#how-it-works">How It Works</Link></li>
-
-          {/* FEATURES DROPDOWN */}
-          <li className="nav-feat-wrap">
-            <button className="nav-feat-btn">
-              Features
-              <svg className="feat-arrow" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="2,3.5 5,6.5 8,3.5" />
-              </svg>
-            </button>
-            <div className="feat-drop">
-              <div className="feat-section-label">Features</div>
-              <a href="/features/job-check-in" className="feat-item">Job Check-In</a>
-              <a href="/features/gbp-posts" className="feat-item">GBP Post Generator</a>
-              <a href="/features/before-after" className="feat-item">Before &amp; After</a>
-              <a href="/features/review-requests" className="feat-item">Review Requests</a>
-              <a href="/features/portfolio" className="feat-item">Portfolio &amp; Dashboard</a>
-              <div className="feat-divider" />
-              <div className="feat-section-label">AI Agents <span className="feat-soon">Soon</span></div>
-              <a href="/features/ai-agents/ai-copywriter" className="feat-item sub">AI Copywriter Agent</a>
-              <a href="/features/ai-agents/ai-review-request" className="feat-item sub">AI Review Request Agent</a>
-            </div>
-          </li>
-
-          <li><a href="/pricing" className="active">Pricing</a></li>
-        </ul>
-        <div className="nav-right">
-          <Link href="/auth/signin" className="btn-ghost">Sign In</Link>
-        </div>
-      </nav>
+    <>
+      <MarketingNav />
+      <div className="pc-pricing">
 
       {/* HERO */}
       <div className="hero">
@@ -471,6 +433,7 @@ export default function PricingPage() {
           <Link href="/terms">Terms of Service</Link>
         </div>
       </footer>
-    </div>
+      </div>
+    </>
   )
 }

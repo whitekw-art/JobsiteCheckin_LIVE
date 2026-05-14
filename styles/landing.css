@@ -194,8 +194,8 @@ nav {
 .nav-hamburger.open span:nth-child(2) { opacity: 0; }
 .nav-hamburger.open span:nth-child(3) { transform: translateY(-9px) rotate(-45deg); }
 
-/* ─── HERO ─── */
-.hero {
+/* ─── HERO — scoped to landing page only ─── */
+.lp-root .hero {
   position: relative;
   padding-top: calc(60px + 88px);
   padding-bottom: 72px;
@@ -204,7 +204,7 @@ nav {
   text-align: center;
   background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(14,165,233,0.06) 0%, transparent 60%);
 }
-.hero::before {
+.lp-root .hero::before {
   content: '';
   position: absolute;
   inset: 0 -80px;
@@ -212,7 +212,7 @@ nav {
   pointer-events: none;
   background: radial-gradient(ellipse 70% 75% at 50% 48%, var(--bg) 18%, transparent 72%);
 }
-.hero-inner { position: relative; z-index: 2; max-width: 860px; margin: 0 auto; }
+.lp-root .hero-inner { position: relative; z-index: 2; max-width: 860px; margin: 0 auto; }
 .spots-note { font-size: 12px; color: var(--muted-lt); display: inline-flex; align-items: center; gap: 6px; justify-content: center; }
 .spots-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--orange); animation: pulse 2s infinite; flex-shrink: 0; }
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
