@@ -59,9 +59,10 @@
 
 .port-url {
   margin-top: 24px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
+  max-width: 100%;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 8px;
@@ -69,6 +70,13 @@
   font-size: 0.75rem;
   color: rgba(255,255,255,0.5);
   font-family: monospace;
+}
+
+.port-url-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .port-url-dot {
