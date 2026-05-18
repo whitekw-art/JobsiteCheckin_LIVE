@@ -326,7 +326,7 @@ export default function Portfolio() {
             </p>
             <div className="port-url">
               <div className="port-url-dot" />
-              projectcheckin.com/portfolio/carters-iron-doors
+              <span className="port-url-text">projectcheckin.com/portfolio/carters-iron-doors</span>
             </div>
           </div>
 
