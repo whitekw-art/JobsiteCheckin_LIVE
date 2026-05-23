@@ -262,6 +262,7 @@ function GbpPostModal({
   onClose: () => void
 }) {
   const [copied, setCopied] = useState(false)
+  const [downloading, setDownloading] = useState(false)
 
   const location = [checkIn.city, checkIn.state].filter(Boolean).join(', ')
   const jobType = checkIn.doorType || 'Job'
@@ -279,6 +280,34 @@ function GbpPostModal({
     setTimeout(() => setCopied(false), 2500)
   }
 
+  async function downloadPhoto(url: string, idx: number) {
+    try {
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const ext = blob.type.includes('png') ? 'png' : 'jpg'
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `job-photo-${idx + 1}.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(a.href)
+    } catch {
+      window.open(url, '_blank')
+    }
+  }
+
+  async function downloadAll() {
+    const urls = checkIn.photoUrls
+    if (!urls?.length) return
+    setDownloading(true)
+    for (let i = 0; i < urls.length; i++) {
+      await downloadPhoto(urls[i], i)
+      if (i < urls.length - 1) await new Promise(resolve => setTimeout(resolve, 400))
+    }
+    setDownloading(false)
+  }
+
   return (
     <div
       style={{
@@ -294,6 +323,7 @@ function GbpPostModal({
           padding: '24px', boxShadow: '0 20px 60px rgba(0,0,0,.22)',
           fontFamily: "'Plus Jakarta Sans', sans-serif",
           border: '1px solid var(--border)',
+          maxHeight: '90vh', overflowY: 'auto',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -319,6 +349,64 @@ function GbpPostModal({
         }}>
           {postText}
         </div>
+
+        {checkIn.photoUrls && checkIn.photoUrls.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--t2)', marginBottom: 8 }}>
+              Photos · {checkIn.photoUrls.length}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+              {checkIn.photoUrls.map((url, i) => (
+                <div key={i} style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: 7, overflow: 'hidden', background: 'var(--surface-2)' }}>
+                  <a href={url} target="_blank" rel="noreferrer" style={{ display: 'block', width: '100%', height: '100%' }}>
+                    <img
+                      src={url}
+                      alt={`Photo ${i + 1}`}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  </a>
+                  <button
+                    onClick={() => downloadPhoto(url, i)}
+                    title="Download photo"
+                    style={{
+                      position: 'absolute', bottom: 5, right: 5,
+                      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)',
+                      border: 'none', borderRadius: 5, padding: '4px 5px',
+                      cursor: 'pointer', color: '#fff', lineHeight: 1,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+            {checkIn.photoUrls.length > 1 && (
+              <button
+                onClick={downloadAll}
+                disabled={downloading}
+                style={{
+                  marginTop: 8, width: '100%', height: 34,
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  borderRadius: 7, fontSize: 12, fontWeight: 600, color: 'var(--t2)',
+                  cursor: downloading ? 'wait' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                {downloading ? 'Downloading…' : `Download all ${checkIn.photoUrls.length} photos`}
+              </button>
+            )}
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button
