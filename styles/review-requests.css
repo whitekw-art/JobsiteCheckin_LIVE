@@ -1,0 +1,401 @@
+/* ── Review Requests feature page — component-specific styles ── */
+/* Shared layout handled by features.css                          */
+
+/* ── iMessage card entrance ── */
+.rr-imsg-wrap {
+  animation: rr-card-entrance 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+@keyframes rr-card-entrance {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.rr-imsg-card {
+  background: #fff;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 32px 72px rgba(0,0,0,0.18), 0 4px 20px rgba(0,0,0,0.08);
+  border: 1px solid #E5E7EB;
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+.rr-imsg-chrome {
+  background: #F2F2F7;
+  border-bottom: 0.5px solid rgba(0,0,0,0.1);
+  padding: 12px 16px 10px;
+  position: relative;
+  text-align: center;
+}
+
+.rr-imsg-back {
+  position: absolute;
+  left: 14px; top: 50%;
+  transform: translateY(-50%);
+  display: flex; align-items: center; gap: 3px;
+  color: #0A84FF;
+  font-size: 0.8rem; font-weight: 400;
+}
+
+.rr-imsg-actions {
+  position: absolute;
+  right: 14px; top: 50%;
+  transform: translateY(-50%);
+  display: flex; align-items: center; gap: 14px;
+  color: #0A84FF;
+}
+
+.rr-imsg-actions svg { width: 20px; height: 20px; }
+
+.rr-imsg-avatar {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8E8E93 0%, #636366 100%);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; font-weight: 600;
+  margin: 0 auto 4px;
+}
+
+.rr-imsg-name { font-size: 0.875rem; font-weight: 600; color: #0D1B2A; }
+.rr-imsg-sub  { font-size: 0.72rem; color: #6B7280; }
+
+.rr-imsg-thread {
+  background: #fff;
+  padding: 16px 16px 8px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+.rr-imsg-ts {
+  text-align: center;
+  font-size: 0.62rem;
+  color: #94A3B8;
+  margin-bottom: 8px;
+}
+
+.rr-imsg-row-out { display: flex; justify-content: flex-end; }
+
+.rr-imsg-bubble {
+  background: #0A84FF;
+  color: #fff;
+  border-radius: 18px 18px 4px 18px;
+  padding: 10px 14px;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  max-width: 86%;
+  word-break: break-word;
+}
+
+.rr-imsg-link {
+  display: block;
+  margin-top: 6px;
+  background: rgba(255,255,255,0.18);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.rr-imsg-sig {
+  display: block;
+  margin-top: 10px;
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.78);
+}
+
+.rr-imsg-delivered {
+  text-align: right;
+  font-size: 0.6rem;
+  color: #94A3B8;
+  margin-top: 2px;
+}
+
+.rr-imsg-compose {
+  border-top: 0.5px solid rgba(0,0,0,0.1);
+  background: #F2F2F7;
+  padding: 8px 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+
+.rr-imsg-compose-icon { color: #0A84FF; }
+.rr-imsg-compose-icon svg { width: 20px; height: 20px; }
+
+.rr-imsg-compose-field {
+  flex: 1;
+  background: #fff;
+  border: 0.5px solid rgba(0,0,0,0.15);
+  border-radius: 16px;
+  padding: 7px 12px;
+  font-size: 0.72rem;
+  color: #8E8E93;
+}
+
+.rr-imsg-send {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: #0A84FF;
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.rr-imsg-send svg { width: 13px; height: 13px; }
+
+/* Annotation chips below the hero card */
+.rr-chips {
+  display: flex; flex-direction: column; gap: 7px;
+  margin-top: 14px;
+}
+
+.rr-chip {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 0.72rem; color: #6B7280; font-weight: 500;
+}
+
+.rr-chip-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%; flex-shrink: 0;
+}
+
+.rr-chip-dot.orange { background: #F97316; }
+.rr-chip-dot.blue   { background: #0A84FF; }
+.rr-chip-dot.green  { background: #10B981; }
+.rr-chip-dot.navy   { background: #0C3D5C; }
+
+/* Step 2 mini dashboard preview */
+.rr-sdp {
+  margin-top: 16px;
+  background: #FDFDFD;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.rr-sdp-label {
+  font-size: 0.58rem; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase;
+  color: #6B7280; opacity: .6;
+  margin-bottom: 8px;
+}
+
+.rr-sdp-job  { font-size: 0.72rem; font-weight: 700; color: #0D1B2A; margin-bottom: 2px; }
+.rr-sdp-addr { font-size: 0.62rem; color: #6B7280; margin-bottom: 10px; }
+.rr-sdp-btns { display: flex; gap: 6px; }
+
+.rr-sdp-btn {
+  flex: 1; font-size: 0.6rem; font-weight: 600;
+  text-align: center; padding: 6px 4px; border-radius: 6px; cursor: default;
+}
+
+.rr-sdp-btn.ghost  { background: #fff; border: 1px solid #E5E7EB; color: #6B7280; }
+.rr-sdp-btn.orange { background: #F97316; color: #fff; animation: rr-sdp-pulse 2.4s ease-in-out infinite; }
+
+@keyframes rr-sdp-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(249,115,22,0); }
+  50%       { box-shadow: 0 0 0 4px rgba(249,115,22,0.22); }
+}
+
+/* ── Dark message preview section ── */
+.rr-msg-section {
+  background: #0D1B2A;
+  color: #fff;
+  padding: clamp(56px, 7vw, 88px) var(--px);
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.rr-msg-inner {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: start;
+}
+
+.rr-msg-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: #F97316;
+  margin-bottom: 16px;
+}
+
+.rr-msg-badge::before {
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
+  background: #F97316;
+  border-radius: 50%;
+}
+
+.rr-msg-copy h2 {
+  font-family: var(--serif);
+  font-size: clamp(1.6rem, 2.8vw, 2.2rem);
+  font-weight: 800; line-height: 1.2; margin-bottom: 20px;
+}
+
+.rr-msg-copy p {
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.68);
+  line-height: 1.75; margin-bottom: 16px;
+}
+
+.rr-msg-tabs { display: flex; gap: 6px; margin-top: 28px; }
+
+.rr-msg-tab {
+  padding: 8px 18px; border-radius: 8px;
+  font-size: 0.78rem; font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.05);
+  transition: all .18s;
+  font-family: var(--font);
+}
+
+.rr-msg-tab.active { background: #F97316; border-color: #F97316; color: #fff; }
+
+/* Message preview card */
+.rr-msg-card {
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 24px 56px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.rr-mc-header {
+  background: #F2F2F7; padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 0.5px solid rgba(0,0,0,0.12);
+}
+
+.rr-mc-recipient { font-size: 0.72rem; font-weight: 600; color: #000; }
+.rr-mc-recipient span { color: #8E8E93; font-weight: 400; }
+
+.rr-mc-chip {
+  background: #0A84FF; color: #fff;
+  font-size: 0.6rem; font-weight: 700;
+  padding: 3px 10px; border-radius: 12px;
+}
+
+.rr-mc-chip.mail { background: #34C759; }
+
+/* SMS view */
+.rr-mc-sms-body {
+  padding: 16px; background: #fff;
+  display: flex; justify-content: flex-end;
+}
+
+.rr-mc-sms-bubble {
+  background: #0A84FF; color: #fff;
+  border-radius: 18px 18px 4px 18px;
+  padding: 12px 16px;
+  font-size: 0.8rem; line-height: 1.65;
+  max-width: 88%; word-break: break-word;
+}
+
+.rr-mc-sms-bubble .rr-ann {
+  display: inline;
+  background: rgba(255,255,255,0.18);
+  border-radius: 4px; padding: 1px 5px;
+  font-size: 0.72rem; font-weight: 600;
+}
+
+.rr-mc-sms-bubble .rr-link {
+  display: block; margin-top: 6px;
+  background: rgba(255,255,255,0.14);
+  border-radius: 8px; padding: 5px 10px;
+  font-size: 0.72rem; font-weight: 500;
+}
+
+.rr-mc-sms-bubble .rr-sig {
+  display: block; margin-top: 10px;
+  font-size: 0.72rem; color: rgba(255,255,255,0.78);
+}
+
+/* Email view */
+.rr-mc-email-field {
+  padding: 9px 16px;
+  border-bottom: 0.5px solid #E5E7EB;
+  font-size: 0.72rem; color: #6B7280;
+  display: flex; gap: 8px;
+}
+
+.rr-mc-email-field strong { color: #0D1B2A; font-weight: 600; min-width: 44px; }
+
+.rr-mc-email-body {
+  padding: 14px 16px;
+  font-size: 0.8rem; line-height: 1.7; color: #0D1B2A;
+}
+
+.rr-mc-email-body .rr-ann {
+  display: inline;
+  background: rgba(249,115,22,0.1);
+  border: 1px solid rgba(249,115,22,0.2);
+  border-radius: 4px; padding: 1px 5px;
+  font-size: 0.72rem; font-weight: 600; color: #F97316;
+}
+
+.rr-mc-email-body .rr-link {
+  display: block; margin-top: 6px;
+  background: #F7F7F5; border: 1px solid #E5E7EB;
+  border-radius: 8px; padding: 5px 10px;
+  font-size: 0.72rem; font-weight: 500; color: #0C3D5C;
+}
+
+.rr-mc-email-body .rr-sig {
+  display: block; margin-top: 10px;
+  color: #6B7280; font-size: 0.72rem;
+}
+
+/* Shared annotation legend */
+.rr-mc-legend {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 16px;
+  background: #F7F7F5;
+  border-top: 1px solid #E5E7EB;
+}
+
+.rr-legend-item {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.68rem; color: #6B7280;
+}
+
+.rr-legend-dot {
+  width: 10px; height: 10px;
+  border-radius: 3px; flex-shrink: 0;
+}
+
+.rr-legend-dot.orange { background: rgba(249,115,22,0.25); border: 1px solid rgba(249,115,22,0.4); }
+.rr-legend-dot.blue   { background: rgba(10,132,255,0.18);  border: 1px solid rgba(10,132,255,0.3); }
+.rr-legend-dot.muted  { background: #F7F7F5; border: 1px solid #E5E7EB; }
+
+.rr-mc-edit-note {
+  margin-top: 14px;
+  font-size: 0.72rem; color: rgba(255,255,255,0.42);
+  font-style: italic; text-align: center;
+}
+
+/* Benefits section italic sub-line */
+.rr-benefits-sub {
+  font-size: 0.9rem; color: #6B7280;
+  margin-bottom: 36px; font-style: italic;
+}
+
+/* ── Scroll reveal ── */
+.rr-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+
+.rr-reveal.rr-visible { opacity: 1; transform: none; }
+.rr-delay-1 { transition-delay: 0.08s; }
+.rr-delay-2 { transition-delay: 0.16s; }
+
+/* ── Mobile ── */
+@media (max-width: 800px) {
+  .rr-msg-inner { grid-template-columns: 1fr; gap: 40px; }
+  .rr-imsg-card { max-width: 100%; }
+  .rr-chips { max-width: 100%; }
+}
