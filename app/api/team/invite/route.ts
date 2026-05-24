@@ -39,7 +39,8 @@ export async function POST(request: NextRequest) {
     }
 
     const invitationId = randomUUID()
-    const invitationRole = 'USER'
+    const validRoles = ['USER', 'ADMIN', 'OWNER']
+    const invitationRole = validRoles.includes(role) ? role : 'USER'
 
     await prisma.$executeRaw(
       Prisma.sql`

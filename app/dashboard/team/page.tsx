@@ -21,6 +21,7 @@ export default function TeamPage() {
   const [inviteRole, setInviteRole] = useState('USER')
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [inviteCopied, setInviteCopied] = useState(false)
+  const [inviteError, setInviteError] = useState('')
 
   useEffect(() => {
     fetchMembers()
@@ -42,6 +43,7 @@ export default function TeamPage() {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault()
+    setInviteError('')
     try {
       const response = await fetch('/api/team/invite', {
         method: 'POST',
@@ -54,9 +56,21 @@ export default function TeamPage() {
         setInviteLink(data.inviteUrl || null)
         setInviteCopied(false)
         fetchMembers()
+      } else {
+        const data = await response.json()
+        const msg = data.error || ''
+        if (msg === 'User already exists') {
+          setInviteError('This email already has an account.')
+        } else if (response.status === 403) {
+          setInviteError('You do not have permission to invite members.')
+        } else if (response.status === 401) {
+          setInviteError('You must be signed in to send invites.')
+        } else {
+          setInviteError('Invite failed. Please try again.')
+        }
       }
-    } catch (error) {
-      console.error('Error inviting member:', error)
+    } catch {
+      setInviteError('Something went wrong. Please try again.')
     }
   }
 
@@ -115,6 +129,11 @@ export default function TeamPage() {
             Invite
           </button>
         </form>
+        {inviteError && (
+          <div style={{ marginTop: 10, fontSize: 13, color: '#DC2626', fontWeight: 500 }}>
+            {inviteError}
+          </div>
+        )}
         {inviteLink && (
           <div className="db-invite-link-row">
             <span style={{ color: 'var(--green)', fontWeight: 700 }}>Invite link ready</span>
