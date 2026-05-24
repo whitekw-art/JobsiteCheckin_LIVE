@@ -49,7 +49,14 @@ export default function SignIn() {
       })
 
       if (result?.error) {
-        setError('Invalid email or password. Please try again.')
+        if (result.error.startsWith('RATE_LIMITED:')) {
+          const mins = result.error.split(':')[1]
+          setError(`locked:${mins}`)
+        } else if (result.error === 'WARN_1_ATTEMPT') {
+          setError('warn_1')
+        } else {
+          setError('invalid')
+        }
       } else {
         router.push('/dashboard')
       }
@@ -152,7 +159,29 @@ export default function SignIn() {
             </div>
           </div>
 
-          {error && <div className="reg-error">{error}</div>}
+          {error && (
+            <div className="reg-error">
+              {error === 'invalid' && (
+                <span>Invalid email or password. Please try again.</span>
+              )}
+              {error === 'warn_1' && (
+                <>
+                  <span>Incorrect email or password.</span>
+                  <span style={{ display: 'block', marginTop: 5, fontWeight: 700, fontSize: 12, letterSpacing: '0.01em' }}>
+                    1 attempt remaining before 15-minute lockout.
+                  </span>
+                </>
+              )}
+              {error.startsWith('locked:') && (
+                <>
+                  <span>Too many failed attempts. Account temporarily locked.</span>
+                  <span style={{ display: 'block', marginTop: 5, fontWeight: 700, fontSize: 12, letterSpacing: '0.01em' }}>
+                    Please try again in {error.split(':')[1]} minute{error.split(':')[1] === '1' ? '' : 's'}.
+                  </span>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Submit */}
           <div className="reg-submit-wrap">
