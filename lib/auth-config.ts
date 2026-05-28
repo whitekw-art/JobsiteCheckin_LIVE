@@ -56,7 +56,7 @@ export const authOptions: NextAuthOptions = {
           if (credentials.password.length < 8) return null
 
           const existingUser = await prisma.user.findUnique({
-            where: { email: credentials.email },
+            where: { email: credentials.email.toLowerCase() },
           })
           if (existingUser) return null
 
@@ -71,7 +71,7 @@ export const authOptions: NextAuthOptions = {
 
           const user = await prisma.user.create({
             data: {
-              email: credentials.email,
+              email: credentials.email.toLowerCase(),
               name: credentials.name,
               password: hashedPassword,
               role: organization ? 'OWNER' : 'USER',
