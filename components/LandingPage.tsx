@@ -27,7 +27,7 @@ const faqs: FaqItem[] = [
   },
   {
     q: 'How is this different from posting on Google myself?',
-    a: "Posting yourself means gathering photos, writing copy, logging in, and doing it after every job. Most contractors try for two weeks and stop. ProjectCheckin makes it one step your crew handles at the job site — so it happens every job, without you thinking about it.",
+    a: "Posting yourself means gathering photos, writing copy, logging in, and doing it after every job. Most businesses try for two weeks and stop. ProjectCheckin makes it one step your crew handles at the job site — so it happens every job, without you thinking about it.",
   },
   {
     q: 'Is there a contract or commitment?',
@@ -43,10 +43,10 @@ const faqs: FaqItem[] = [
   },
   {
     q: 'How do I get more Google reviews from customers?',
-    a: "The biggest reason contractors don't get reviews is they never ask — or they ask too late. ProjectCheckin sends a personalized review request to your customer automatically after each job is published, while the work is still fresh. Text or email, one tap, pre-written. Most contractors see more review conversations in their first month than they did all year.",
+    a: "The biggest reason most businesses don't get reviews is they never ask — or they ask too late. ProjectCheckin sends a personalized review request to your customer automatically after each job is published, while the work is still fresh. Text or email, one tap, pre-written. Most businesses see more review conversations in their first month than they did all year.",
   },
   {
-    q: 'How do I get my contracting business to show up on Google?',
+    q: 'How do I get my service business to show up on Google?',
     a: 'Google ranks local businesses that are active, documented, and reviewed. Every job you publish through ProjectCheckin creates a location-specific page Google can index, a Google Business Profile post showing recent activity, and a review request to your customer. Do that consistently and your Google presence builds with every job your crew completes.',
   },
 ]
@@ -320,11 +320,11 @@ export default function LandingPage({ registrationOpen = false }: { registration
         <div className="hero-inner">
           <h1 className="hero-h1 r">
             <span className="h1-line1">Show your best work.</span>
-            <span className="h1-line2"><em>Win your best clients.</em></span>
+            <span className="h1-line2"><em>Win your best customers.</em></span>
           </h1>
           <div className="hero-bottom r d2">
             <p className="hero-sub">
-              Turn every completed job into a marketing presence that finds your next customer — without any extra effort.
+              Turn every completed job into a marketing presence that finds your next customer.
             </p>
             <div className="hero-cta-col">
               {registrationOpen ? (
@@ -339,7 +339,7 @@ export default function LandingPage({ registrationOpen = false }: { registration
               {!registrationOpen && (
                 <div className="spots-note">
                   <span className="spots-dot"></span>
-                  20 founding spots remaining
+                  Founding spots available
                 </div>
               )}
               <div className="trust-row">
@@ -452,13 +452,13 @@ export default function LandingPage({ registrationOpen = false }: { registration
       <section className="stats">
         <div className="stats-inner">
           <div className="stat r">
-            <span className="stat-n">54%</span>
-            <div className="stat-lbl">of homeowners struggle to find a qualified contractor</div>
-            <div className="stat-src">Angi, 2025</div>
+            <span className="stat-n">57%</span>
+            <div className="stat-lbl">of consumers won&apos;t hire a business with under 4 stars on Google</div>
+            <div className="stat-src">BrightLocal, 2023</div>
           </div>
           <div className="stat r d1">
             <span className="stat-n">81%</span>
-            <div className="stat-lbl">of customers check Google before calling a contractor</div>
+            <div className="stat-lbl">of customers research on Google before contacting a local business</div>
             <div className="stat-src">BrightLocal, 2024</div>
           </div>
           <div className="stat r d2">
@@ -535,9 +535,50 @@ export default function LandingPage({ registrationOpen = false }: { registration
                   <span className="bac-ghost-dot"></span>
                 </div>
                 <div className="bac-ghost-body">
-                  <div className="bac-ghost-phone">
-                    <div className="bac-ghost-overlay"></div>
-                    <div className="bac-ghost-viewfinder"></div>
+                  <div className="ghost-phone-wrap">
+                    <div className="ghost-phone">
+                      <div className="ghost-notch" />
+                      <div className="ghost-screen">
+                        <div className="ghost-live-feed" />
+                        <div className="ghost-overlay" />
+                        <div className="ghost-reticle">
+                          <span className="rct rct-tl" />
+                          <span className="rct rct-tr" />
+                          <span className="rct rct-bl" />
+                          <span className="rct rct-br" />
+                        </div>
+                        <div className="ghost-top-bar">
+                          <div className="ios-icon-btn">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M13 2L4.5 13.5H11L10 22L19.5 10H13L13 2Z" />
+                            </svg>
+                          </div>
+                          <div className="ios-icon-btn">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                              <circle cx="5" cy="12" r="1.5" />
+                              <circle cx="12" cy="12" r="1.5" />
+                              <circle cx="19" cy="12" r="1.5" />
+                            </svg>
+                          </div>
+                        </div>
+                        <div className="ghost-bottom-area">
+                          <div className="ghost-zoom-row">
+                            <div className="ios-zoom-pill">1×</div>
+                          </div>
+                          <div className="ghost-bottom-bar">
+                            <div className="ios-thumb" />
+                            <div className="ios-shutter" />
+                            <div className="ios-flip">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M1 4v6h6" />
+                                <path d="M23 20v-6h-6" />
+                                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   <div className="bac-ghost-copy">
                     <p><strong>Add a photo later?</strong> The ghost camera overlays the before photo semi-transparently in your viewfinder so your crew lines up the same angle every time — no guessing.</p>
@@ -636,7 +677,7 @@ export default function LandingPage({ registrationOpen = false }: { registration
               <div className="hs-visual">
                 <div className="step-photo-wrap">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/images/lp-contractor-checkin.png" alt="Contractor checking in at job site" />
+                  <img src="/images/lp-contractor-checkin.png" alt="Field crew checking in at job site" />
                   <div className="step-photo-badge">
                     <span className="spb-dot"></span>
                     <div>
@@ -866,10 +907,10 @@ export default function LandingPage({ registrationOpen = false }: { registration
               </div>
             </div>
             <div className="asp-m">
-              <div className="asp-m-num">4<span>x</span></div>
+              <div className="asp-m-num">30<span>+</span></div>
               <div>
-                <div className="asp-m-t">More review conversations started</div>
-                <div className="asp-m-s">Follow-up goes out after every published job, no manual effort</div>
+                <div className="asp-m-t">Review requests sent</div>
+                <div className="asp-m-s">One pre-written request goes out after every published job</div>
               </div>
             </div>
           </div>

@@ -17,7 +17,7 @@ const WITHOUT = [
   { title: 'Thin or blank descriptions hurt SEO', body: "Google has nothing to rank. Homeowners have nothing to read." },
   { title: 'Owner has to write or edit every page', body: 'Another task on the list that never gets done.' },
   { title: 'Inconsistent content across your portfolio', body: "Some pages look great. Most don't." },
-  { title: 'Schema, alt text, and internal links left to you', body: 'Most contractors skip it entirely. Pages without structured data rank worse and get ignored by AI platforms.' },
+  { title: 'Schema, alt text, and internal links left to you', body: 'Most businesses skip it entirely. Pages without structured data rank worse and get ignored by AI platforms.' },
 ]
 
 const WITH = [
@@ -235,7 +235,7 @@ export default function AICopywriterAgent() {
               {[
                 { title: 'Location-specific from the first sentence', body: "City, street address, and neighborhood baked in — the way Google's local search algorithm expects it." },
                 { title: 'Materials and scope from the photos', body: 'Reads what was actually used and what was done — not generic filler copy about the trade.' },
-                { title: 'Professional tone, contractor voice', body: 'Written to sound like an experienced contractor wrote it — not like marketing copy or AI boilerplate.' },
+                { title: 'Professional tone, not AI boilerplate', body: 'Written to sound like someone experienced in the trade wrote it — specific, confident, direct.' },
                 { title: 'Editable before it publishes', body: "You always review before anything goes live. Change a word or the whole thing — it's your page." },
                 { title: 'Schema, alt text, and internal links at every publish', body: 'Structured data, image captions from photo analysis, and links to related jobs in the same city and trade — added automatically. Nothing to configure.' },
               ].map(({ title, body }) => (

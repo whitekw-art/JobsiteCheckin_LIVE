@@ -9,7 +9,7 @@ const benefits = [
     num: '01',
     title: 'Branded Search Presence',
     teaser: 'When a prospect Googles your company name after getting a quote, a professional page with real job photos appears in results.',
-    body: 'Before calling, most prospects do a quick search. A Local Job Page gives them something professional to land on — real photos, your business name, your location, and a direct way to contact you. This works on day one, before you\'ve published dozens of jobs. A contractor with no website still looks credible because Google returns a well-structured page from a real job.',
+    body: 'Before calling, most prospects do a quick search. A Local Job Page gives them something professional to land on — real photos, your business name, your location, and a direct way to contact you. This works on day one, before you\'ve published dozens of jobs. A service business with no website still looks credible because Google returns a well-structured page from a real job.',
   },
   {
     num: '02',
@@ -21,7 +21,7 @@ const benefits = [
     num: '03',
     title: 'Structured Data — Schema Markup',
     teaser: 'Every page is automatically tagged so Google understands your business, service type, exact location, and photos — without guessing.',
-    body: 'Each Local Job Page includes JSON-LD schema markup — LocalBusiness, Service, ImageObject, and GeoCoordinates — embedded automatically on every publish. This tells Google exactly who you are, what you did, where you did it, and what the result looked like. Most contractor websites have no schema markup at all. Structured data is one of the few ranking factors Google explicitly confirms in its own documentation.',
+    body: 'Each Local Job Page includes JSON-LD schema markup — LocalBusiness, Service, ImageObject, and GeoCoordinates — embedded automatically on every publish. This tells Google exactly who you are, what you did, where you did it, and what the result looked like. Most service business websites have no schema markup at all. Structured data is one of the few ranking factors Google explicitly confirms in its own documentation.',
   },
   {
     num: '04',
@@ -39,7 +39,7 @@ const benefits = [
     num: '06',
     title: 'Permanent, Compounding Content Library',
     teaser: 'Each page you publish is a permanent indexed asset. 200 jobs over 18 months = 200 location-specific pages with your name on them.',
-    body: 'Each Local Job Page doesn\'t disappear when the job is done — it stays indexed and continues to accumulate value. A competitor with a 5-page website can\'t replicate this without hiring an agency to produce content or building the same tool themselves. The library you build over 12–18 months becomes hard to replicate. A contractor who starts publishing today builds a lead that competitors can\'t quickly close.',
+    body: 'Each Local Job Page doesn\'t disappear when the job is done — it stays indexed and continues to accumulate value. A competitor with a 5-page website can\'t replicate this without hiring an agency to produce content or building the same tool themselves. The library you build over 12–18 months becomes hard to replicate. A service business that starts publishing today builds a lead that competitors can\'t quickly close.',
   },
   {
     num: '07',

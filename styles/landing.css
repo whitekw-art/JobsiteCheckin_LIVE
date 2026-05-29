@@ -379,12 +379,34 @@ nav {
 .bac-ghost-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.5); }
 .bac-ghost-dot { width: 6px; height: 6px; border-radius: 50%; background: #EF4444; }
 .bac-ghost-body { padding: 16px; display: flex; align-items: center; gap: 14px; }
-.bac-ghost-phone { width: 64px; height: 108px; border-radius: 10px; background: #0D1B2A; border: 1.5px solid rgba(255,255,255,0.12); flex-shrink: 0; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-.bac-ghost-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, #8B7355 0%, #6B5840 100%); opacity: 0.35; }
-.bac-ghost-viewfinder { position: relative; z-index: 1; width: 32px; height: 32px; border: 1.5px solid rgba(255,255,255,0.7); border-radius: 4px; }
-.bac-ghost-viewfinder::before, .bac-ghost-viewfinder::after { content: ''; position: absolute; top: 50%; left: 50%; width: 10px; height: 1px; background: rgba(255,255,255,0.6); transform: translate(-50%,-50%); }
-.bac-ghost-viewfinder::after { transform: translate(-50%,-50%) rotate(90deg); width: 1px; height: 10px; }
 .bac-ghost-copy { flex: 1; }
+
+/* Scoped ghost phone — landing page bento card */
+.bac-ghost-body .ghost-phone-wrap { display: flex; justify-content: center; align-items: center; zoom: 0.56; flex-shrink: 0; }
+.bac-ghost-body .ghost-phone { width: 220px; background: linear-gradient(160deg, #52525A 0%, #3E3E45 45%, #2E2E34 100%); border-radius: 36px; padding: 9px; position: relative; box-shadow: 0 0 0 1px rgba(255,255,255,0.22), 0 0 0 2.5px #111116, inset 0 1px 0 rgba(255,255,255,0.18), 0 32px 64px rgba(0,0,0,0.8), 0 8px 24px rgba(0,0,0,0.55); }
+.bac-ghost-body .ghost-phone::before { content: ''; position: absolute; left: -5px; top: 72px; width: 4px; height: 28px; background: linear-gradient(to right, #3A3A40, #50505A); border-radius: 2px 0 0 2px; box-shadow: 0 38px 0 #3A3A40, 0 70px 0 #3A3A40; }
+.bac-ghost-body .ghost-phone::after { content: ''; position: absolute; right: -5px; top: 96px; width: 4px; height: 44px; background: linear-gradient(to left, #3A3A40, #50505A); border-radius: 0 2px 2px 0; }
+.bac-ghost-body .ghost-screen { background: #1C2A3A; border-radius: 28px; overflow: hidden; aspect-ratio: 9/16; position: relative; display: flex; align-items: flex-end; }
+.bac-ghost-body .ghost-live-feed { position: absolute; inset: 0; background-image: url('/images/lp-bac-after-door.png'); background-size: cover; background-repeat: no-repeat; background-position: 54% 46%; }
+.bac-ghost-body .ghost-overlay { position: absolute; inset: 0; background-image: url('/images/lp-bac-before-door.png'); background-size: cover; background-repeat: no-repeat; background-position: 50% 50%; opacity: 0.55; }
+.bac-ghost-body .ghost-reticle { position: absolute; inset: 10% 8%; pointer-events: none; z-index: 10; }
+.bac-ghost-body .rct { position: absolute; width: 16px; height: 16px; border-color: rgba(255,255,255,0.9); border-style: solid; }
+.bac-ghost-body .rct-tl { top: 0; left: 0; border-width: 2px 0 0 2px; }
+.bac-ghost-body .rct-tr { top: 0; right: 0; border-width: 2px 2px 0 0; }
+.bac-ghost-body .rct-bl { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+.bac-ghost-body .rct-br { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+.bac-ghost-body .ghost-top-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 20; padding: 38px 14px 8px; display: flex; justify-content: space-between; align-items: center; }
+.bac-ghost-body .ios-icon-btn { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.92); }
+.bac-ghost-body .ios-icon-btn svg { width: 16px; height: 16px; }
+.bac-ghost-body .ghost-bottom-area { position: absolute; bottom: 0; left: 0; right: 0; z-index: 20; }
+.bac-ghost-body .ghost-zoom-row { display: flex; justify-content: center; margin-bottom: 6px; }
+.bac-ghost-body .ios-zoom-pill { background: rgba(0,0,0,0.42); color: rgba(255,255,255,0.9); font-size: 0.52rem; font-weight: 700; padding: 3px 10px; border-radius: 12px; backdrop-filter: blur(8px); letter-spacing: .04em; }
+.bac-ghost-body .ghost-bottom-bar { background: rgba(0,0,0,0.58); backdrop-filter: blur(16px); padding: 10px 18px 14px; display: flex; align-items: center; justify-content: space-between; }
+.bac-ghost-body .ios-thumb { width: 34px; height: 34px; border-radius: 6px; background-image: url('/images/lp-bac-before-door.png'); background-size: cover; background-position: center; border: 1.5px solid rgba(255,255,255,0.65); flex-shrink: 0; }
+.bac-ghost-body .ios-shutter { width: 52px; height: 52px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.9); background: rgba(255,255,255,0.92); flex-shrink: 0; }
+.bac-ghost-body .ios-flip { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.85); flex-shrink: 0; }
+.bac-ghost-body .ios-flip svg { width: 20px; height: 20px; }
+.bac-ghost-body .ghost-notch { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 68px; height: 22px; background: #050508; border-radius: 12px; z-index: 10; }
 .bac-ghost-copy p { font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.55; margin: 0; }
 .bac-ghost-copy strong { color: rgba(255,255,255,0.85); font-weight: 600; }
 

@@ -366,9 +366,9 @@ export default function BeforeAfter() {
             <div className="stat-source">ProjectCheckin</div>
           </div>
           <div>
-            <div className="stat-number"><em>54</em>%</div>
-            <div className="stat-desc">of homeowners say they struggle to find contractors they can trust to do quality work.</div>
-            <div className="stat-source">Angi State of Home Spending 2025</div>
+            <div className="stat-number"><em>57</em>%</div>
+            <div className="stat-desc">of consumers won&apos;t hire a business with under 4 stars on Google.</div>
+            <div className="stat-source">BrightLocal, 2023</div>
           </div>
         </div>
       </div>

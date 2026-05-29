@@ -9,7 +9,7 @@ const benefits = [
     num: '01',
     title: 'Google Rewards Active Listings',
     teaser: 'Businesses that post regularly to their GBP show up more often in local search results and the Google Maps local pack.',
-    body: "Google's local ranking algorithm weighs engagement signals — how often a business updates its profile, adds photos, and posts content. Most contractors create a GBP listing and never touch it again. Regular job posts directly address that gap. Every post is a signal that you're active, working, and present in the areas you serve. Consistency over time is what moves the needle — not a single burst of posts.",
+    body: "Google's local ranking algorithm weighs engagement signals — how often a business updates its profile, adds photos, and posts content. Most businesses create a GBP listing and never touch it again. Regular job posts directly address that gap. Every post is a signal that you're active, working, and present in the areas you serve. Consistency over time is what moves the needle — not a single burst of posts.",
   },
   {
     num: '02',
@@ -33,19 +33,19 @@ const benefits = [
     num: '05',
     title: 'Posts Drive Traffic to Your Full Job Page',
     teaser: 'Each GBP post links to the full Local Job Page — more photos, more detail, and a direct path for interested homeowners to contact you.',
-    body: 'A GBP post shows one photo and a short caption — enough to get attention. The "See the full project" link takes interested homeowners to the full Local Job Page: all the photos, the job notes, the exact location, and a direct call-to-action to contact you. The GBP post creates the first impression; the job page handles the close. Most contractors have no landing page behind their GBP. Yours does.',
+    body: 'A GBP post shows one photo and a short caption — enough to get attention. The "See the full project" link takes interested homeowners to the full Local Job Page: all the photos, the job notes, the exact location, and a direct call-to-action to contact you. The GBP post creates the first impression; the job page handles the close. Most businesses have no landing page behind their GBP. Yours does.',
   },
   {
     num: '06',
     title: 'No Google Login Every Time',
     teaser: 'Connect once. Post from your ProjectCheckin dashboard as many times as you want — no switching apps, no passwords, no interruptions.',
-    body: "Most contractors who try to post to their GBP manually give up because logging into Google's Business Profile tools is cumbersome — especially mid-day from a phone on a job site. After a one-time Google account connection in your ProjectCheckin account settings, posting is a single button click from the same dashboard you already use. No context switching. No loading a separate app. The friction is eliminated, which is the only reason consistent posting ever actually happens.",
+    body: "Most businesses that try to post to their GBP manually give up because logging into Google's Business Profile tools is cumbersome — especially mid-day from a phone on a job site. After a one-time Google account connection in your ProjectCheckin account settings, posting is a single button click from the same dashboard you already use. No context switching. No loading a separate app. The friction is eliminated, which is the only reason consistent posting ever actually happens.",
   },
   {
     num: '07',
     title: 'The 7-Day Window Works in Your Favor',
     teaser: "Google Posts expire after 7 days — which means a post-per-job cadence keeps your listing permanently fresh, not permanently stale.",
-    body: "The expiration that frustrates contractors who post manually is an advantage for contractors who post consistently. A business that posts every time they publish a job always has a current post showing. A business that doesn't — or that posts once and stops — shows nothing. If a competitor's last GBP post was four months ago, your listing showing last week's job is a direct contrast. The 7-day limit keeps the bar clear: to stay visible, you have to keep working and keep posting. You already do the work. ProjectCheckin handles the rest.",
+    body: "The expiration that frustrates businesses that post manually is an advantage for businesses that post consistently. A business that posts every time they publish a job always has a current post showing. A business that doesn't — or that posts once and stops — shows nothing. If a competitor's last GBP post was four months ago, your listing showing last week's job is a direct contrast. The 7-day limit keeps the bar clear: to stay visible, you have to keep working and keep posting. You already do the work. ProjectCheckin handles the rest.",
   },
   {
     num: '08',
@@ -70,7 +70,7 @@ const faqs = [
   },
   {
     q: 'GBP posts expire after 7 days — is that a problem?',
-    a: "No — it works in your favor. If you publish one job per week, your Google Business Profile always shows a fresh post from the current week. The 7-day window means consistent job publishing translates directly into a constantly updated listing. Google rewards active profiles with better placement in local results. Contractors who post once and stop show nothing. Yours shows last week's job.",
+    a: "No — it works in your favor. If you publish one job per week, your Google Business Profile always shows a fresh post from the current week. The 7-day window means consistent job publishing translates directly into a constantly updated listing. Google rewards active profiles with better placement in local results. Businesses that post once and stop show nothing. Yours shows last week's job.",
   },
   {
     q: 'How is this different from Local Job Pages?',
@@ -78,7 +78,7 @@ const faqs = [
   },
   {
     q: 'Which plans include GBP posting?',
-    a: "GBP posting is available on Pro, Elite, and Titan plans. Pro and Elite plans post links back to the full job page on projectcheckin.com. Titan plans post links to the job page on the contractor's own domain — so the traffic and any SEO credit from that click goes to their own website instead of ours.",
+    a: "GBP posting is available on Pro, Elite, and Titan plans. Pro and Elite plans post links back to the full job page on projectcheckin.com. Titan plans post links to the job page on your own domain — so the traffic and any SEO credit from that click goes to your own website instead of ours.",
   },
   {
     q: "What if I don't have a Google Business Profile set up yet?",
