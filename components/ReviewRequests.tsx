@@ -120,7 +120,7 @@ export default function ReviewRequests() {
           <div className="hero-copy">
             <h1>Happy customers don&apos;t leave reviews. Until you ask.</h1>
             <p>
-              Most contractors finish a job and move on. The ones with 50 five-star reviews
+              Most businesses finish a job and move on. The ones with 50 five-star reviews
               did one thing different — they asked. One tap from your dashboard sends a
               message from your own phone, with your Google review link already in it.
             </p>
@@ -386,7 +386,7 @@ export default function ReviewRequests() {
         <div className="benefits-inner">
           <div className="section-label">What you get</div>
           <div className="section-title" style={{ marginBottom: '16px' }}>
-            Why most contractors have fewer reviews than they deserve.
+            Why most businesses have fewer reviews than they deserve.
           </div>
           <p className="rr-benefits-sub">
             Your competitors with 4.8 stars aren&apos;t doing better work. They&apos;re asking.
