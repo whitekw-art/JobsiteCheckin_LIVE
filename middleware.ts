@@ -79,9 +79,9 @@ if (
       token.onboardingComplete === false &&
       token.role !== 'SUPER_ADMIN' &&
       !pathname.startsWith('/dashboard') &&
+      !pathname.startsWith('/subscribe') &&
       !pathname.startsWith('/pricing') &&
       !pathname.startsWith('/payments') &&
-
       !pathname.startsWith('/auth/') &&
       pathname !== '/' &&
       pathname !== ''
