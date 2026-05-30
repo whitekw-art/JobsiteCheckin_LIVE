@@ -17,6 +17,12 @@ export const metadata: Metadata = {
     siteName: 'ProjectCheckin',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'AI Review Request Agent — Personalized Review Texts & Replies',
+    description:
+      'Your AI agent writes a personalized review request from your job data and handles replies automatically. Complaints escalate to you immediately.',
+  },
 }
 
 const breadcrumbJsonLd = {

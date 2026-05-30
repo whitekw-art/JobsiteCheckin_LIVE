@@ -59,7 +59,56 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     }))
 
+  const staticEntries: MetadataRoute.Sitemap = [
+    {
+      url: `${baseUrl}/`,
+      changeFrequency: 'weekly',
+      priority: 1.0,
+    },
+    {
+      url: `${baseUrl}/pricing`,
+      changeFrequency: 'monthly',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/features/local-job-pages`,
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/features/review-requests`,
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/features/gbp-post-generator`,
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/features/portfolio`,
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/features/before-after`,
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/features/ai-copywriter`,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/features/ai-review-request`,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+  ]
+
   return [
+    ...staticEntries,
     ...jobEntries,
     ...portfolioEntries,
   ]

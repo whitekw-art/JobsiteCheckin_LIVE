@@ -17,6 +17,12 @@ export const metadata: Metadata = {
     siteName: 'ProjectCheckin',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Before & After Photos — Show Transformations That Close Jobs',
+    description:
+      'Your crew tags a photo Before and After on every job. ProjectCheckin pairs them and publishes a drag-to-reveal slider on the public job page automatically.',
+  },
 }
 
 const breadcrumbJsonLd = {

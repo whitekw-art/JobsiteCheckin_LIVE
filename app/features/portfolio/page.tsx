@@ -17,6 +17,12 @@ export const metadata: Metadata = {
     siteName: 'ProjectCheckin',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Job Portfolio — Share Every Completed Job with One Link',
+    description:
+      'Every job you publish automatically appears in a public portfolio at your own ProjectCheckin URL. Send one link to any potential customer.',
+  },
 }
 
 const breadcrumbJsonLd = {
