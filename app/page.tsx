@@ -5,14 +5,22 @@ import LandingPage from '@/components/LandingPage'
 export const metadata: Metadata = {
   title: 'ProjectCheckin \u2014 Turn Every Job Into Your Next Customer | Free to Join',
   description:
-    'Every job your crew completes becomes a searchable page that brings in the next customer. Free to join the waitlist. ProjectCheckin turns completed jobs into automatic Google pages for contractors.',
+    'Every job your crew completes becomes a searchable page that brings in the next customer. Free to join the waitlist. ProjectCheckin turns completed jobs into automatic Google pages for field service businesses.',
   alternates: { canonical: 'https://projectcheckin.com/' },
   openGraph: {
     title: 'ProjectCheckin \u2014 Turn Every Job Into Your Next Customer | Free to Join',
     description:
-      'Every job your crew completes becomes a searchable page that brings in the next customer. Free to join the waitlist. ProjectCheckin turns completed jobs into automatic Google pages for contractors.',
+      'Every job your crew completes becomes a searchable page that brings in the next customer. Free to join the waitlist. ProjectCheckin turns completed jobs into automatic Google pages for field service businesses.',
     url: 'https://projectcheckin.com/',
     siteName: 'ProjectCheckin',
+    images: [{ url: '/og/og-default-v1.png', width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ProjectCheckin \u2014 Turn Every Job Into Your Next Customer | Free to Join',
+    description:
+      'Every job your crew completes becomes a searchable page that brings in the next customer. Free to join the waitlist.',
+    images: ['/og/og-default-v1.png'],
   },
 }
 
@@ -22,26 +30,42 @@ const faqJsonLd = {
   mainEntity: [
     {
       '@type': 'Question',
-      name: 'Does my crew need a smartphone?',
+      name: 'Does my crew need to download an app?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'No. Your crew can check in from any smartphone on the job, but it\'s not required. Photos can be taken with any camera and uploaded later from a computer. The check-in form runs in any browser — phone, tablet, or desktop.',
+        text: 'No download required. Your crew opens a link in a mobile browser, takes photos, adds a description, and submits. Most people are running in under two minutes.',
       },
     },
     {
       '@type': 'Question',
-      name: 'Do I need a website to use this?',
+      name: 'How does the GBP posting work?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'No. Every published job gets its own page on our domain — customers can find you on Google without you having a website at all. If you do have a website, our Pro tier lets you embed those pages directly on your site too.',
+        text: 'After each job is published, ProjectCheckin generates a GBP post for you — formatted and ready. You copy it and paste it into your GBP. Takes about 30 seconds. Full auto-posting is coming in a future update.',
       },
     },
     {
       '@type': 'Question',
-      name: 'How many jobs do we need to see results?',
+      name: 'What trades does this work for?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Consistency matters more than volume. Every check-in creates a permanent, indexed page with your business name and location on it. A job or two a week builds a library of pages that compounds over time — the more you publish, the stronger your presence grows.',
+        text: 'Any field service business where the work is done on-site and can be photographed. Roofing, flooring, painting, HVAC, landscaping, plumbing, electrical, remodeling — if your crew goes to a job site, it works.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What\'s the difference between a project page and my portfolio?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Every job gets its own project page — a standalone before/after link you can send in a quote. Your portfolio is the full library of all published jobs as a public-facing showcase.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How is this different from posting on Google myself?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Posting yourself means gathering photos, writing copy, logging in, and doing it after every job. Most contractors try for two weeks and stop. ProjectCheckin makes it one step your crew handles at the job site — so it happens every job, without you thinking about it.',
       },
     },
     {
@@ -49,63 +73,39 @@ const faqJsonLd = {
       name: 'Is there a contract or commitment?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'No contract, no commitment, no cancellation fees. Cancel any time from your account page. You keep every page and every photo you\'ve published — they stay indexed on Google even after you cancel.',
+        text: 'No contract, no commitment. Cancel anytime from your account settings. You keep every project page and portfolio entry you\'ve published — they stay live as long as you\'re a subscriber.',
       },
     },
     {
       '@type': 'Question',
-      name: 'Can I control which jobs get published?',
+      name: 'My crew isn\'t tech-savvy. Will they actually use this?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Yes. Every job starts private. You review it and publish when you\'re ready. You can edit, unpublish, or keep any job internal at any time. Your crew checks in; you decide what goes on Google.',
+        text: 'No app to download, no account to create. You send your crew a link — they open it in their phone browser, take photos, add a quick note, and hit submit. Most crews are doing it on their first job. If they can text, they can do this.',
       },
     },
     {
       '@type': 'Question',
-      name: 'Can I cancel anytime?',
+      name: 'How long does it take to get set up?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Yes. Month-to-month. No contracts. No cancellation fees. Cancel any time from your account — takes 30 seconds.',
+        text: 'Under 10 minutes. Create your account, add your business info, and send your crew the check-in link. Your first job can be published the same day.',
       },
     },
     {
       '@type': 'Question',
-      name: 'How does my job page actually show up on Google?',
+      name: 'How do I get more Google reviews from customers?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Each job your crew checks in becomes a live web page at its own URL — built with your business name, location, service type, and job photos. Google indexes these pages the same way it indexes any other website. Most pages start appearing in search results within a few days of publishing.',
+        text: 'The biggest reason contractors don\'t get reviews is they never ask — or they ask too late. ProjectCheckin sends a personalized review request to your customer automatically after each job is published, while the work is still fresh. Text or email, one tap, pre-written. Most contractors see more review conversations in their first month than they did all year.',
       },
     },
     {
       '@type': 'Question',
-      name: 'What trades and industries does this work for?',
+      name: 'How do I get my contracting business to show up on Google?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Any trade that does work at customer locations — door and window companies, HVAC, plumbing, roofing, flooring, painting, electrical, landscaping, and more. If you do jobs at job sites and want those jobs showing up when local customers search, this was built for you.',
-      },
-    },
-    {
-      '@type': 'Question',
-      name: 'Do I need to know anything about SEO to use this?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Nothing. Every job page is built with search-optimized structure, local schema markup, and your job details automatically applied. That covers traditional Google search — and we also optimize for AI search tools like ChatGPT and Perplexity, which are increasingly where customers find local businesses. You check in — we handle all of it.',
-      },
-    },
-    {
-      '@type': 'Question',
-      name: 'How is this different from just having a website?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'A website is one page that rarely changes. ProjectCheckin creates a new page for every job — each one targeting the specific search terms a customer uses when they need exactly what you just completed. More pages means more ways Google can find you for more searches.',
-      },
-    },
-    {
-      '@type': 'Question',
-      name: 'What happens to my job pages if I cancel?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Your published job pages stay live for 30 days after cancellation so you don\'t lose rankings overnight. After that, the pages are taken offline. We\'ll make sure you can retain everything — your job history, notes, and photos — before anything disappears.',
+        text: 'Google ranks local businesses that are active, documented, and reviewed. Every job you publish through ProjectCheckin creates a location-specific page Google can index, a Google Business Profile post showing recent activity, and a review request to your customer. Do that consistently and your Google presence builds with every job your crew completes.',
       },
     },
   ],

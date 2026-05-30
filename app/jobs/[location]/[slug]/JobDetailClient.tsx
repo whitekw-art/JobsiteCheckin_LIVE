@@ -191,13 +191,15 @@ function BeforeAfterReveal({ beforeUrl, afterUrl }: { beforeUrl: string; afterUr
       style={{
         position: 'relative',
         width: '100%',
-        aspectRatio: '16/9',
+        aspectRatio: '4/3',
         overflow: 'hidden',
         cursor: 'ew-resize',
-        borderRadius: 12,
         userSelect: 'none',
         background: '#000',
         touchAction: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
       {/* After photo (base layer) */}
@@ -206,7 +208,7 @@ function BeforeAfterReveal({ beforeUrl, afterUrl }: { beforeUrl: string; afterUr
         src={afterUrl}
         alt="After"
         draggable={false}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }}
       />
       {/* Before photo (clipped) */}
       <div
@@ -221,7 +223,7 @@ function BeforeAfterReveal({ beforeUrl, afterUrl }: { beforeUrl: string; afterUr
           src={beforeUrl}
           alt="Before"
           draggable={false}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
         />
       </div>
       {/* Divider line */}
@@ -419,31 +421,111 @@ export default function JobDetailClient({
             </div>
           ) : (
             <>
-              {/* Featured photo */}
-              <button
-                onClick={() => handlePhotoClick(featuredIndex)}
-                className="w-full rounded-xl overflow-hidden cursor-pointer block relative group"
-                style={{ border: '1px solid rgba(255,255,255,0.08)' }}
-                type="button"
-                aria-label="Open photo lightbox"
+              {/* Photo carousel — peek layout on lg+, simple on mobile */}
+              <div
+                className="relative overflow-hidden rounded-xl"
+                style={{
+                  height: 'min(65vh, 520px)',
+                  background: '#080e0b',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                }}
               >
-                <div className="relative" style={{ height: 'min(60vh, 500px)', background: '#080e0b' }}>
+                {/* Left peek zone — lg+ only */}
+                {photos.length > 1 && (
+                  <button
+                    type="button"
+                    className="hidden lg:flex absolute left-0 top-0 h-full z-[3] cursor-pointer items-center justify-center"
+                    style={{ width: '17%', padding: '0 10px' }}
+                    onClick={() => setFeaturedIndex((featuredIndex - 1 + photos.length) % photos.length)}
+                    aria-label="Previous photo"
+                  >
+                    <div style={{ position: 'relative', width: '100%', height: '72%', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.14)', background: '#080e0b' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={photos[(featuredIndex - 1 + photos.length) % photos.length]}
+                        alt=""
+                        aria-hidden="true"
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: 0.55 }}
+                      />
+                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.38)', pointerEvents: 'none' }} />
+                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                        <ChevronLeftIcon className="w-5 h-5 text-white" />
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {/* Right peek zone — lg+ only */}
+                {photos.length > 1 && (
+                  <button
+                    type="button"
+                    className="hidden lg:flex absolute right-0 top-0 h-full z-[3] cursor-pointer items-center justify-center"
+                    style={{ width: '17%', padding: '0 10px' }}
+                    onClick={() => setFeaturedIndex((featuredIndex + 1) % photos.length)}
+                    aria-label="Next photo"
+                  >
+                    <div style={{ position: 'relative', width: '100%', height: '72%', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.14)', background: '#080e0b' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={photos[(featuredIndex + 1) % photos.length]}
+                        alt=""
+                        aria-hidden="true"
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: 0.55 }}
+                      />
+                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.38)', pointerEvents: 'none' }} />
+                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                        <ChevronRightIcon className="w-5 h-5 text-white" />
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {/* Center image — object-contain, inset by peek width on lg+ */}
+                <button
+                  type="button"
+                  onClick={() => handlePhotoClick(featuredIndex)}
+                  className="absolute inset-0 lg:left-[17%] lg:right-[17%] group z-[2] flex items-center justify-center overflow-hidden cursor-pointer"
+                  aria-label="Open photo lightbox"
+                >
                   <Image
                     src={photos[featuredIndex]}
                     alt={`${photoAltBase} - photo ${featuredIndex + 1}`}
                     fill
-                    className="object-contain md:object-cover"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 76rem"
+                    className="object-contain"
+                    sizes="(max-width: 1024px) 100vw, 66vw"
                     priority
                   />
-                  {/* Hover overlay */}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center pointer-events-none">
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/50 text-white text-sm font-medium px-4 py-2 rounded-lg backdrop-blur-sm">
                       View all photos ({photos.length})
                     </span>
                   </div>
-                </div>
-              </button>
+                </button>
+
+                {/* Arrows — narrow viewports only; peek zones handle nav on lg+ */}
+                {photos.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      className="lg:hidden absolute left-3 top-1/2 -translate-y-1/2 z-[10] w-9 h-9 flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors duration-200 cursor-pointer"
+                      style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(6px)' }}
+                      onClick={() => setFeaturedIndex((featuredIndex - 1 + photos.length) % photos.length)}
+                      aria-label="Previous photo"
+                    >
+                      <ChevronLeftIcon className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      className="lg:hidden absolute right-3 top-1/2 -translate-y-1/2 z-[10] w-9 h-9 flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors duration-200 cursor-pointer"
+                      style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(6px)' }}
+                      onClick={() => setFeaturedIndex((featuredIndex + 1) % photos.length)}
+                      aria-label="Next photo"
+                    >
+                      <ChevronRightIcon className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
+              </div>
 
               {/* Thumbnail strip */}
               {photos.length > 1 && (
@@ -485,20 +567,6 @@ export default function JobDetailClient({
       </section>
 
       {/* ============================================
-          SECTION B2: Before/After Reveal (when both set)
-          ============================================ */}
-      {canBeforeAfter && beforePhotoUrl && afterPhotoUrl && (
-        <section style={{ background: '#080e0b', padding: '0 0 24px' }}>
-          <div className="max-w-[76rem] mx-auto px-5 sm:px-8">
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-              Before &amp; After — drag to compare
-            </p>
-            <BeforeAfterReveal beforeUrl={beforePhotoUrl} afterUrl={afterPhotoUrl} />
-          </div>
-        </section>
-      )}
-
-      {/* ============================================
           SECTION C: Job Details (lighter background)
           ============================================ */}
       <JobDetailsSection
@@ -512,6 +580,9 @@ export default function JobDetailClient({
         businessName={businessName}
         businessPhone={businessPhone}
         normalizedWebsite={normalizedWebsite}
+        canBeforeAfter={canBeforeAfter}
+        beforePhotoUrl={beforePhotoUrl}
+        afterPhotoUrl={afterPhotoUrl}
       />
 
       {/* ============================================
@@ -590,6 +661,9 @@ function JobDetailsSection({
   businessName,
   businessPhone,
   normalizedWebsite,
+  canBeforeAfter,
+  beforePhotoUrl,
+  afterPhotoUrl,
 }: {
   title: string
   doorType: string
@@ -601,6 +675,9 @@ function JobDetailsSection({
   businessName: string
   businessPhone: string
   normalizedWebsite: string
+  canBeforeAfter: boolean
+  beforePhotoUrl: string | null
+  afterPhotoUrl: string | null
 }) {
   const { ref, inView } = useInView()
 
@@ -655,6 +732,8 @@ function JobDetailsSection({
                   style={{
                     borderLeft: '3px solid',
                     borderImage: 'linear-gradient(to bottom, #e8a83a, #d4912a) 1',
+                    overflowWrap: 'break-word',
+                    wordBreak: 'break-word',
                   }}
                 >
                   {notes}
@@ -663,51 +742,67 @@ function JobDetailsSection({
             )}
           </div>
 
-          {/* Right column: contact card */}
+          {/* Right column: contact card + before/after */}
           <div className="lg:w-[340px] shrink-0">
-            <div
-              className="lg:sticky lg:top-24 rounded-xl p-6"
-              style={{
-                background: 'rgba(255,255,255,0.85)',
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-                border: '1px solid rgba(0,0,0,0.06)',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)',
-              }}
-            >
-              <p className="font-display font-bold text-surface-900 text-lg">
-                {businessName}
-              </p>
-              <p className="text-[0.82rem] text-surface-500 mt-1">
-                Professional door installation
-              </p>
+            <div className="lg:sticky lg:top-6 flex flex-col gap-4">
+              {/* Contact card */}
+              <div
+                className="rounded-xl p-4"
+                style={{
+                  background: 'rgba(255,255,255,0.85)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)',
+                }}
+              >
+                <p className="font-display font-bold text-surface-900 text-lg">
+                  {businessName}
+                </p>
+                <p className="text-[0.82rem] text-surface-500 mt-0.5">
+                  Professional door installation
+                </p>
 
-              <div className="mt-5 space-y-2.5">
-                {businessPhone && (
-                  <JobPhoneLink
-                    checkInId={checkInId}
-                    href={`tel:${businessPhone.replace(/[^0-9+]/g, '')}`}
-                    label="Get a Free Estimate"
-                    className="w-full inline-flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-500 text-white font-semibold px-5 py-3 rounded-lg text-[0.88rem] min-h-[44px] hover:-translate-y-px transition-all duration-200"
-                  />
-                )}
-                {businessPhone && (
-                  <JobPhoneLink
-                    checkInId={checkInId}
-                    href={`tel:${businessPhone.replace(/[^0-9+]/g, '')}`}
-                    label={businessPhone}
-                    className="w-full inline-flex items-center justify-center gap-2 text-surface-700 font-medium px-5 py-2.5 rounded-lg text-[0.85rem] min-h-[44px] transition-all duration-200 border border-surface-200 hover:border-primary-300 hover:text-primary-700"
-                  />
-                )}
-                {normalizedWebsite && (
-                  <JobWebsiteLink
-                    checkInId={checkInId}
-                    href={normalizedWebsite}
-                    label="Visit Website"
-                    className="w-full inline-flex items-center justify-center gap-2 text-surface-700 font-medium px-5 py-2.5 rounded-lg text-[0.85rem] min-h-[44px] transition-all duration-200 border border-surface-200 hover:border-primary-300 hover:text-primary-700"
-                  />
-                )}
+                <div className="mt-3 space-y-2">
+                  {businessPhone && (
+                    <JobPhoneLink
+                      checkInId={checkInId}
+                      href={`tel:${businessPhone.replace(/[^0-9+]/g, '')}`}
+                      label="Get a Free Estimate"
+                      className="w-full inline-flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-500 text-white font-semibold px-5 py-3 rounded-lg text-[0.88rem] min-h-[44px] hover:-translate-y-px transition-all duration-200"
+                    />
+                  )}
+                  {businessPhone && (
+                    <JobPhoneLink
+                      checkInId={checkInId}
+                      href={`tel:${businessPhone.replace(/[^0-9+]/g, '')}`}
+                      label={businessPhone}
+                      className="w-full inline-flex items-center justify-center gap-2 text-surface-700 font-medium px-5 py-2.5 rounded-lg text-[0.85rem] min-h-[44px] transition-all duration-200 border border-surface-200 hover:border-primary-300 hover:text-primary-700"
+                    />
+                  )}
+                  {normalizedWebsite && (
+                    <JobWebsiteLink
+                      checkInId={checkInId}
+                      href={normalizedWebsite}
+                      label="Visit Website"
+                      className="w-full inline-flex items-center justify-center gap-2 text-surface-700 font-medium px-5 py-2.5 rounded-lg text-[0.85rem] min-h-[44px] transition-all duration-200 border border-surface-200 hover:border-primary-300 hover:text-primary-700"
+                    />
+                  )}
+                </div>
               </div>
+
+              {/* Before/After card */}
+              {canBeforeAfter && beforePhotoUrl && afterPhotoUrl && (
+                <div
+                  className="rounded-xl overflow-hidden"
+                  style={{
+                    border: '1px solid rgba(0,0,0,0.06)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <BeforeAfterReveal beforeUrl={beforePhotoUrl} afterUrl={afterPhotoUrl} />
+                </div>
+              )}
             </div>
           </div>
         </div>

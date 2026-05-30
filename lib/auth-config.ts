@@ -34,12 +34,20 @@ export const authOptions: NextAuthOptions = {
 
         // Rate limit by email — 5 attempts per 15 minutes
         // Fail open: if Upstash is unavailable, allow login rather than blocking all users
+        let rlRemaining: number | null = null
+        let rlReset: number | null = null
         try {
-          const { success } = await loginRatelimit.limit(
+          const { success, remaining, reset } = await loginRatelimit.limit(
             `email:${credentials.email.toLowerCase()}`
           )
-          if (!success) return null
-        } catch {
+          if (!success) {
+            const mins = Math.max(1, Math.ceil((reset - Date.now()) / 60000))
+            throw new Error(`RATE_LIMITED:${mins}`)
+          }
+          rlRemaining = remaining
+          rlReset = reset
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith('RATE_LIMITED')) throw e
           // Upstash unavailable — fail open, login proceeds normally
         }
 
@@ -48,7 +56,7 @@ export const authOptions: NextAuthOptions = {
           if (credentials.password.length < 8) return null
 
           const existingUser = await prisma.user.findUnique({
-            where: { email: credentials.email },
+            where: { email: credentials.email.toLowerCase() },
           })
           if (existingUser) return null
 
@@ -63,7 +71,7 @@ export const authOptions: NextAuthOptions = {
 
           const user = await prisma.user.create({
             data: {
-              email: credentials.email,
+              email: credentials.email.toLowerCase(),
               name: credentials.name,
               password: hashedPassword,
               role: organization ? 'OWNER' : 'USER',
@@ -85,7 +93,14 @@ export const authOptions: NextAuthOptions = {
           if (!user || !user.password) return null
 
           const isValid = await bcrypt.compare(credentials.password, user.password)
-          if (!isValid) return null
+          if (!isValid) {
+            if (rlRemaining === 1) throw new Error('WARN_1_ATTEMPT')
+            if (rlRemaining === 0) {
+              const mins = rlReset ? Math.max(1, Math.ceil((rlReset - Date.now()) / 60000)) : 15
+              throw new Error(`RATE_LIMITED:${mins}`)
+            }
+            return null
+          }
 
           return {
             id: user.id,

@@ -5,9 +5,10 @@ import Providers from '@/components/Providers'
 import Navigation from '@/components/Navigation'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://projectcheckin.com'),
   title: 'ProjectCheckin',
   description: 'Automatic job pages and local SEO for field service businesses.',
-   verification: {
+  verification: {
     google: 'XqifA49nAacc21QeSSWjavqCfJM1v_l-1vj8vibmR2k',
   },
 }
