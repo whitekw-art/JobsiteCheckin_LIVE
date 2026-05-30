@@ -16,12 +16,14 @@ export const metadata: Metadata = {
     url: 'https://projectcheckin.com/features/ai-copywriter',
     siteName: 'ProjectCheckin',
     type: 'website',
+    images: [{ url: '/og/og-default-v1.png', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'AI Copywriter Agent — Photos In, Published Pages Out',
     description:
       'Your crew submits photos. Your AI copywriting agent reads every image and writes a complete, keyword-rich job description — ready to review and publish.',
+    images: ['/og/og-default-v1.png'],
   },
 }
 

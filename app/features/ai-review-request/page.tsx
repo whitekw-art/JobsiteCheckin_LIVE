@@ -16,12 +16,14 @@ export const metadata: Metadata = {
     url: 'https://projectcheckin.com/features/ai-review-request',
     siteName: 'ProjectCheckin',
     type: 'website',
+    images: [{ url: '/og/og-default-v1.png', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'AI Review Request Agent — Personalized Review Texts & Replies',
     description:
       'Your AI agent writes a personalized review request from your job data and handles replies automatically. Complaints escalate to you immediately.',
+    images: ['/og/og-default-v1.png'],
   },
 }
 

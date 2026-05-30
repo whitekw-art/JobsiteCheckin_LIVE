@@ -16,12 +16,14 @@ export const metadata: Metadata = {
     url: 'https://projectcheckin.com/features/gbp-post-generator',
     siteName: 'ProjectCheckin',
     type: 'website',
+    images: [{ url: '/og/og-default-v1.png', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'GBP Post Generator — Post Completed Jobs to Google Business Profile',
     description:
       'Every job you publish can post to your Google Business Profile automatically. One button from your dashboard — ProjectCheckin writes the caption, attaches the photo, and posts it.',
+    images: ['/og/og-default-v1.png'],
   },
 }
 

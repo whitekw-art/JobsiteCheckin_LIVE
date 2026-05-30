@@ -16,12 +16,14 @@ export const metadata: Metadata = {
     url: 'https://projectcheckin.com/features/review-requests',
     siteName: 'ProjectCheckin',
     type: 'website',
+    images: [{ url: '/og/og-default-v1.png', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Review Requests — Get More Google Reviews After Every Job',
     description:
       'One tap from your dashboard sends a pre-written review request from your own phone number, with your Google review link already included. No platform fees.',
+    images: ['/og/og-default-v1.png'],
   },
 }
 
