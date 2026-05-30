@@ -162,7 +162,7 @@ function RegisterForm() {
           }
           stripeKeys.forEach(k => localStorage.removeItem(k))
         } catch { /* private browsing */ }
-        window.location.href = '/pricing'
+        window.location.href = '/subscribe'
       } else {
         window.location.href = `/auth/signin?email=${encodeURIComponent(normEmail)}`
       }
