@@ -61,13 +61,14 @@ if (
       !token.planTier &&
       token.onboardingComplete === false &&
       token.role === 'OWNER' &&
+      !pathname.startsWith('/subscribe') &&
       !pathname.startsWith('/pricing') &&
       !pathname.startsWith('/payments') &&
       !pathname.startsWith('/auth/') &&
       pathname !== '/' &&
       pathname !== ''
     ) {
-      return NextResponse.redirect(new URL('/pricing', req.url))
+      return NextResponse.redirect(new URL('/subscribe', req.url))
     }
 
     // Onboarding gate — if the owner/admin hasn't completed onboarding,
