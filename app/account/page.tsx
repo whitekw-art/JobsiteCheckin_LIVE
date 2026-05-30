@@ -235,12 +235,12 @@ export default function AccountPage() {
       const res = await fetch('/api/billing/portal', { method: 'POST' })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
-        window.location.href = '/pricing'
+        window.location.href = '/subscribe'
         return
       }
       window.location.href = data.url
     } catch {
-      window.location.href = '/pricing'
+      window.location.href = '/subscribe'
     }
   }
 
@@ -402,7 +402,7 @@ export default function AccountPage() {
 
               {planTier === 'free' ? (
                 <a
-                  href="/pricing"
+                  href="/subscribe"
                   className="db-shell-btn"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
                 >
