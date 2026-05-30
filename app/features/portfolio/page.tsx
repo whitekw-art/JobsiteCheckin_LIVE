@@ -16,12 +16,14 @@ export const metadata: Metadata = {
     url: 'https://projectcheckin.com/features/portfolio',
     siteName: 'ProjectCheckin',
     type: 'website',
+    images: [{ url: '/og/og-default-v1.png', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Job Portfolio — Share Every Completed Job with One Link',
     description:
       'Every job you publish automatically appears in a public portfolio at your own ProjectCheckin URL. Send one link to any potential customer.',
+    images: ['/og/og-default-v1.png'],
   },
 }
 

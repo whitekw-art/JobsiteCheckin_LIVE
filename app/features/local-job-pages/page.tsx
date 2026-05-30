@@ -16,12 +16,14 @@ export const metadata: Metadata = {
     url: 'https://projectcheckin.com/features/local-job-pages',
     siteName: 'ProjectCheckin',
     type: 'website',
+    images: [{ url: '/og/og-default-v1.png', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Local Job Pages — Every Job Creates a Searchable Page',
     description:
       'Every completed job becomes an indexed Google page with your photos, location, and business info. Automatic local presence, zero extra work from your team.',
+    images: ['/og/og-default-v1.png'],
   },
 }
 

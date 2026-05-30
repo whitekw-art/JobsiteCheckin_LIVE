@@ -13,12 +13,14 @@ export const metadata: Metadata = {
       'Every job your crew completes becomes a searchable page that brings in the next customer. Free to join the waitlist. ProjectCheckin turns completed jobs into automatic Google pages for field service businesses.',
     url: 'https://projectcheckin.com/',
     siteName: 'ProjectCheckin',
+    images: [{ url: '/og/og-default-v1.png', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'ProjectCheckin \u2014 Turn Every Job Into Your Next Customer | Free to Join',
     description:
       'Every job your crew completes becomes a searchable page that brings in the next customer. Free to join the waitlist.',
+    images: ['/og/og-default-v1.png'],
   },
 }
 

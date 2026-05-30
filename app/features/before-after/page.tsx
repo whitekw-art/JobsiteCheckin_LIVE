@@ -16,12 +16,14 @@ export const metadata: Metadata = {
     url: 'https://projectcheckin.com/features/before-after',
     siteName: 'ProjectCheckin',
     type: 'website',
+    images: [{ url: '/og/og-default-v1.png', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Before & After Photos — Show Transformations That Close Jobs',
     description:
       'Your crew tags a photo Before and After on every job. ProjectCheckin pairs them and publishes a drag-to-reveal slider on the public job page automatically.',
+    images: ['/og/og-default-v1.png'],
   },
 }
 
