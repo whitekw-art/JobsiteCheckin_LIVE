@@ -17,6 +17,12 @@ export const metadata: Metadata = {
     siteName: 'ProjectCheckin',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'GBP Post Generator — Post Completed Jobs to Google Business Profile',
+    description:
+      'Every job you publish can post to your Google Business Profile automatically. One button from your dashboard — ProjectCheckin writes the caption, attaches the photo, and posts it.',
+  },
 }
 
 const breadcrumbJsonLd = {

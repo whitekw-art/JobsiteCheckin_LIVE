@@ -17,6 +17,12 @@ export const metadata: Metadata = {
     siteName: 'ProjectCheckin',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'AI Copywriter Agent — Photos In, Published Pages Out',
+    description:
+      'Your crew submits photos. Your AI copywriting agent reads every image and writes a complete, keyword-rich job description — ready to review and publish.',
+  },
 }
 
 const breadcrumbJsonLd = {
