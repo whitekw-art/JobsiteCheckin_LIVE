@@ -7,18 +7,30 @@ const POLL_INTERVAL_MS = 2000
 const MAX_ATTEMPTS = 10 // ~20 seconds
 
 export default function PaymentSuccessPage() {
-  const { update } = useSession()
+  const { update, status } = useSession()
   const attempts = useRef(0)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    if (status === 'loading') return
+
+    if (status === 'unauthenticated') {
+      // Session cookie lost during Stripe checkout redirect — send user to sign in.
+      // Webhook fires within seconds; by the time they sign in planTier is set.
+      timerRef.current = setTimeout(() => {
+        window.location.href = '/auth/signin?callbackUrl=/dashboard'
+      }, 3000)
+      return () => {
+        if (timerRef.current) clearTimeout(timerRef.current)
+      }
+    }
+
     async function checkPlanTier() {
       try {
         const res = await fetch('/api/billing/plan-status')
         const data = await res.json()
 
         if (data.planTier) {
-          // planTier confirmed in DB — refresh JWT then navigate
           await update()
           window.location.href = '/dashboard'
           return
@@ -30,7 +42,6 @@ export default function PaymentSuccessPage() {
       attempts.current += 1
 
       if (attempts.current >= MAX_ATTEMPTS) {
-        // Give up waiting — go anyway, middleware will re-evaluate
         await update()
         window.location.href = '/dashboard'
         return
@@ -39,13 +50,12 @@ export default function PaymentSuccessPage() {
       timerRef.current = setTimeout(checkPlanTier, POLL_INTERVAL_MS)
     }
 
-    // Start first check after a short delay to give webhook time to fire
     timerRef.current = setTimeout(checkPlanTier, 1000)
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <main style={{
