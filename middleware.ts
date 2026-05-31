@@ -49,6 +49,7 @@ if (
   pathname !== '/' &&
   pathname !== '' &&
   !pathname.startsWith('/api/waitlist') &&
+  !pathname.startsWith('/payments') &&
   !isPublicAssetPath
 ) {
   return NextResponse.redirect(new URL('/auth/signin', req.url))
