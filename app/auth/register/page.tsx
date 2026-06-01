@@ -272,7 +272,7 @@ function RegisterForm() {
                     id="reg-first"
                     type="text"
                     className="reg-input"
-                    placeholder="Tom"
+                    placeholder="First name"
                     autoComplete="given-name"
                     value={firstName}
                     onChange={e => setFirstName(e.target.value)}
@@ -287,7 +287,7 @@ function RegisterForm() {
                     id="reg-last"
                     type="text"
                     className="reg-input"
-                    placeholder="Wilson"
+                    placeholder="Last name"
                     autoComplete="family-name"
                     value={lastName}
                     onChange={e => setLastName(e.target.value)}
