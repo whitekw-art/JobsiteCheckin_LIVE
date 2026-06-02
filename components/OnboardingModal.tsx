@@ -35,9 +35,9 @@ const PLAN_LABELS: Record<string, string> = {
 
 const PLAN_FEATURES: Record<string, string[]> = {
   free:  ['Job check-ins with photos (up to 5 per job)', 'Up to 5 published job pages on Google', 'Basic dashboard'],
-  pro:   ['Unlimited published job pages with full SEO', 'Portfolio page', 'Analytics & click tracking', 'Remove "Powered by" branding'],
-  elite: ['Everything in Pro', 'Auto-formatted Google Business Profile posts', 'Post-job review requests', 'Review tracking'],
-  titan: ['Everything in Elite', 'Geo-grid rank tracking', 'Multi-location support', 'Priority support'],
+  pro:   ['Unlimited published job pages with full SEO', 'Portfolio page', 'Analytics & click tracking', 'Google Business Profile post generator'],
+  elite: ['Everything in Pro', 'Auto-formatted Google Business Profile posts', 'Professional before & after images', 'Ghost camera overlay', 'Drag-to-reveal widget'],
+  titan: ['Everything in Elite', 'Automatic Google Business review requests', 'Custom AI copywriting agent', 'Custom AI Review Request Manager', 'Custom subdomain & white-label branding'],
 }
 
 interface Props {
@@ -45,8 +45,19 @@ interface Props {
   orgSlug?: string | null
 }
 
+const ONBOARDING_STEP_KEY = 'pc_onboarding_step'
+
 export default function OnboardingModal({ planTier, orgSlug }: Props) {
-  const [step, setStep] = useState(1)
+  const [step, setStepState] = useState<number>(() => {
+    if (typeof window === 'undefined') return 1
+    const saved = parseInt(localStorage.getItem(ONBOARDING_STEP_KEY) || '1', 10)
+    return (saved >= 1 && saved <= 5) ? saved : 1
+  })
+
+  const setStep = (n: number) => {
+    localStorage.setItem(ONBOARDING_STEP_KEY, String(n))
+    setStepState(n)
+  }
 
   // Step 4 — GBP review link
   const [gbpReviewLink,  setGbpReviewLink]  = useState('')
@@ -141,7 +152,9 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
     }
   }
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
+    localStorage.removeItem(ONBOARDING_STEP_KEY)
+    await fetch('/api/auth/session')
     window.location.href = '/dashboard'
   }
 

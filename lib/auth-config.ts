@@ -120,7 +120,7 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as string
         session.user.organizationId = token.organizationId as string
         session.user.orgSlug = token.orgSlug as string | null
-        session.user.onboardingComplete = token.onboardingComplete ?? true
+        session.user.onboardingComplete = token.onboardingComplete ?? false
         session.user.planTier = token.planTier as string | null
         if (token.companyName) {
           session.user.companyName = token.companyName as string
@@ -147,7 +147,7 @@ export const authOptions: NextAuthOptions = {
           token.organizationId = dbUser.organizationId
           token.companyName = dbUser.organization?.name
           token.orgSlug = dbUser.organization?.slug
-          token.onboardingComplete = dbUser.organization?.onboardingComplete ?? true
+          token.onboardingComplete = dbUser.organization?.onboardingComplete ?? false
           token.planTier = dbUser.organization?.planTier ?? null
         }
       } catch (error) {
