@@ -64,7 +64,6 @@ export async function PATCH(request: NextRequest) {
         website:           normalizeWebsite(website),
         trade:             trade?.trim() || null,
         howHeardAbout:     howHeardAbout?.trim() || null,
-        onboardingComplete: true,
       },
       select: {
         name: true,

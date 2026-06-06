@@ -97,6 +97,15 @@ export default function MarketingNav() {
         <div className={`nav-right${navOpen ? ' open' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Link href="/auth/signin" className="btn-ghost nav-signin" onClick={closeAll}>Sign In /</Link>
           <Link href="/auth/register" className="btn-ghost" onClick={closeAll}>Register</Link>
+          <a
+            href="https://calendly.com/whitekw92/30min"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-sm-link"
+            onClick={closeAll}
+          >
+            Book a Demo
+          </a>
         </div>
 
         <button

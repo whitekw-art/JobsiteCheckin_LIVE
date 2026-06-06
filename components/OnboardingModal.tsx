@@ -153,8 +153,8 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
   }
 
   const handleFinish = async () => {
+    await fetch('/api/organization/complete-onboarding', { method: 'POST' })
     localStorage.removeItem(ONBOARDING_STEP_KEY)
-    await fetch('/api/auth/session')
     window.location.href = '/dashboard'
   }
 

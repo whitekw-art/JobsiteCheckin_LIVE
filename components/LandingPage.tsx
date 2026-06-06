@@ -1056,6 +1056,14 @@ export default function LandingPage({ registrationOpen = false }: { registration
             </button>
           )}
           <p className="final-sub r d3">No credit card required &middot; Cancel anytime</p>
+          <a
+            href="https://calendly.com/whitekw92/30min"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-demo-ghost r d4"
+          >
+            Book a Demo →
+          </a>
         </div>
       </section>
 
