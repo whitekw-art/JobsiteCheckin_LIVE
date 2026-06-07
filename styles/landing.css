@@ -183,6 +183,8 @@ nav {
 .btn-sm:hover { background: var(--orange-h); }
 .btn-sm-link { height: 36px; padding: 0 18px; background: var(--orange); color: white; font-family: var(--font); font-size: 13px; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; transition: background 150ms; text-decoration: none; }
 .btn-sm-link:hover { background: var(--orange-h); color: white; }
+.btn-demo-ghost { height: 52px; padding: 0 34px; background: transparent; color: var(--orange); font-family: var(--font); font-size: 15px; font-weight: 700; border-radius: 12px; border: 2px solid var(--orange); display: inline-flex; align-items: center; gap: 8px; text-decoration: none; white-space: nowrap; transition: border-color 150ms, background 150ms; }
+.btn-demo-ghost:hover { background: rgba(249,115,22,0.1); color: var(--orange); }
 
 /* Hamburger — mobile nav */
 .nav-hamburger {
@@ -383,6 +385,9 @@ nav {
 
 /* Scoped ghost phone — landing page bento card */
 .bac-ghost-body .ghost-phone-wrap { display: flex; justify-content: center; align-items: center; zoom: 0.56; flex-shrink: 0; }
+@supports not (zoom: 1) {
+  .bac-ghost-body .ghost-phone-wrap { zoom: unset; transform: scale(0.56); transform-origin: top center; }
+}
 .bac-ghost-body .ghost-phone { width: 220px; background: linear-gradient(160deg, #52525A 0%, #3E3E45 45%, #2E2E34 100%); border-radius: 36px; padding: 9px; position: relative; box-shadow: 0 0 0 1px rgba(255,255,255,0.22), 0 0 0 2.5px #111116, inset 0 1px 0 rgba(255,255,255,0.18), 0 32px 64px rgba(0,0,0,0.8), 0 8px 24px rgba(0,0,0,0.55); }
 .bac-ghost-body .ghost-phone::before { content: ''; position: absolute; left: -5px; top: 72px; width: 4px; height: 28px; background: linear-gradient(to right, #3A3A40, #50505A); border-radius: 2px 0 0 2px; box-shadow: 0 38px 0 #3A3A40, 0 70px 0 #3A3A40; }
 .bac-ghost-body .ghost-phone::after { content: ''; position: absolute; right: -5px; top: 96px; width: 4px; height: 44px; background: linear-gradient(to left, #3A3A40, #50505A); border-radius: 0 2px 2px 0; }
@@ -688,6 +693,7 @@ footer { background:#07283D;padding:44px 0; position: relative; z-index: 1; }
   .nav-link { display: none; }
   .nav-feat-wrap { display: none; }
   .btn-ghost { display: none; }
+  .btn-sm-link { display: none; }
   .nav-hamburger { display: flex; }
   .nav-links.open { display: flex; flex-direction: column; align-items: flex-start; gap: 0; position: fixed; top: 60px; left: 0; right: 0; background: rgba(255,255,255,0.97); border-bottom: 1px solid var(--border); padding: 16px var(--px) 24px; backdrop-filter: blur(16px); z-index: 99; }
   .nav-links.open .nav-link { display: block; font-size: 16px; padding: 10px 0; border-bottom: 1px solid var(--border); width: 100%; }
@@ -714,6 +720,8 @@ footer { background:#07283D;padding:44px 0; position: relative; z-index: 1; }
   .stats-inner { grid-template-columns: 1fr 1fr; }
   .hero { padding-top: calc(60px + 56px); padding-bottom: 48px; }
   .hero-visual-wrap { padding: 0 16px; margin-top: 40px; }
+  .dash-side { display: none; }
+  .dash-ui { grid-template-columns: 1fr; }
   .jobs-g { grid-template-columns: repeat(2,1fr); }
   .how-step { padding: 40px 0; }
   .final { padding: 80px var(--px); }

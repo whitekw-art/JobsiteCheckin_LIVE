@@ -183,7 +183,7 @@ export default function AcceptInvitePage() {
             <input
               type="text"
               className="w-full p-3 border rounded text-sm"
-              placeholder="Tom"
+              placeholder="First name"
               autoComplete="given-name"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
@@ -195,7 +195,7 @@ export default function AcceptInvitePage() {
             <input
               type="text"
               className="w-full p-3 border rounded text-sm"
-              placeholder="Wilson"
+              placeholder="Last name"
               autoComplete="family-name"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}

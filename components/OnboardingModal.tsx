@@ -1,8 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useState, useEffect } from 'react'
 
 const TRADES = [
   'Door Installation',
@@ -37,9 +35,9 @@ const PLAN_LABELS: Record<string, string> = {
 
 const PLAN_FEATURES: Record<string, string[]> = {
   free:  ['Job check-ins with photos (up to 5 per job)', 'Up to 5 published job pages on Google', 'Basic dashboard'],
-  pro:   ['Unlimited published job pages with full SEO', 'Portfolio page', 'Analytics & click tracking', 'Remove "Powered by" branding'],
-  elite: ['Everything in Pro', 'Auto-formatted Google Business Profile posts', 'Post-job review requests', 'Review tracking'],
-  titan: ['Everything in Elite', 'Geo-grid rank tracking', 'Multi-location support', 'Priority support'],
+  pro:   ['Unlimited published job pages with full SEO', 'Portfolio page', 'Analytics & click tracking', 'Google Business Profile post generator'],
+  elite: ['Everything in Pro', 'Auto-formatted Google Business Profile posts', 'Professional before & after images', 'Ghost camera overlay', 'Drag-to-reveal widget'],
+  titan: ['Everything in Elite', 'Automatic Google Business review requests', 'Custom AI copywriting agent', 'Custom AI Review Request Manager', 'Custom subdomain & white-label branding'],
 }
 
 interface Props {
@@ -47,18 +45,24 @@ interface Props {
   orgSlug?: string | null
 }
 
+const ONBOARDING_STEP_KEY = 'pc_onboarding_step'
+
 export default function OnboardingModal({ planTier, orgSlug }: Props) {
-  const router = useRouter()
-  const [step, setStep] = useState(1)
+  const [step, setStepState] = useState<number>(() => {
+    if (typeof window === 'undefined') return 1
+    const saved = parseInt(localStorage.getItem(ONBOARDING_STEP_KEY) || '1', 10)
+    return (saved >= 1 && saved <= 5) ? saved : 1
+  })
 
-  // Step 3 GBP state (localStorage-backed, Phase 1)
-  const [gbpConnected, setGbpConnected] = useState(false)
-
-  function handleGbpConnect() {
-    const next = !gbpConnected
-    setGbpConnected(next)
-    try { localStorage.setItem('gbp_connected', String(next)) } catch {}
+  const setStep = (n: number) => {
+    localStorage.setItem(ONBOARDING_STEP_KEY, String(n))
+    setStepState(n)
   }
+
+  // Step 4 — GBP review link
+  const [gbpReviewLink,  setGbpReviewLink]  = useState('')
+  const [gbpLinkSaving,  setGbpLinkSaving]  = useState(false)
+  const [gbpLinkError,   setGbpLinkError]   = useState<string | null>(null)
 
   // Step 2 form state
   const [bizName,      setBizName]      = useState('')
@@ -116,9 +120,42 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
     }
   }
 
-  const handleFinish = () => {
-    // Full reload so the server re-reads onboardingComplete = true from DB
-    // and the modal doesn't re-render
+  const handleGbpLinkSave = async () => {
+    const link = gbpReviewLink.trim()
+    if (!link) { setStep(5); return }
+
+    const isValid =
+      link.startsWith('https://g.page/r/') ||
+      link.startsWith('https://search.google.com/local/writereview')
+    if (!isValid) {
+      setGbpLinkError('Link must start with https://g.page/r/ or https://search.google.com/local/writereview')
+      return
+    }
+
+    setGbpLinkSaving(true)
+    setGbpLinkError(null)
+    try {
+      const res = await fetch('/api/organization/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gbpReviewLink: link }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || 'Failed to save. Please try again.')
+      }
+      setStep(5)
+    } catch (err: any) {
+      setGbpLinkError(err.message)
+    } finally {
+      setGbpLinkSaving(false)
+    }
+  }
+
+  const handleFinish = async () => {
+    await fetch('/api/organization/complete-onboarding', { method: 'POST' })
+    await fetch('/api/auth/session')
+    localStorage.removeItem(ONBOARDING_STEP_KEY)
     window.location.href = '/dashboard'
   }
 
@@ -127,13 +164,12 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
   const features = PLAN_FEATURES[tier] || PLAN_FEATURES.free
 
   return (
-    // Backdrop — pointer-events: none so clicks pass through to nothing interactive
     <div style={styles.backdrop} aria-modal="true" role="dialog" aria-label="Account setup">
       <div style={styles.modal}>
 
-        {/* Progress dots */}
+        {/* Progress dots — 5 steps */}
         <div style={styles.dots}>
-          {[1,2,3,4].map(n => (
+          {[1,2,3,4,5].map(n => (
             <div key={n} style={{ ...styles.dot, ...(n === step ? styles.dotActive : n < step ? styles.dotDone : {}) }} />
           ))}
         </div>
@@ -157,7 +193,9 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
               {features.map(f => (
                 <li key={f} style={styles.featureItem}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                    stroke="#059669" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    stroke="#059669" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: 2 }}>
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
                   <span>{f}</span>
                 </li>
               ))}
@@ -184,7 +222,6 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
 
             <div style={styles.form}>
 
-              {/* Business name */}
               <div style={styles.field}>
                 <label style={styles.label} htmlFor="ob-name">
                   Business name <span style={styles.required}>*</span>
@@ -193,7 +230,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                   id="ob-name"
                   type="text"
                   style={styles.input}
-                  placeholder="Wilson's Door Company"
+                  placeholder="Your business name"
                   value={bizName}
                   onChange={e => setBizName(e.target.value)}
                   autoFocus
@@ -201,7 +238,6 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                 <span style={styles.hint}>Appears on every published job page and your portfolio.</span>
               </div>
 
-              {/* Business phone */}
               <div style={styles.field}>
                 <label style={styles.label} htmlFor="ob-phone">Business phone</label>
                 <input
@@ -217,7 +253,6 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                 </span>
               </div>
 
-              {/* Website */}
               <div style={styles.field}>
                 <label style={styles.label} htmlFor="ob-web">Business website</label>
                 <input
@@ -233,7 +268,6 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                 </span>
               </div>
 
-              {/* Trade */}
               <div style={styles.field}>
                 <label style={styles.label} htmlFor="ob-trade">What type of work do you do?</label>
                 <select
@@ -250,7 +284,6 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                 </span>
               </div>
 
-              {/* How did you hear */}
               <div style={styles.field}>
                 <label style={styles.label} htmlFor="ob-heard">How did you hear about us?</label>
                 <select
@@ -302,98 +335,139 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
           </div>
         )}
 
-        {/* ── STEP 3: Google Business Profile ── */}
+        {/* ── STEP 3: Get your Google review link (guide) ── */}
         {step === 3 && (
           <div style={styles.body}>
-            <div style={{ ...styles.welcomeIcon, background: '#fff', borderColor: '#dadce0', boxShadow: '0 1px 4px rgba(0,0,0,.08)' }}>
-              <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1 }}>
-                <span style={{ color: '#4285F4' }}>G</span>
-                <span style={{ color: '#EA4335' }}>o</span>
-                <span style={{ color: '#FBBC05' }}>o</span>
-                <span style={{ color: '#4285F4' }}>g</span>
-                <span style={{ color: '#34A853' }}>l</span>
-                <span style={{ color: '#EA4335' }}>e</span>
-              </span>
-            </div>
-            <h2 style={styles.stepTitle}>Connect your Google Business Profile</h2>
-            <p style={styles.stepSub}>
-              Every job you publish can automatically appear as a post on your Google listing — keeping your profile active and bringing in more calls.
-            </p>
+            <h2 style={styles.stepTitle}>Get your Google review link</h2>
 
-            <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 10, padding: '12px 14px', marginBottom: 20, fontSize: 13, color: '#0C4A6E', lineHeight: 1.6 }}>
-              Businesses with active GBP posts get <strong>42% more direction requests</strong> and <strong>35% more website clicks</strong>. — Google
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 22 }}>
-              {[
-                'Job posts go live on your Google listing automatically when you publish',
-                'Posts include your job photo, location, and work description',
-                'Google rewards consistent activity — your profile ranks higher',
-              ].map((txt, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: '#4B7A94', lineHeight: 1.5 }}>
-                  <div style={{ width: 20, height: 20, background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0EA5E9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                  </div>
-                  {txt}
+            {/* 1 */}
+            <div style={{ ...styles.guideStep, marginBottom: 14 }}>
+              <div style={styles.guideNum}>1</div>
+              <div style={styles.guideText}>
+                <div style={styles.guideLabel}>
+                  Open your Google Business Profile{' '}
+                  <a
+                    href="https://business.google.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#0EA5E9', textDecoration: 'underline' }}
+                  >
+                    HERE
+                  </a>.
                 </div>
-              ))}
+              </div>
             </div>
 
-            {!gbpConnected ? (
-              <button
-                onClick={handleGbpConnect}
-                style={{
-                  width: '100%', padding: '11px 16px', borderRadius: 10, marginBottom: 12,
-                  background: '#fff', color: '#3c4043',
-                  border: '1px solid #dadce0', boxShadow: '0 1px 2px rgba(0,0,0,.08)',
-                  fontSize: 14, fontWeight: 600,
-                  fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                }}
-              >
-                <span style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1 }}>
-                  <span style={{ color: '#4285F4' }}>G</span>
-                  <span style={{ color: '#EA4335' }}>o</span>
-                  <span style={{ color: '#FBBC05' }}>o</span>
-                  <span style={{ color: '#4285F4' }}>g</span>
-                  <span style={{ color: '#34A853' }}>l</span>
-                  <span style={{ color: '#EA4335' }}>e</span>
-                </span>
-                Connect Google Business Profile
-              </button>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 16px', borderRadius: 10, background: '#F0FDF4', border: '1px solid #A7F3D0', marginBottom: 12, fontSize: 14, fontWeight: 600, color: '#059669' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
-                  <polyline points="22 4 12 14.01 9 11.01"/>
-                </svg>
-                Google Business Profile connected
+            {/* 2 */}
+            <div style={{ ...styles.guideStep, marginBottom: 14 }}>
+              <div style={styles.guideNum}>2</div>
+              <div style={styles.guideText}>
+                <div style={styles.guideLabel}>Log in and click &ldquo;Ask for reviews&rdquo;</div>
+                <div style={{ ...styles.guideDesc, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const, marginBottom: 0 }}>
+                  Look for this button on your dashboard:
+                  <img
+                    src="/images/onboarding/gbp-ask-reviews-icon.png"
+                    alt="Ask for reviews button"
+                    style={{ height: 46, borderRadius: 6, border: '1px solid #BAE6FD', flexShrink: 0 }}
+                  />
+                </div>
               </div>
-            )}
+            </div>
 
-            <button
-              style={{ ...styles.btnPrimary, marginTop: 0 }}
-              onClick={() => setStep(4)}
-            >
-              {gbpConnected ? 'Continue' : 'Continue'}
+            {/* 3 */}
+            <div style={{ ...styles.guideStep, marginBottom: 14 }}>
+              <div style={styles.guideNum}>3</div>
+              <div style={styles.guideText}>
+                <div style={styles.guideLabel}>Copy your review link</div>
+                <div style={styles.guideDesc}>A panel opens with your unique review link. Copy the highlighted link:</div>
+                <img
+                  src="/images/onboarding/gbp-review-link-screenshot.png"
+                  alt="Copy your review link"
+                  style={{ width: '100%', borderRadius: 8, border: '1px solid #BAE6FD', display: 'block' }}
+                />
+              </div>
+            </div>
+
+            {/* 4 */}
+            <div style={{ ...styles.guideStep, marginBottom: 24 }}>
+              <div style={styles.guideNum}>4</div>
+              <div style={styles.guideText}>
+                <div style={styles.guideLabel}>Come back here and paste it</div>
+                <div style={styles.guideDesc}>Hit the button below when you&rsquo;ve copied your link.</div>
+              </div>
+            </div>
+
+            <button style={styles.btnPrimary} onClick={() => setStep(4)}>
+              I&rsquo;ve copied my link — paste it now
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
                 stroke="white" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/>
                 <polyline points="12 5 19 12 12 19"/></svg>
             </button>
-
-            <button
-              onClick={() => setStep(4)}
-              style={{ background: 'none', border: 'none', color: '#4B7A94', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', marginTop: 10, alignSelf: 'center' }}
-            >
-              Skip for now
-            </button>
+            <button onClick={() => setStep(4)} style={styles.btnSkip}>Skip for now</button>
           </div>
         )}
 
-        {/* ── STEP 4: First steps ── */}
+        {/* ── STEP 4: Paste your review link ── */}
         {step === 4 && (
+          <div style={styles.body}>
+            <div style={{ ...styles.welcomeIcon, background: '#F0F9FF', borderColor: '#BAE6FD' }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0EA5E9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+              </svg>
+            </div>
+            <h2 style={styles.stepTitle}>Paste your review link</h2>
+            <p style={styles.stepSub}>
+              We&rsquo;ll connect the customers you choose to your Google review page with this link.
+            </p>
+
+            <div style={styles.field}>
+              <label style={styles.label} htmlFor="ob-gbp-link">Your Google review link</label>
+              <input
+                id="ob-gbp-link"
+                type="url"
+                style={{ ...styles.input, fontFamily: 'monospace', fontSize: 13 }}
+                placeholder="https://g.page/r/..."
+                value={gbpReviewLink}
+                onChange={e => { setGbpReviewLink(e.target.value); setGbpLinkError(null) }}
+                autoFocus
+              />
+              <span style={styles.hint}>
+                Starts with <code>https://g.page/r/</code> or <code>https://search.google.com/local/writereview</code>
+              </span>
+            </div>
+
+            {gbpLinkError && <div style={{ ...styles.errorBox, marginBottom: 16 }}>{gbpLinkError}</div>}
+
+            <button
+              style={{ ...styles.btnPrimary, ...(gbpLinkSaving ? styles.btnDisabled : {}) }}
+              onClick={handleGbpLinkSave}
+              disabled={gbpLinkSaving}
+            >
+              {gbpLinkSaving ? (
+                <>
+                  <svg style={styles.spinner} width="16" height="16" viewBox="0 0 24 24"
+                    fill="none" stroke="white" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" strokeOpacity="0.3"/>
+                    <path d="M12 2a10 10 0 0110 10"/>
+                  </svg>
+                  Saving…
+                </>
+              ) : (
+                <>
+                  Save and continue
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                    stroke="white" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/>
+                    <polyline points="12 5 19 12 12 19"/></svg>
+                </>
+              )}
+            </button>
+            <button onClick={() => setStep(5)} style={styles.btnSkip}>Skip for now</button>
+          </div>
+        )}
+
+        {/* ── STEP 5: First steps ── */}
+        {step === 5 && (
           <div style={styles.body}>
             <div style={{ ...styles.welcomeIcon, background: '#F0FDF4', borderColor: '#A7F3D0' }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
@@ -465,7 +539,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
   )
 }
 
-// ── Inline styles (avoids CSS-in-JS dependency and keeps component self-contained) ──
+// ── Inline styles ──
 const styles: Record<string, React.CSSProperties> = {
   backdrop: {
     position:        'fixed',
@@ -590,6 +664,17 @@ const styles: Record<string, React.CSSProperties> = {
     opacity:         0.65,
     cursor:          'not-allowed',
   },
+  btnSkip: {
+    background:      'none',
+    border:          'none',
+    color:           '#4B7A94',
+    fontSize:        '13px',
+    fontWeight:      600,
+    fontFamily:      "'Plus Jakarta Sans', sans-serif",
+    cursor:          'pointer',
+    marginTop:       '10px',
+    alignSelf:       'center',
+  },
   form: {
     display:         'flex',
     flexDirection:   'column',
@@ -599,6 +684,7 @@ const styles: Record<string, React.CSSProperties> = {
     display:         'flex',
     flexDirection:   'column',
     gap:             '5px',
+    marginBottom:    '2px',
   },
   label: {
     fontSize:        '13px',
@@ -649,6 +735,41 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize:        '13px',
     color:           '#DC2626',
   },
+  guideStep: {
+    display:         'flex',
+    gap:             '12px',
+    alignItems:      'flex-start',
+  },
+  guideNum: {
+    width:           '24px',
+    height:          '24px',
+    minWidth:        '24px',
+    background:      '#0EA5E9',
+    color:           '#fff',
+    borderRadius:    '50%',
+    fontSize:        '12px',
+    fontWeight:      700,
+    display:         'flex',
+    alignItems:      'center',
+    justifyContent:  'center',
+    marginTop:       '1px',
+  },
+  guideText: {
+    flex:            1,
+  },
+  guideLabel: {
+    fontSize:        '13.5px',
+    fontWeight:      700,
+    color:           '#0C4A6E',
+    marginBottom:    '4px',
+    lineHeight:      1.4,
+  },
+  guideDesc: {
+    fontSize:        '12.5px',
+    color:           '#4B7A94',
+    lineHeight:      1.5,
+    marginBottom:    '8px',
+  },
   actionCards: {
     display:         'flex',
     flexDirection:   'column',
@@ -690,6 +811,6 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight:      1.4,
   },
   spinner: {
-    animation: 'spin 0.8s linear infinite',
+    animation:       'spin 0.8s linear infinite',
   },
 }
