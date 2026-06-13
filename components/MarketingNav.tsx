@@ -98,7 +98,7 @@ export default function MarketingNav() {
           <Link href="/auth/signin" className="btn-ghost nav-signin" onClick={closeAll}>Sign In /</Link>
           <Link href="/auth/register" className="btn-ghost" onClick={closeAll}>Register</Link>
           <a
-            href="https://calendly.com/whitekw92/30min"
+            href="https://calendly.com/projectcheckin-/30min"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-sm-link"
