@@ -1057,7 +1057,7 @@ export default function LandingPage({ registrationOpen = false }: { registration
           )}
           <p className="final-sub r d3">No credit card required &middot; Cancel anytime</p>
           <a
-            href="https://calendly.com/whitekw92/30min"
+            href="https://calendly.com/projectcheckin-/30min"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-demo-ghost r d4"
