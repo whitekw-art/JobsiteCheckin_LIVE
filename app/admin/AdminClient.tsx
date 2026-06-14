@@ -65,7 +65,15 @@ function statusBadge(status: string | null) {
 /* ── Main Component ───────────────────────────────────────────── */
 
 export default function AdminClient() {
-  const [tab, setTab] = useState<'overview' | 'orgs' | 'waitlist' | 'emails'>('overview')
+  const [tab, setTab] = useState<'overview' | 'orgs' | 'waitlist' | 'emails' | 'ai-prompt'>('overview')
+
+  const TAB_LABELS: Record<string, string> = {
+    overview: 'Overview',
+    orgs: 'Orgs',
+    waitlist: 'Waitlist',
+    emails: 'Follow-up Emails',
+    'ai-prompt': 'AI Prompt',
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -81,15 +89,15 @@ export default function AdminClient() {
       {/* Tabs */}
       <div className="border-b border-gray-200 bg-white px-6">
         <nav className="flex gap-1">
-          {(['overview', 'orgs', 'waitlist', 'emails'] as const).map((t) => (
+          {(['overview', 'orgs', 'waitlist', 'emails', 'ai-prompt'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors capitalize cursor-pointer ${
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
                 tab === t ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t === 'emails' ? 'Follow-up Emails' : t.charAt(0).toUpperCase() + t.slice(1)}
+              {TAB_LABELS[t]}
             </button>
           ))}
         </nav>
@@ -101,6 +109,7 @@ export default function AdminClient() {
         {tab === 'orgs' && <OrgsTab />}
         {tab === 'waitlist' && <WaitlistTab />}
         {tab === 'emails' && <EmailsTab />}
+        {tab === 'ai-prompt' && <AiPromptTab />}
       </div>
     </div>
   )
@@ -381,6 +390,80 @@ function EmailsTab() {
             {triggerResult}
           </p>
         )}
+      </div>
+    </div>
+  )
+}
+
+/* ── AI Prompt Tab ────────────────────────────────────────────── */
+
+function AiPromptTab() {
+  const [prompt, setPrompt] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/admin/ai-prompt')
+      .then(r => r.json())
+      .then(data => setPrompt(data.prompt ?? ''))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const savePrompt = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/ai-prompt', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error ?? 'Failed to save')
+      }
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <p className="text-gray-500 text-sm">Loading...</p>
+
+  return (
+    <div className="max-w-2xl">
+      <h2 className="text-lg font-semibold text-gray-900 mb-1">AI Job Description Prompt</h2>
+      <p className="text-sm text-gray-500 mb-4">
+        System prompt used by the AI copywriting agent to generate job descriptions for Titan customers.
+        Changes take effect immediately — no deploy required. The default prompt is restored if you blank this field and save.
+      </p>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">System prompt</label>
+          <textarea
+            rows={18}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono resize-y"
+            spellCheck={false}
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            The prompt receives BUSINESS CONTEXT (services, products, service area, about) and JOB CONTEXT (door type, location, notes) as the user message, along with up to 5 job photos as vision content blocks.
+          </p>
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button
+          onClick={savePrompt}
+          disabled={saving || !prompt.trim()}
+          className="bg-gray-900 hover:bg-gray-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 cursor-pointer"
+        >
+          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Prompt'}
+        </button>
       </div>
     </div>
   )

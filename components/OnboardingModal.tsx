@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 const TRADES = [
   'Door Installation',
@@ -48,6 +48,8 @@ interface Props {
 const ONBOARDING_STEP_KEY = 'pc_onboarding_step'
 
 export default function OnboardingModal({ planTier, orgSlug }: Props) {
+  const isTitan = (planTier ?? 'free').toLowerCase() === 'titan'
+
   const [step, setStepState] = useState<number>(() => {
     if (typeof window === 'undefined') return 1
     const saved = parseInt(localStorage.getItem(ONBOARDING_STEP_KEY) || '1', 10)
@@ -74,6 +76,67 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
   const [submitting,   setSubmitting]   = useState(false)
   const [error,        setError]        = useState<string | null>(null)
   const [savedSlug,    setSavedSlug]    = useState<string | null>(orgSlug ?? null)
+
+  // AI research step state (Titan only — shown between step 2 and step 3)
+  const [showAiResearch,  setShowAiResearch]  = useState(false)
+  const [aiScraping,      setAiScraping]      = useState(false)
+  const [aiScraped,       setAiScraped]       = useState(false)
+  const [aiError,         setAiError]         = useState<string | null>(null)
+  const [aiServices,      setAiServices]      = useState('')
+  const [aiProducts,      setAiProducts]      = useState('')
+  const [aiServiceArea,   setAiServiceArea]   = useState('')
+  const [aiAbout,         setAiAbout]         = useState('')
+  const [aiSaving,        setAiSaving]        = useState(false)
+
+  const handleActivateAgentResearch = useCallback(async () => {
+    setAiScraping(true)
+    setAiError(null)
+    try {
+      const res = await fetch('/api/agents/scrape-website', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setAiError(data?.error === 'rate_limited' ? 'Scan limit reached.' : 'Unable to read your website. Fill in your business info below.')
+        setAiScraped(true)
+        return
+      }
+      setAiServices(data.services ?? '')
+      setAiProducts(data.products ?? '')
+      setAiServiceArea(data.serviceArea ?? '')
+      setAiAbout(data.businessDescription ?? '')
+      setAiScraped(true)
+    } catch {
+      setAiError('Unable to read your website. Fill in your business info below.')
+      setAiScraped(true)
+    } finally {
+      setAiScraping(false)
+    }
+  }, [])
+
+  const handleAiStepConfirm = useCallback(async () => {
+    setAiSaving(true)
+    try {
+      await fetch('/api/organization/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          services: aiServices,
+          products: aiProducts,
+          serviceArea: aiServiceArea,
+          businessDescription: aiAbout,
+        }),
+      })
+    } catch {
+      // non-fatal — data already saved by scrape route; silently continue
+    } finally {
+      setAiSaving(false)
+      setShowAiResearch(false)
+      setStep(3)
+    }
+  }, [aiServices, aiProducts, aiServiceArea, aiAbout])
 
   // Suppress ESC key while modal is mounted
   useEffect(() => {
@@ -112,7 +175,11 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error || 'Failed to save. Please try again.')
       if (data?.organization?.slug) setSavedSlug(data.organization.slug)
-      setStep(3)
+      if (isTitan) {
+        setShowAiResearch(true)
+      } else {
+        setStep(3)
+      }
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -167,15 +234,130 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
     <div style={styles.backdrop} aria-modal="true" role="dialog" aria-label="Account setup">
       <div style={styles.modal}>
 
-        {/* Progress dots — 5 steps */}
-        <div style={styles.dots}>
-          {[1,2,3,4,5].map(n => (
-            <div key={n} style={{ ...styles.dot, ...(n === step ? styles.dotActive : n < step ? styles.dotDone : {}) }} />
-          ))}
-        </div>
+        {/* Progress dots — 6 for Titan (has AI step), 5 for all others */}
+        {(() => {
+          const totalDots = isTitan ? 6 : 5
+          // For Titan: AI step = dot 3, GBP steps shift to 4 and 5, done = 6
+          const activeDot = showAiResearch ? 3 : (isTitan && step >= 3 ? step + 1 : step)
+          return (
+            <div style={styles.dots}>
+              {Array.from({ length: totalDots }, (_, i) => i + 1).map(n => (
+                <div key={n} style={{ ...styles.dot, ...(n === activeDot ? styles.dotActive : n < activeDot ? styles.dotDone : {}) }} />
+              ))}
+            </div>
+          )
+        })()}
+
+        {/* ── TITAN ONLY: AI Agent Research step (shown after step 2) ── */}
+        {showAiResearch && isTitan && (
+          <div style={styles.body}>
+            <div style={{ ...styles.welcomeIcon, background: '#FFF7ED', borderColor: '#FED7AA' }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14M15.54 8.46a5 5 0 010 7.07M8.46 8.46a5 5 0 000 7.07"/>
+              </svg>
+            </div>
+            <h2 style={styles.stepTitle}>Activate Agent Research</h2>
+            <p style={styles.stepSub}>
+              Your AI copywriting agent reads your website to learn your business — services, products, and service area — so it can write accurate job descriptions without you lifting a finger.
+            </p>
+
+            {bizWebsite && (
+              <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: '#0C4A6E' }}>
+                <span style={{ fontWeight: 600 }}>Website: </span>
+                <span style={{ color: '#0EA5E9' }}>{bizWebsite}</span>
+              </div>
+            )}
+
+            {!aiScraped && (
+              <button
+                style={{ ...styles.btnPrimary, ...(aiScraping ? styles.btnDisabled : {}), background: aiScraping ? '#94A3B8' : '#F97316' }}
+                onClick={handleActivateAgentResearch}
+                disabled={aiScraping}
+              >
+                {aiScraping ? (
+                  <>
+                    <svg style={styles.spinner} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" strokeOpacity="0.3"/>
+                      <path d="M12 2a10 10 0 0110 10"/>
+                    </svg>
+                    Analyzing your website…
+                  </>
+                ) : (
+                  <>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 4.93a10 10 0 000 14.14"/></svg>
+                    Activate Agent Research
+                  </>
+                )}
+              </button>
+            )}
+
+            {aiError && (
+              <div style={{ ...styles.errorBox, marginBottom: 12 }}>{aiError}</div>
+            )}
+
+            {aiScraped && (
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14, marginTop: 4 }}>
+                {!aiError && (
+                  <div style={{ background: '#F0FDF4', border: '1px solid #A7F3D0', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, color: '#065F46' }}>
+                    Research complete. Review and edit below before continuing.
+                  </div>
+                )}
+                <div style={styles.field}>
+                  <label style={styles.label}>Services offered</label>
+                  <input type="text" style={styles.input} value={aiServices} onChange={e => setAiServices(e.target.value)} placeholder="e.g. Door installation, garage doors, storm doors" />
+                </div>
+                <div style={styles.field}>
+                  <label style={styles.label}>Products / brands</label>
+                  <input type="text" style={styles.input} value={aiProducts} onChange={e => setAiProducts(e.target.value)} placeholder="e.g. Therma-Tru, Pella, Emtek hardware" />
+                </div>
+                <div style={styles.field}>
+                  <label style={styles.label}>Service area</label>
+                  <input type="text" style={styles.input} value={aiServiceArea} onChange={e => setAiServiceArea(e.target.value)} placeholder="e.g. Huntsville, AL and surrounding areas" />
+                </div>
+                <div style={styles.field}>
+                  <label style={styles.label}>About your business</label>
+                  <textarea
+                    style={{ ...styles.input, height: 'auto', padding: '10px 14px', resize: 'vertical' as const }}
+                    rows={3}
+                    value={aiAbout}
+                    onChange={e => setAiAbout(e.target.value)}
+                    placeholder="1–2 sentences about what you do and who you serve."
+                  />
+                </div>
+
+                <button
+                  style={{ ...styles.btnPrimary, ...(aiSaving ? styles.btnDisabled : {}) }}
+                  onClick={handleAiStepConfirm}
+                  disabled={aiSaving}
+                >
+                  {aiSaving ? (
+                    <>
+                      <svg style={styles.spinner} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" strokeOpacity="0.3"/>
+                        <path d="M12 2a10 10 0 0110 10"/>
+                      </svg>
+                      Saving…
+                    </>
+                  ) : (
+                    <>
+                      Looks good — continue
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {!aiScraped && (
+              <button onClick={() => { setShowAiResearch(false); setStep(3) }} style={styles.btnSkip}>
+                Skip for now
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ── STEP 1: Welcome ── */}
-        {step === 1 && (
+        {!showAiResearch && step === 1 && (
           <div style={styles.body}>
             <div style={styles.welcomeIcon}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
@@ -213,7 +395,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
         )}
 
         {/* ── STEP 2: Business details ── */}
-        {step === 2 && (
+        {!showAiResearch && step === 2 && (
           <div style={styles.body}>
             <h2 style={styles.stepTitle}>Tell us about your business</h2>
             <p style={styles.stepSub}>
@@ -336,7 +518,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
         )}
 
         {/* ── STEP 3: Get your Google review link (guide) ── */}
-        {step === 3 && (
+        {!showAiResearch && step === 3 && (
           <div style={styles.body}>
             <h2 style={styles.stepTitle}>Get your Google review link</h2>
 
@@ -408,7 +590,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
         )}
 
         {/* ── STEP 4: Paste your review link ── */}
-        {step === 4 && (
+        {!showAiResearch && step === 4 && (
           <div style={styles.body}>
             <div style={{ ...styles.welcomeIcon, background: '#F0F9FF', borderColor: '#BAE6FD' }}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0EA5E9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -467,7 +649,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
         )}
 
         {/* ── STEP 5: First steps ── */}
-        {step === 5 && (
+        {!showAiResearch && step === 5 && (
           <div style={styles.body}>
             <div style={{ ...styles.welcomeIcon, background: '#F0FDF4', borderColor: '#A7F3D0' }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none"

@@ -22,6 +22,9 @@ export async function GET() {
         website: true,
         email: true,
         gbpReviewLink: true,
+        businessContext: true,
+        businessContextUpdatedAt: true,
+        websiteScanHistory: true,
       },
     })
 
@@ -60,12 +63,41 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const { name, phone, website, email, gbpReviewLink } = (await request.json()) as {
+    const { name, phone, website, email, gbpReviewLink, services, products, serviceArea, businessDescription } = (await request.json()) as {
       name?: string
       phone?: string
       website?: string
       email?: string
       gbpReviewLink?: string
+      services?: string
+      products?: string
+      serviceArea?: string
+      businessDescription?: string
+    }
+
+    // If any AI business context fields are present, serialize them into businessContext
+    const hasAiFields = services !== undefined || products !== undefined || serviceArea !== undefined || businessDescription !== undefined
+    let businessContextUpdate: Record<string, unknown> = {}
+    if (hasAiFields) {
+      // Fetch current businessContext to merge with updates
+      const current = await prisma.organization.findUnique({
+        where: { id: currentUser.organizationId },
+        select: { businessContext: true },
+      })
+      let existing: Record<string, string> = {}
+      if (current?.businessContext) {
+        try { existing = JSON.parse(current.businessContext) } catch { /* ignore */ }
+      }
+      const merged = {
+        services:             services             ?? existing.services             ?? '',
+        products:             products             ?? existing.products             ?? '',
+        serviceArea:          serviceArea          ?? existing.serviceArea          ?? '',
+        businessDescription:  businessDescription  ?? existing.businessDescription  ?? '',
+      }
+      businessContextUpdate = {
+        businessContext:          JSON.stringify(merged),
+        businessContextUpdatedAt: new Date(),
+      }
     }
 
     const updated = await prisma.organization.update({
@@ -76,6 +108,7 @@ export async function PATCH(request: NextRequest) {
         website: website ?? null,
         ...(email !== undefined && { email: email.trim() || null }),
         ...(gbpReviewLink !== undefined && { gbpReviewLink: gbpReviewLink || null }),
+        ...businessContextUpdate,
       },
       select: {
         name: true,
@@ -84,6 +117,7 @@ export async function PATCH(request: NextRequest) {
         website: true,
         email: true,
         gbpReviewLink: true,
+        businessContext: true,
       },
     })
 
