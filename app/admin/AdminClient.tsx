@@ -540,13 +540,9 @@ function AiSettingsTab() {
                 role="switch"
                 aria-checked={rates.jobDescriptionEnabled}
                 onClick={() => setRates(r => ({ ...r, jobDescriptionEnabled: !r.jobDescriptionEnabled }))}
-                className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors cursor-pointer ${
-                  rates.jobDescriptionEnabled ? 'bg-emerald-500' : 'bg-gray-300'
-                }`}
+                style={{ width: 40, height: 24, borderRadius: 9999, border: 'none', padding: 0, cursor: 'pointer', position: 'relative', flexShrink: 0, backgroundColor: rates.jobDescriptionEnabled ? '#10b981' : '#d1d5db', transition: 'background-color 0.2s' }}
               >
-                <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                  rates.jobDescriptionEnabled ? 'translate-x-5' : 'translate-x-1'
-                }`} />
+                <span style={{ position: 'absolute', width: 16, height: 16, borderRadius: '50%', backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.2)', top: 4, left: rates.jobDescriptionEnabled ? 20 : 4, transition: 'left 0.15s' }} />
               </button>
             </div>
             <div className={`space-y-3 ${!rates.jobDescriptionEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
@@ -586,13 +582,9 @@ function AiSettingsTab() {
                 role="switch"
                 aria-checked={rates.websiteScanEnabled}
                 onClick={() => setRates(r => ({ ...r, websiteScanEnabled: !r.websiteScanEnabled }))}
-                className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors cursor-pointer ${
-                  rates.websiteScanEnabled ? 'bg-emerald-500' : 'bg-gray-300'
-                }`}
+                style={{ width: 40, height: 24, borderRadius: 9999, border: 'none', padding: 0, cursor: 'pointer', position: 'relative', flexShrink: 0, backgroundColor: rates.websiteScanEnabled ? '#10b981' : '#d1d5db', transition: 'background-color 0.2s' }}
               >
-                <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                  rates.websiteScanEnabled ? 'translate-x-5' : 'translate-x-1'
-                }`} />
+                <span style={{ position: 'absolute', width: 16, height: 16, borderRadius: '50%', backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.2)', top: 4, left: rates.websiteScanEnabled ? 20 : 4, transition: 'left 0.15s' }} />
               </button>
             </div>
             <div className={`space-y-3 ${!rates.websiteScanEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
