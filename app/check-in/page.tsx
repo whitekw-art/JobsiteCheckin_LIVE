@@ -494,7 +494,7 @@ function CheckInContent() {
               <textarea
                 id="notes"
                 className="ci-textarea"
-                placeholder="Be as specific and detailed as possible — materials used, colors, special requests, job conditions. Detailed notes rank higher in search results."
+                placeholder="Product details, upgrades, and customizations (e.g. mahogany iron door, Emtek hardware, storm door added)"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}

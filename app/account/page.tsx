@@ -13,6 +13,9 @@ interface OrganizationProfile {
   website: string | null
   email: string | null
   gbpReviewLink: string | null
+  businessContext: string | null
+  businessContextUpdatedAt: string | null
+  websiteScanHistory: string[] | null
 }
 
 const PLAN_LABELS: Record<string, string> = {
@@ -133,6 +136,65 @@ export default function AccountPage() {
   const [editingReviewLink, setEditingReviewLink] = useState(false)
   const [showReviewLinkDisc, setShowReviewLinkDisc] = useState(false)
 
+  // AI Business Profile state (Titan only)
+  const [aiServices,       setAiServices]       = useState('')
+  const [aiProducts,       setAiProducts]       = useState('')
+  const [aiServiceArea,    setAiServiceArea]     = useState('')
+  const [aiAbout,          setAiAbout]           = useState('')
+  const [aiRescanning,     setAiRescanning]      = useState(false)
+  const [aiRescanError,    setAiRescanError]     = useState<string | null>(null)
+  const [aiRescanSuccess,  setAiRescanSuccess]   = useState(false)
+  const isTitan = (planTier ?? '').toLowerCase() === 'titan'
+
+  function parseScanCap(history: string[] | null | undefined): { used: number; daysRemaining: number; nextAvailableAt: Date | null } {
+    const now = Date.now()
+    const WINDOW = 7 * 24 * 60 * 60 * 1000
+    const recent = (history ?? []).filter((ts) => now - new Date(ts).getTime() < WINDOW)
+    if (recent.length < 2) return { used: recent.length, daysRemaining: 0, nextAvailableAt: null }
+    const oldest = Math.min(...recent.map((ts) => new Date(ts).getTime()))
+    const availableAt = new Date(oldest + WINDOW)
+    const daysRemaining = Math.ceil((availableAt.getTime() - now) / (24 * 60 * 60 * 1000))
+    return { used: recent.length, daysRemaining, nextAvailableAt: availableAt }
+  }
+
+  async function handleRescan() {
+    setAiRescanning(true)
+    setAiRescanError(null)
+    setAiRescanSuccess(false)
+    try {
+      const res = await fetch('/api/agents/scrape-website', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json().catch(() => null)
+      if (res.status === 429) {
+        setAiRescanError(`Re-scan available in ${data?.daysRemaining ?? '?'} day(s).`)
+        return
+      }
+      if (!res.ok) {
+        setAiRescanError('Re-scan failed. Try again or update fields manually.')
+        return
+      }
+      setAiServices(data.services ?? '')
+      setAiProducts(data.products ?? '')
+      setAiServiceArea(data.serviceArea ?? '')
+      setAiAbout(data.businessDescription ?? '')
+      // Update profile in state so scan history re-renders
+      const profileRes = await fetch('/api/organization/profile')
+      if (profileRes.ok) {
+        const profileData = await profileRes.json()
+        setProfile(profileData.organization)
+      }
+      setAiRescanSuccess(true)
+      setTimeout(() => setAiRescanSuccess(false), 3000)
+    } catch {
+      setAiRescanError('Re-scan failed. Try again or update fields manually.')
+    } finally {
+      setAiRescanning(false)
+    }
+  }
+
   function handleCopyPortfolioLink() {
     const slug = profile?.slug
     if (!slug) return
@@ -168,6 +230,16 @@ export default function AccountPage() {
         setPhone(org.phone || '')
         setWebsite(org.website || '')
         setGbpReviewLinkInput(org.gbpReviewLink || '')
+        // Parse AI business context if present
+        if (org.businessContext) {
+          try {
+            const ctx = JSON.parse(org.businessContext)
+            setAiServices(ctx.services ?? '')
+            setAiProducts(ctx.products ?? '')
+            setAiServiceArea(ctx.serviceArea ?? '')
+            setAiAbout(ctx.businessDescription ?? '')
+          } catch { /* ignore malformed */ }
+        }
       } catch (err: any) {
         setError(err.message || 'Failed to load profile')
       } finally {
@@ -259,6 +331,12 @@ export default function AccountPage() {
           email: orgEmail.trim() || null,
           phone: phone.trim() || null,
           website: website.trim() || null,
+          ...(isTitan && {
+            services: aiServices,
+            products: aiProducts,
+            serviceArea: aiServiceArea,
+            businessDescription: aiAbout,
+          }),
         }),
       })
       const data = await res.json().catch(() => null)
@@ -354,6 +432,87 @@ export default function AccountPage() {
                   placeholder="https://example.com"
                 />
               </div>
+
+              {/* \u2500\u2500 AI Business Profile (Titan only) \u2500\u2500 */}
+              {isTitan && (
+                <>
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 18, marginTop: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>AI Business Profile</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 10.5, fontWeight: 700, background: '#FFF7ED', color: '#C2410C', border: '1px solid #FED7AA' }}>Titan</span>
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--t3)', lineHeight: 1.55, marginBottom: 16 }}>
+                      Used by the AI copywriting agent to write accurate job descriptions. Populated automatically from your website \u2014 edit anytime.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
+                      <div>
+                        <label htmlFor="ai-services" className="db-shell-label">Services offered</label>
+                        <input id="ai-services" type="text" className="db-shell-input" style={{ width: '100%', minWidth: 0 }} value={aiServices} onChange={(e) => setAiServices(e.target.value)} placeholder="e.g. Door installation, garage doors, storm doors" />
+                      </div>
+                      <div>
+                        <label htmlFor="ai-products" className="db-shell-label">Products / brands</label>
+                        <input id="ai-products" type="text" className="db-shell-input" style={{ width: '100%', minWidth: 0 }} value={aiProducts} onChange={(e) => setAiProducts(e.target.value)} placeholder="e.g. Therma-Tru, Pella, Emtek hardware" />
+                      </div>
+                      <div>
+                        <label htmlFor="ai-service-area" className="db-shell-label">Service area</label>
+                        <input id="ai-service-area" type="text" className="db-shell-input" style={{ width: '100%', minWidth: 0 }} value={aiServiceArea} onChange={(e) => setAiServiceArea(e.target.value)} placeholder="e.g. Huntsville, AL and surrounding areas" />
+                      </div>
+                      <div>
+                        <label htmlFor="ai-about" className="db-shell-label">About your business</label>
+                        <textarea id="ai-about" className="db-shell-input" style={{ width: '100%', minWidth: 0, height: 'auto', padding: '9px 13px', resize: 'vertical' }} rows={3} value={aiAbout} onChange={(e) => setAiAbout(e.target.value)} placeholder="1\u20132 sentences about what you do and who you serve." />
+                      </div>
+                    </div>
+
+                    {/* Re-scan button */}
+                    {(() => {
+                      const { used, daysRemaining, nextAvailableAt } = parseScanCap(profile?.websiteScanHistory)
+                      const capped = used >= 2
+                      const lastScanned = profile?.businessContextUpdatedAt
+                        ? new Date(profile.businessContextUpdatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : null
+                      return (
+                        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column' as const, gap: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const }}>
+                            <button
+                              type="button"
+                              onClick={handleRescan}
+                              disabled={capped || aiRescanning}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: capped || aiRescanning ? 'not-allowed' : 'pointer', background: aiRescanSuccess ? 'var(--green)' : 'var(--surface-3)', color: aiRescanSuccess ? '#fff' : 'var(--t2)', border: '1px solid var(--border)', opacity: capped ? 0.55 : 1, transition: 'background .15s, color .15s' }}
+                            >
+                              {aiRescanning ? (
+                                <>
+                                  <svg style={{ animation: 'spin 0.8s linear infinite' }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity="0.3"/><path d="M12 2a10 10 0 0110 10"/></svg>
+                                  Scanning\u2026
+                                </>
+                              ) : aiRescanSuccess ? (
+                                <>
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                  Scanned!
+                                </>
+                              ) : (
+                                <>
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                                  Re-scan my website
+                                </>
+                              )}
+                            </button>
+                            {lastScanned && <span style={{ fontSize: 11.5, color: 'var(--t3)' }}>Last scanned {lastScanned}</span>}
+                          </div>
+                          {capped && nextAvailableAt && (
+                            <span style={{ fontSize: 11.5, color: '#B45309' }}>
+                              Re-scan available in {daysRemaining} day{daysRemaining !== 1 ? 's' : ''} ({nextAvailableAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})
+                            </span>
+                          )}
+                          {!capped && (
+                            <span style={{ fontSize: 11.5, color: 'var(--t3)' }}>{2 - used} of 2 re-scans available this week</span>
+                          )}
+                          {aiRescanError && <span style={{ fontSize: 12, color: 'var(--red)' }}>{aiRescanError}</span>}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </>
+              )}
 
               {message && <div className="db-shell-alert-success">{message}</div>}
               {error && <div className="db-shell-alert-error">{error}</div>}

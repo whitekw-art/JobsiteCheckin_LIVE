@@ -24,8 +24,12 @@ model Organization {
   subscriptionStatus   String?
   planTier             String?
   planVersion          Int     @default(1)
-  gbpReviewLink        String?
-  email                String?
+  gbpReviewLink            String?
+  email                    String?
+  businessContext          String?
+  businessContextUpdatedAt DateTime?
+  websiteScanHistory       Json      @default("[]")
+  aiDescriptionHistory     Json      @default("[]")
   Invitations Invitations[]
   users       User[]
   checkIns    CheckIn[]
@@ -73,9 +77,11 @@ model CheckIn {
   homeCustomerEmail     String?
   publishedAt           DateTime?      @db.Timestamptz(6)
   followUpEmailSentAt   DateTime?      @db.Timestamptz(6)
-  beforePhotoUrl        String?
-  afterPhotoUrl         String?
-  events                CheckInEvent[]
+  beforePhotoUrl           String?
+  afterPhotoUrl            String?
+  aiDescriptionGeneratedAt DateTime?
+  aiDescriptionCount       Int       @default(0)
+  events                   CheckInEvent[]
 
   @@index([organizationId])
 }
