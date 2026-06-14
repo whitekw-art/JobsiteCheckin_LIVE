@@ -2,12 +2,11 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { hasFeature } from '@/lib/planVersions'
+import { getAiConfig } from '@/lib/aiConfig'
 import OpenAI from 'openai'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-const JOB_CAP = 3           // max generations per check-in
-const DAILY_ORG_CAP = 20   // max generations per org per day
 const DAY_MS = 24 * 60 * 60 * 1000
 
 const DEFAULT_PROMPT = `You are an SEO copywriter for a field service business. Write a 100–150 word description of a completed job.
@@ -60,6 +59,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Titan plan required' }, { status: 403 })
     }
 
+    const aiConfig = await getAiConfig()
+
+    if (!aiConfig.jobDescriptionEnabled) {
+      return NextResponse.json({ error: 'AI job description generation is currently disabled.' }, { status: 503 })
+    }
+
     const { checkInId } = await req.json()
     if (!checkInId) {
       return NextResponse.json({ error: 'checkInId is required' }, { status: 400 })
@@ -84,9 +89,9 @@ export async function POST(req: Request) {
     }
 
     // Per-job rate cap
-    if ((checkIn.aiDescriptionCount ?? 0) >= JOB_CAP) {
+    if ((checkIn.aiDescriptionCount ?? 0) >= aiConfig.jobDescriptionPerJobCap) {
       return NextResponse.json(
-        { error: 'rate_limited', message: `Maximum ${JOB_CAP} generations per job reached` },
+        { error: 'rate_limited', message: `Maximum ${aiConfig.jobDescriptionPerJobCap} generations per job reached` },
         { status: 429 }
       )
     }
@@ -95,9 +100,9 @@ export async function POST(req: Request) {
     const history = (org.aiDescriptionHistory as string[]) ?? []
     const now = Date.now()
     const todayHistory = history.filter((ts) => now - new Date(ts).getTime() < DAY_MS)
-    if (todayHistory.length >= DAILY_ORG_CAP) {
+    if (todayHistory.length >= aiConfig.jobDescriptionDailyOrgCap) {
       return NextResponse.json(
-        { error: 'rate_limited', message: `Daily limit of ${DAILY_ORG_CAP} generations reached. Try again tomorrow.` },
+        { error: 'rate_limited', message: `Daily limit of ${aiConfig.jobDescriptionDailyOrgCap} generations reached. Try again tomorrow.` },
         { status: 429 }
       )
     }

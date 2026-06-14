@@ -3,12 +3,10 @@ import dns from 'dns'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { hasFeature } from '@/lib/planVersions'
+import { getAiConfig } from '@/lib/aiConfig'
 import OpenAI from 'openai'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
-const SCAN_CAP = 2
-const SCAN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 const MAX_PAGES = 10
 const MAX_TEXT_BYTES = 50_000
 const MAX_REDIRECTS = 3
@@ -166,13 +164,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Titan plan required' }, { status: 403 })
     }
 
-    // Rate cap: 2 scans per rolling 7-day window
+    const aiConfig = await getAiConfig()
+
+    if (!aiConfig.websiteScanEnabled) {
+      return NextResponse.json({ error: 'Website scanning is currently disabled.' }, { status: 503 })
+    }
+
+    const scanWindowMs = aiConfig.websiteScanWindowDays * 24 * 60 * 60 * 1000
+
+    // Rate cap: N scans per rolling window
     const history = (org.websiteScanHistory as string[]) ?? []
     const now = Date.now()
-    const recent = history.filter((ts) => now - new Date(ts).getTime() < SCAN_WINDOW_MS)
-    if (recent.length >= SCAN_CAP) {
+    const recent = history.filter((ts) => now - new Date(ts).getTime() < scanWindowMs)
+    if (recent.length >= aiConfig.websiteScanCap) {
       const oldest = Math.min(...recent.map((ts) => new Date(ts).getTime()))
-      const availableAt = new Date(oldest + SCAN_WINDOW_MS)
+      const availableAt = new Date(oldest + scanWindowMs)
       const daysRemaining = Math.ceil((availableAt.getTime() - now) / (24 * 60 * 60 * 1000))
       return NextResponse.json(
         { error: 'rate_limited', daysRemaining, availableAt: availableAt.toISOString() },
