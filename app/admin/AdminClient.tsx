@@ -65,14 +65,14 @@ function statusBadge(status: string | null) {
 /* ── Main Component ───────────────────────────────────────────── */
 
 export default function AdminClient() {
-  const [tab, setTab] = useState<'overview' | 'orgs' | 'waitlist' | 'emails' | 'ai-prompt'>('overview')
+  const [tab, setTab] = useState<'overview' | 'orgs' | 'waitlist' | 'emails' | 'ai-settings'>('overview')
 
   const TAB_LABELS: Record<string, string> = {
     overview: 'Overview',
     orgs: 'Orgs',
     waitlist: 'Waitlist',
     emails: 'Follow-up Emails',
-    'ai-prompt': 'AI Prompt',
+    'ai-settings': 'AI Settings',
   }
 
   return (
@@ -89,7 +89,7 @@ export default function AdminClient() {
       {/* Tabs */}
       <div className="border-b border-gray-200 bg-white px-6">
         <nav className="flex gap-1">
-          {(['overview', 'orgs', 'waitlist', 'emails', 'ai-prompt'] as const).map((t) => (
+          {(['overview', 'orgs', 'waitlist', 'emails', 'ai-settings'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -109,7 +109,7 @@ export default function AdminClient() {
         {tab === 'orgs' && <OrgsTab />}
         {tab === 'waitlist' && <WaitlistTab />}
         {tab === 'emails' && <EmailsTab />}
-        {tab === 'ai-prompt' && <AiPromptTab />}
+        {tab === 'ai-settings' && <AiSettingsTab />}
       </div>
     </div>
   )
@@ -395,25 +395,54 @@ function EmailsTab() {
   )
 }
 
-/* ── AI Prompt Tab ────────────────────────────────────────────── */
+/* ── AI Settings Tab ──────────────────────────────────────────── */
 
-function AiPromptTab() {
+interface RateConfig {
+  jobDescriptionEnabled: boolean
+  jobDescriptionPerJobCap: number
+  jobDescriptionDailyOrgCap: number
+  websiteScanEnabled: boolean
+  websiteScanCap: number
+  websiteScanWindowDays: number
+}
+
+function AiSettingsTab() {
+  // Prompt state
   const [prompt, setPrompt] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [promptLoading, setPromptLoading] = useState(true)
+  const [promptSaving, setPromptSaving] = useState(false)
+  const [promptSaved, setPromptSaved] = useState(false)
+  const [promptError, setPromptError] = useState<string | null>(null)
+
+  // Rate limit state
+  const [rates, setRates] = useState<RateConfig>({
+    jobDescriptionEnabled: true,
+    jobDescriptionPerJobCap: 3,
+    jobDescriptionDailyOrgCap: 20,
+    websiteScanEnabled: true,
+    websiteScanCap: 2,
+    websiteScanWindowDays: 7,
+  })
+  const [ratesLoading, setRatesLoading] = useState(true)
+  const [ratesSaving, setRatesSaving] = useState(false)
+  const [ratesSaved, setRatesSaved] = useState(false)
+  const [ratesError, setRatesError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/ai-prompt')
       .then(r => r.json())
       .then(data => setPrompt(data.prompt ?? ''))
-      .finally(() => setLoading(false))
+      .finally(() => setPromptLoading(false))
+
+    fetch('/api/admin/ai-settings')
+      .then(r => r.json())
+      .then(data => { if (data.config) setRates(data.config) })
+      .finally(() => setRatesLoading(false))
   }, [])
 
   const savePrompt = async () => {
-    setSaving(true)
-    setError(null)
+    setPromptSaving(true)
+    setPromptError(null)
     try {
       const res = await fetch('/api/admin/ai-prompt', {
         method: 'PATCH',
@@ -424,47 +453,183 @@ function AiPromptTab() {
         const data = await res.json().catch(() => null)
         throw new Error(data?.error ?? 'Failed to save')
       }
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      setPromptSaved(true)
+      setTimeout(() => setPromptSaved(false), 2000)
     } catch (err: any) {
-      setError(err.message)
+      setPromptError(err.message)
     } finally {
-      setSaving(false)
+      setPromptSaving(false)
     }
   }
 
-  if (loading) return <p className="text-gray-500 text-sm">Loading...</p>
+  const saveRates = async () => {
+    setRatesSaving(true)
+    setRatesError(null)
+    try {
+      const res = await fetch('/api/admin/ai-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rates),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error ?? 'Failed to save')
+      }
+      setRatesSaved(true)
+      setTimeout(() => setRatesSaved(false), 2000)
+    } catch (err: any) {
+      setRatesError(err.message)
+    } finally {
+      setRatesSaving(false)
+    }
+  }
+
+  if (promptLoading || ratesLoading) return <p className="text-gray-500 text-sm">Loading...</p>
 
   return (
-    <div className="max-w-2xl">
-      <h2 className="text-lg font-semibold text-gray-900 mb-1">AI Job Description Prompt</h2>
-      <p className="text-sm text-gray-500 mb-4">
-        System prompt used by the AI copywriting agent to generate job descriptions for Titan customers.
-        Changes take effect immediately — no deploy required. The default prompt is restored if you blank this field and save.
-      </p>
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">System prompt</label>
-          <textarea
-            rows={18}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono resize-y"
-            spellCheck={false}
-          />
-          <p className="mt-1 text-xs text-gray-400">
-            The prompt receives BUSINESS CONTEXT (services, products, service area, about) and JOB CONTEXT (door type, location, notes) as the user message, along with up to 5 job photos as vision content blocks.
-          </p>
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8 items-start">
+
+      {/* LEFT — System Prompt */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">AI Job Description Prompt</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          System prompt used by the AI copywriting agent to generate job descriptions for Titan customers.
+          Changes take effect immediately — no deploy required. Blank the field and save to restore the default.
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">System prompt</label>
+            <textarea
+              rows={18}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono resize-y"
+              spellCheck={false}
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              The prompt receives BUSINESS CONTEXT (services, products, service area, about) and JOB CONTEXT (door type, location, notes) as the user message, along with up to 5 job photos as vision content blocks.
+            </p>
+          </div>
+          {promptError && <p className="text-sm text-red-600">{promptError}</p>}
+          <button
+            onClick={savePrompt}
+            disabled={promptSaving || !prompt.trim()}
+            className="bg-gray-900 hover:bg-gray-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            {promptSaving ? 'Saving...' : promptSaved ? 'Saved!' : 'Save Prompt'}
+          </button>
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          onClick={savePrompt}
-          disabled={saving || !prompt.trim()}
-          className="bg-gray-900 hover:bg-gray-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 cursor-pointer"
-        >
-          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Prompt'}
-        </button>
       </div>
+
+      {/* RIGHT — Rate Limits */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Rate Limits</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Controls apply to all Titan accounts. Changes take effect immediately.
+        </p>
+        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-6">
+
+          {/* Job Description Generator */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
+              Job Description Generator
+            </p>
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-medium text-gray-700">Enabled</span>
+              <button
+                role="switch"
+                aria-checked={rates.jobDescriptionEnabled}
+                onClick={() => setRates(r => ({ ...r, jobDescriptionEnabled: !r.jobDescriptionEnabled }))}
+                className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors cursor-pointer ${
+                  rates.jobDescriptionEnabled ? 'bg-emerald-500' : 'bg-gray-300'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                  rates.jobDescriptionEnabled ? 'translate-x-5' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+            <div className={`space-y-3 ${!rates.jobDescriptionEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Generations per job</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={rates.jobDescriptionPerJobCap}
+                  onChange={(e) => setRates(r => ({ ...r, jobDescriptionPerJobCap: Math.max(1, parseInt(e.target.value) || 1) }))}
+                  className="w-16 border border-gray-300 rounded-md px-2 py-1 text-sm text-center"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Generations per org / day</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={rates.jobDescriptionDailyOrgCap}
+                  onChange={(e) => setRates(r => ({ ...r, jobDescriptionDailyOrgCap: Math.max(1, parseInt(e.target.value) || 1) }))}
+                  className="w-16 border border-gray-300 rounded-md px-2 py-1 text-sm text-center"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100" />
+
+          {/* Website Scanner */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
+              Website Scanner
+            </p>
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-medium text-gray-700">Enabled</span>
+              <button
+                role="switch"
+                aria-checked={rates.websiteScanEnabled}
+                onClick={() => setRates(r => ({ ...r, websiteScanEnabled: !r.websiteScanEnabled }))}
+                className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors cursor-pointer ${
+                  rates.websiteScanEnabled ? 'bg-emerald-500' : 'bg-gray-300'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                  rates.websiteScanEnabled ? 'translate-x-5' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+            <div className={`space-y-3 ${!rates.websiteScanEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Scans per window</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={rates.websiteScanCap}
+                  onChange={(e) => setRates(r => ({ ...r, websiteScanCap: Math.max(1, parseInt(e.target.value) || 1) }))}
+                  className="w-16 border border-gray-300 rounded-md px-2 py-1 text-sm text-center"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Window length (days)</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={rates.websiteScanWindowDays}
+                  onChange={(e) => setRates(r => ({ ...r, websiteScanWindowDays: Math.max(1, parseInt(e.target.value) || 1) }))}
+                  className="w-16 border border-gray-300 rounded-md px-2 py-1 text-sm text-center"
+                />
+              </div>
+            </div>
+          </div>
+
+          {ratesError && <p className="text-sm text-red-600">{ratesError}</p>}
+          <button
+            onClick={saveRates}
+            disabled={ratesSaving}
+            className="w-full bg-gray-900 hover:bg-gray-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            {ratesSaving ? 'Saving...' : ratesSaved ? 'Saved!' : 'Save Rate Limits'}
+          </button>
+        </div>
+      </div>
+
     </div>
   )
 }
