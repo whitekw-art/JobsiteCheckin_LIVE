@@ -25,6 +25,7 @@ export async function PATCH(request: NextRequest) {
       homeCustomerName,
       homeCustomerPhone,
       homeCustomerEmail,
+      aiDescriptionGeneratedAt,
     } = body as {
       id: string
       installer?: string
@@ -40,6 +41,7 @@ export async function PATCH(request: NextRequest) {
       homeCustomerName?: string | null
       homeCustomerPhone?: string | null
       homeCustomerEmail?: string | null
+      aiDescriptionGeneratedAt?: string | null
     }
 
     if (!id) {
@@ -85,6 +87,9 @@ export async function PATCH(request: NextRequest) {
         ...(homeCustomerName !== undefined && { homeCustomerName: homeCustomerName?.trim() || null }),
         ...(homeCustomerPhone !== undefined && { homeCustomerPhone: homeCustomerPhone?.trim() || null }),
         ...(homeCustomerEmail !== undefined && { homeCustomerEmail: homeCustomerEmail?.trim() || null }),
+        ...(aiDescriptionGeneratedAt !== undefined && {
+          aiDescriptionGeneratedAt: aiDescriptionGeneratedAt ? new Date(aiDescriptionGeneratedAt) : null,
+        }),
       },
     })
 

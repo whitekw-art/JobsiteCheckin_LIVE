@@ -530,6 +530,12 @@ export default function Dashboard() {
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null)
 
+  // AI description generation (Titan only)
+  const [aiGeneratingId,  setAiGeneratingId]  = useState<string | null>(null)
+  const [aiEditingId,     setAiEditingId]     = useState<string | null>(null)
+  const [aiSavingId,      setAiSavingId]      = useState<string | null>(null)
+  const [aiGenerateError, setAiGenerateError] = useState<Record<string, string>>({})
+
   // Customer editing (keyed by checkIn.id)
   const [editCustomers, setEditCustomers] = useState<Record<string, EditCustomer>>({})
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null)
@@ -913,6 +919,57 @@ export default function Dashboard() {
       alert(err.message || 'Failed to update notes')
     } finally {
       setSavingNoteId(null)
+    }
+  }
+
+  // ── AI description generate ────────────────────────────────────────────────
+
+  const handleAiGenerate = async (checkIn: CheckIn) => {
+    setAiGeneratingId(checkIn.id)
+    setAiGenerateError((prev) => { const n = { ...prev }; delete n[checkIn.id]; return n })
+    try {
+      const res = await fetch('/api/agents/job-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkInId: checkIn.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 429) {
+        setAiGenerateError((prev) => ({ ...prev, [checkIn.id]: data.message ?? 'Generation limit reached.' }))
+        return
+      }
+      if (!res.ok) {
+        setAiGenerateError((prev) => ({ ...prev, [checkIn.id]: data.error ?? 'Generation failed. Try again.' }))
+        return
+      }
+      // Enter AI edit mode with generated content
+      setEditNotes((prev) => ({ ...prev, [checkIn.id]: data.description }))
+      setAiEditingId(checkIn.id)
+      setEditingNoteId(null) // ensure manual edit mode is off
+    } finally {
+      setAiGeneratingId(null)
+    }
+  }
+
+  const handleAiNoteSave = async (checkIn: CheckIn) => {
+    const notes = editNotes[checkIn.id] ?? ''
+    setAiSavingId(checkIn.id)
+    try {
+      const res = await fetch('/api/checkins/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkIn.id, notes, aiDescriptionGeneratedAt: new Date().toISOString() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed to save')
+      setCheckIns((prev) =>
+        prev.map((c) => c.id === checkIn.id ? { ...c, notes } : c)
+      )
+      setAiEditingId(null)
+    } catch (err: any) {
+      alert(err.message || 'Failed to save')
+    } finally {
+      setAiSavingId(null)
     }
   }
 
@@ -1734,7 +1791,8 @@ export default function Dashboard() {
                             <div>
                               <div className="db-notes-header">
                                 <span className="db-d-label">Notes</span>
-                                {editingNoteId !== checkIn.id && (
+                                {/* Hide Edit link when in AI edit mode */}
+                                {editingNoteId !== checkIn.id && aiEditingId !== checkIn.id && (
                                   <button
                                     className="db-btn-note-edit"
                                     onClick={() => setEditingNoteId(checkIn.id)}
@@ -1742,8 +1800,55 @@ export default function Dashboard() {
                                     Edit
                                   </button>
                                 )}
+                                {/* AI edit mode label */}
+                                {aiEditingId === checkIn.id && (
+                                  <span style={{ fontSize: 11, fontWeight: 600, color: '#7C3AED', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+                                    AI-generated \u2014 edit before saving
+                                  </span>
+                                )}
                               </div>
-                              {editingNoteId === checkIn.id ? (
+
+                              {/* State B: AI edit mode */}
+                              {aiEditingId === checkIn.id ? (
+                                <>
+                                  <textarea
+                                    className="db-notes-textarea"
+                                    value={editNotes[checkIn.id] ?? ''}
+                                    onChange={(e) =>
+                                      setEditNotes((prev) => ({ ...prev, [checkIn.id]: e.target.value }))
+                                    }
+                                    rows={6}
+                                  />
+                                  <div className="db-edit-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <button
+                                      className="db-btn-save"
+                                      disabled={aiSavingId === checkIn.id}
+                                      onClick={() => handleAiNoteSave(checkIn)}
+                                    >
+                                      {aiSavingId === checkIn.id ? 'Saving\u2026' : 'Save'}
+                                    </button>
+                                    <button
+                                      className="db-btn-cancel"
+                                      onClick={() => {
+                                        setAiEditingId(null)
+                                        setEditNotes((prev) => ({ ...prev, [checkIn.id]: checkIn.notes || '' }))
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      className="db-btn-note-edit"
+                                      style={{ marginLeft: 'auto' }}
+                                      disabled={aiGeneratingId === checkIn.id}
+                                      onClick={() => handleAiGenerate(checkIn)}
+                                    >
+                                      {aiGeneratingId === checkIn.id ? 'Regenerating\u2026' : '\u21ba Regenerate'}
+                                    </button>
+                                  </div>
+                                </>
+                              ) : editingNoteId === checkIn.id ? (
+                                /* State C: manual edit (existing behavior) */
                                 <>
                                   <textarea
                                     className="db-notes-textarea"
@@ -1779,9 +1884,49 @@ export default function Dashboard() {
                                   </div>
                                 </>
                               ) : (
-                                <div className="db-d-val">
-                                  {checkIn.notes || <span className="db-notes-empty">No notes added</span>}
-                                </div>
+                                /* State A: read-only + optional Generate button */
+                                <>
+                                  <div className="db-d-val">
+                                    {checkIn.notes || <span className="db-notes-empty">No notes added</span>}
+                                  </div>
+                                  {/* Generate button \u2014 Titan only */}
+                                  {tierHasFeature(planTier, 'ai_job_description') && (
+                                    <div style={{ marginTop: 10 }}>
+                                      <button
+                                        style={{
+                                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                                          padding: '6px 12px', borderRadius: 8,
+                                          fontSize: 12, fontWeight: 700,
+                                          fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                          background: aiGeneratingId === checkIn.id ? '#E0E7EF' : '#F3F0FF',
+                                          color: aiGeneratingId === checkIn.id ? '#64748B' : '#5B21B6',
+                                          border: '1px solid #DDD6FE',
+                                          cursor: aiGeneratingId === checkIn.id ? 'not-allowed' : 'pointer',
+                                          transition: 'background .15s',
+                                        }}
+                                        disabled={aiGeneratingId === checkIn.id}
+                                        onClick={() => handleAiGenerate(checkIn)}
+                                      >
+                                        {aiGeneratingId === checkIn.id ? (
+                                          <>
+                                            <svg style={{ animation: 'spin 0.8s linear infinite' }} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity="0.3"/><path d="M12 2a10 10 0 0110 10"/></svg>
+                                            Generating\u2026
+                                          </>
+                                        ) : (
+                                          <>
+                                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 4.93a10 10 0 000 14.14"/></svg>
+                                            Generate description with AI
+                                          </>
+                                        )}
+                                      </button>
+                                      {aiGenerateError[checkIn.id] && (
+                                        <div style={{ marginTop: 6, fontSize: 11.5, color: '#DC2626' }}>
+                                          {aiGenerateError[checkIn.id]}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </div>
 

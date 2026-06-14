@@ -18,7 +18,7 @@ export const PLAN_FEATURES: Record<string, Record<number, string[]>> = {
     1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'gbp_post', 'before_after_tagging'],
   },
   titan: {
-    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'api_access', 'white_label', 'gbp_post', 'before_after_tagging', 'review_request'],
+    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'api_access', 'white_label', 'gbp_post', 'before_after_tagging', 'review_request', 'ai_job_description'],
   },
 }
 
