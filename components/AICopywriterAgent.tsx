@@ -51,7 +51,7 @@ const FAQS = [
   },
   {
     q: 'Which plan includes this feature?',
-    a: 'The AI Copywriter Agent is included in the Titan plan. It is coming soon — start capturing jobs now so your agent has a full library of job data to work from on day one.',
+    a: 'The AI Copywriter Agent is included in the Titan plan and is live now. Every job you check in with photos gets a ready-to-publish description in seconds.',
   },
 ]
 

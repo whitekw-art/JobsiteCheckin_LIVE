@@ -385,6 +385,19 @@ body {
   margin-left: 3px;
 }
 
+.new-pill {
+  display: inline-block;
+  background: rgba(16,185,129,.1);
+  color: var(--green);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 3px;
+}
+
 /* ─── SINGLE CTA BLOCK ─── */
 .cta-block {
   margin: 32px 0 0;
