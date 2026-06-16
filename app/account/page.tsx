@@ -442,7 +442,7 @@ export default function AccountPage() {
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 10.5, fontWeight: 700, background: '#FFF7ED', color: '#C2410C', border: '1px solid #FED7AA' }}>Titan</span>
                     </div>
                     <p style={{ fontSize: 12, color: 'var(--t3)', lineHeight: 1.55, marginBottom: 16 }}>
-                      Used by the AI copywriting agent to write accurate job descriptions. Populated automatically from your website \u2014 edit anytime.
+                      Used by the AI copywriting agent to write accurate job descriptions. Populated automatically from your website {'\u2014'} edit anytime.
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
                       <div>
