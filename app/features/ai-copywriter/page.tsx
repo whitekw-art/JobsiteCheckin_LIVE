@@ -60,7 +60,7 @@ const softwareJsonLd = {
     '@type': 'Offer',
     price: '0',
     priceCurrency: 'USD',
-    description: 'Included in Titan plan. Coming soon.',
+    description: 'Included in Titan plan.',
   },
   url: 'https://projectcheckin.com',
 }

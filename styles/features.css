@@ -180,6 +180,18 @@ body {
   border-radius: 3px;
 }
 
+.feat-new {
+  display: inline-block;
+  background: rgba(16,185,129,.10);
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
 /* Hamburger — mobile nav */
 .nav-hamburger {
   display: none;

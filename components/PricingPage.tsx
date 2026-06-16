@@ -189,10 +189,7 @@ export default function PricingPage() {
               {['Everything in Elite', 'One-tap review requests', 'Automated Google review requests', 'Unlimited photos per month'].map(item => (
                 <li key={item}><span className="li-check"><Ck /></span>{item}</li>
               ))}
-              <li className="li-soon-row">
-                <span className="li-soon-dot" />
-                AI copywriting agent <span className="soon-pill">Soon</span>
-              </li>
+              <li><span className="li-check"><Ck /></span>AI copywriting agent <span className="new-pill">New</span></li>
               <li className="li-soon-row">
                 <span className="li-soon-dot" />
                 AI review request agent <span className="soon-pill">Soon</span>
@@ -352,7 +349,7 @@ export default function PricingPage() {
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
-                  <td><span className="cs">Soon</span></td>
+                  <td><span className="ck">✓</span></td>
                 </tr>
                 <tr>
                   <td>AI-personalized review request message</td>

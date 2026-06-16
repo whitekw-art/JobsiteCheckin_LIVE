@@ -78,14 +78,12 @@ export default function MarketingNav() {
                 </Link>
               ))}
               <div className="feat-divider" />
-              <div className="feat-section-label">
-                AI Agents <span className="feat-soon">Soon</span>
-              </div>
+              <div className="feat-section-label">AI Agents</div>
               <Link href="/features/ai-copywriter" className="feat-item sub" onClick={closeAll}>
-                AI Copywriter Agent
+                AI Copywriter Agent <span className="feat-new">New</span>
               </Link>
               <Link href="/features/ai-review-request" className="feat-item sub" onClick={closeAll}>
-                AI Review Request Agent
+                AI Review Request Agent <span className="feat-soon">Soon</span>
               </Link>
             </div>
           </li>
