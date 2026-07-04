@@ -334,7 +334,7 @@ function GbpPostModal({
           </div>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', padding: 4, lineHeight: 1 }}
+            style={{ background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', lineHeight: 1, minWidth: 40, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -369,9 +369,9 @@ function GbpPostModal({
                     onClick={() => downloadPhoto(url, i)}
                     title="Download photo"
                     style={{
-                      position: 'absolute', bottom: 5, right: 5,
+                      position: 'absolute', bottom: 4, right: 4,
                       background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)',
-                      border: 'none', borderRadius: 5, padding: '4px 5px',
+                      border: 'none', borderRadius: 6, width: 36, height: 36,
                       cursor: 'pointer', color: '#fff', lineHeight: 1,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}

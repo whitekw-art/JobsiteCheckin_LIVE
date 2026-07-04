@@ -507,7 +507,7 @@ export default function JobDetailClient({
                   <>
                     <button
                       type="button"
-                      className="lg:hidden absolute left-3 top-1/2 -translate-y-1/2 z-[10] w-9 h-9 flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors duration-200 cursor-pointer"
+                      className="lg:hidden absolute left-3 top-1/2 -translate-y-1/2 z-[10] w-11 h-11 flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors duration-200 cursor-pointer"
                       style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(6px)' }}
                       onClick={() => setFeaturedIndex((featuredIndex - 1 + photos.length) % photos.length)}
                       aria-label="Previous photo"
@@ -516,7 +516,7 @@ export default function JobDetailClient({
                     </button>
                     <button
                       type="button"
-                      className="lg:hidden absolute right-3 top-1/2 -translate-y-1/2 z-[10] w-9 h-9 flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors duration-200 cursor-pointer"
+                      className="lg:hidden absolute right-3 top-1/2 -translate-y-1/2 z-[10] w-11 h-11 flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors duration-200 cursor-pointer"
                       style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(6px)' }}
                       onClick={() => setFeaturedIndex((featuredIndex + 1) % photos.length)}
                       aria-label="Next photo"

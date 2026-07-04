@@ -1491,10 +1491,14 @@
   border: none;
   color: var(--t3);
   cursor: pointer;
-  padding: 2px;
   line-height: 1;
   flex-shrink: 0;
   margin-left: 12px;
+  min-width: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .rrm-cust-display {
   background: var(--surface-3);

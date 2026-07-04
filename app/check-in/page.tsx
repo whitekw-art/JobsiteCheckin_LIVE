@@ -513,7 +513,7 @@ function CheckInContent() {
                     onClick={handlePickContact}
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: 5,
-                      padding: '4px 10px', borderRadius: 6,
+                      padding: '10px 14px', minHeight: 40, borderRadius: 6,
                       border: '1px solid var(--border)', background: 'var(--card)',
                       color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 600,
                       cursor: 'pointer',
