@@ -18,6 +18,7 @@ export default withAuth(
       '/payments/checkout',
     ]
     const isPublicAssetPath = pathname.startsWith('/temp-photos/') ||
+      pathname.startsWith('/widget.') || // embed widget script — loaded by customer websites
       /\.(png|jpg|jpeg|svg|ico|webp|gif)$/i.test(pathname)
 
     // Registration gating — redirect /auth/register to homepage when registration is closed.

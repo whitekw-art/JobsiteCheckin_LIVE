@@ -25,6 +25,8 @@ model Organization {
   planTier             String?
   planVersion          Int     @default(1)
   gbpReviewLink            String?
+  portfolioPageUrl         String?
+  portfolioIntro           String?
   email                    String?
   businessContext          String?
   businessContextUpdatedAt DateTime?

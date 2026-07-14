@@ -22,6 +22,8 @@ export async function GET() {
         website: true,
         email: true,
         gbpReviewLink: true,
+        portfolioPageUrl: true,
+        portfolioIntro: true,
         businessContext: true,
         businessContextUpdatedAt: true,
         websiteScanHistory: true,
@@ -63,16 +65,36 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const { name, phone, website, email, gbpReviewLink, services, products, serviceArea, businessDescription } = (await request.json()) as {
+    const { name, phone, website, email, gbpReviewLink, portfolioPageUrl, portfolioIntro, services, products, serviceArea, businessDescription } = (await request.json()) as {
       name?: string
       phone?: string
       website?: string
       email?: string
       gbpReviewLink?: string
+      portfolioPageUrl?: string | null
+      portfolioIntro?: string | null
       services?: string
       products?: string
       serviceArea?: string
       businessDescription?: string
+    }
+
+    // Validate portfolio page URL before saving — it becomes the link target
+    // in GBP posts and the widget's estimate button
+    if (portfolioPageUrl !== undefined && portfolioPageUrl !== null && portfolioPageUrl.trim()) {
+      let validUrl = false
+      try {
+        const parsed = new URL(portfolioPageUrl.trim())
+        validUrl = parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      } catch {
+        validUrl = false
+      }
+      if (!validUrl) {
+        return NextResponse.json(
+          { error: 'Portfolio page URL must be a valid URL starting with http:// or https://' },
+          { status: 400 }
+        )
+      }
     }
 
     // If any AI business context fields are present, serialize them into businessContext
@@ -108,6 +130,8 @@ export async function PATCH(request: NextRequest) {
         website: website ?? null,
         ...(email !== undefined && { email: email.trim() || null }),
         ...(gbpReviewLink !== undefined && { gbpReviewLink: gbpReviewLink || null }),
+        ...(portfolioPageUrl !== undefined && { portfolioPageUrl: portfolioPageUrl?.trim() || null }),
+        ...(portfolioIntro !== undefined && { portfolioIntro: portfolioIntro?.trim() || null }),
         ...businessContextUpdate,
       },
       select: {
@@ -117,6 +141,8 @@ export async function PATCH(request: NextRequest) {
         website: true,
         email: true,
         gbpReviewLink: true,
+        portfolioPageUrl: true,
+        portfolioIntro: true,
         businessContext: true,
       },
     })
