@@ -999,7 +999,7 @@ export default function LandingPage({ registrationOpen = false }: { registration
                 <div className="pf"><span className="pf-ck">&#10003;</span>Automated Google review requests</div>
                 <div className="pf"><span className="pf-ck">&#10003;</span>Geo-grid rank tracking heatmap <span className="soon-badge">Soon</span></div>
                 <div className="pf"><span className="pf-ck">&#10003;</span>CRM &amp; QuickBooks integration <span className="soon-badge">Soon</span></div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Website integration <span className="soon-badge">Soon</span></div>
+                <div className="pf"><span className="pf-ck">&#10003;</span>Website Integration for Local SEO</div>
                 <div className="pf"><span className="pf-ck">&#10003;</span>Priority support + strategy calls</div>
               </div>
               {registrationOpen ? (

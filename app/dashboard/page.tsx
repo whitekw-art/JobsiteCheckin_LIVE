@@ -255,10 +255,12 @@ function IcoGbp() {
 function GbpPostModal({
   checkIn,
   publicUrl,
+  portfolioPageUrl,
   onClose,
 }: {
   checkIn: CheckIn
   publicUrl: string
+  portfolioPageUrl: string | null
   onClose: () => void
 }) {
   const [copied, setCopied] = useState(false)
@@ -266,10 +268,15 @@ function GbpPostModal({
 
   const location = [checkIn.city, checkIn.state].filter(Boolean).join(', ')
   const jobType = checkIn.doorType || 'Job'
+  // When a portfolio page URL is configured, GBP posts link to the customer's
+  // own domain (with UTM tracking) instead of the PCK job page
+  const postLink = portfolioPageUrl
+    ? `${portfolioPageUrl}${portfolioPageUrl.includes('?') ? '&' : '?'}utm_source=googlebusiness&utm_medium=post&utm_campaign=projectcheckin`
+    : publicUrl
   const postText = [
     `${jobType} completed${location ? ` in ${location}` : ''}.`,
     checkIn.notes?.trim() ? checkIn.notes.trim() : null,
-    `See the full job details and photos: ${publicUrl}`,
+    `See the full job details and photos: ${postLink}`,
   ]
     .filter(Boolean)
     .join('\n\n')
@@ -341,6 +348,17 @@ function GbpPostModal({
             </svg>
           </button>
         </div>
+
+        {portfolioPageUrl && (
+          <div style={{
+            background: 'var(--green-bg, #F0FDF4)', border: '1px solid rgba(22,163,74,.2)',
+            borderRadius: 8, padding: '10px 13px', fontSize: 12, color: 'var(--green, #16A34A)',
+            fontWeight: 600, display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 14,
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Portfolio URL set — link sends traffic to <strong>your website</strong></span>
+          </div>
+        )}
 
         <div style={{
           background: 'var(--surface-2)', border: '1px solid var(--border)',
@@ -546,6 +564,7 @@ export default function Dashboard() {
   const [orgPhone, setOrgPhone] = useState('')
   const [orgEmail, setOrgEmail] = useState('')
   const [gbpReviewLink, setGbpReviewLink] = useState('')
+  const [orgPortfolioUrl, setOrgPortfolioUrl] = useState<string | null>(null)
 
   // Review request modal
   const [reviewModalCheckIn, setReviewModalCheckIn] = useState<CheckIn | null>(null)
@@ -619,6 +638,7 @@ export default function Dashboard() {
         if (d.organization?.phone) setOrgPhone(d.organization.phone)
         if (d.organization?.email) setOrgEmail(d.organization.email)
         if (d.organization?.gbpReviewLink) setGbpReviewLink(d.organization.gbpReviewLink)
+        if (d.organization?.portfolioPageUrl) setOrgPortfolioUrl(d.organization.portfolioPageUrl)
       })
       .catch(() => {})
   }, [])
@@ -2104,6 +2124,7 @@ export default function Dashboard() {
           <GbpPostModal
             checkIn={ci}
             publicUrl={getPublicUrl(ci)}
+            portfolioPageUrl={orgPortfolioUrl}
             onClose={() => setGbpPostId(null)}
           />
         )

@@ -196,7 +196,7 @@ export default function PricingPage() {
               <div className="pf"><span className="pf-ck">&#10003;</span>AI copywriting agent <span className="new-badge">New</span></div>
               <div className="pf"><span className="pf-ck">&#10003;</span>AI review request agent <span className="soon-badge">Soon</span></div>
               <div className="pf"><span className="pf-ck">&#10003;</span>CRM &amp; QuickBooks integration <span className="soon-badge">Soon</span></div>
-              <div className="pf"><span className="pf-ck">&#10003;</span>Website integration <span className="soon-badge">Soon</span></div>
+              <div className="pf"><span className="pf-ck">&#10003;</span>Website Integration for Local SEO</div>
             </div>
           </div>
 
