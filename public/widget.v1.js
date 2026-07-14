@@ -40,6 +40,17 @@
     return n;
   }
 
+  // Only allow http(s) hrefs for org-supplied URLs — blocks javascript: URI injection
+  // if a non-validated value ever reaches this API response.
+  function safeHref(raw) {
+    try {
+      var u = new URL(String(raw), window.location.href);
+      return (u.protocol === 'https:' || u.protocol === 'http:') ? u.href : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function slugify(v) {
     return String(v || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   }
@@ -392,9 +403,10 @@
     pck.rel = 'noopener';
     links.appendChild(pck);
     foot.appendChild(links);
-    if (state.org.portfolioPageUrl) {
+    var estHref = state.org.portfolioPageUrl ? safeHref(state.org.portfolioPageUrl) : null;
+    if (estHref) {
       var est = el('a', 'pcw-est', 'Get a free estimate');
-      est.href = state.org.portfolioPageUrl;
+      est.href = estHref;
       foot.appendChild(est);
     }
     modal.appendChild(foot);
