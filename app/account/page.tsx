@@ -31,10 +31,10 @@ interface WidgetJobsSummary {
 }
 
 const WIDGET_PLATFORM_INSTRUCTIONS: Record<string, string> = {
-  WordPress: 'In WordPress, open your page in the editor. Click the + button to add a new block, then search for "Custom HTML". Paste the code below into the block. Click Update or Publish to save.',
-  Squarespace: 'In Squarespace, open your page in the editor and click Edit. Click the + icon to add a new block, scroll down and select Code. Paste the code below and click Apply. Save and publish your page.',
-  Webflow: 'In Webflow, open your page in the Designer. In the left panel, drag an Embed element onto the canvas. Double-click the element to open the embed editor, paste the code below, and click Save & Close. Publish your site.',
-  'Plain HTML': 'Open your HTML file in a code editor. Find the location on the page where you want the widget. Paste the code below inside the <body> tag at that location. Save the file and upload it to your hosting provider.',
+  WordPress: '1. Log into WordPress and open the page where you want your work to show up (or create a new page).\n2. Click the + button to add a new block.\n3. Type "Custom HTML" in the search box and select it.\n4. Paste the code below into that block.\n5. Click Update (or Publish) in the top right to save your page.',
+  Squarespace: '1. Log into Squarespace and open the page where you want your work to show up.\n2. Click Edit on that page.\n3. Click the + icon where you want the widget to appear, scroll down, and choose Code.\n4. Paste the code below into the box that opens, then click Apply.\n5. Click Save, then Publish, in the top right.',
+  Webflow: '1. Open your site in the Webflow Designer and go to the page where you want your work to show up.\n2. In the left panel, find the Embed element and drag it onto the page.\n3. Double-click the Embed box you just added.\n4. Paste the code below into the box, then click Save & Close.\n5. Click Publish in the top right to make it live.',
+  'Plain HTML': '1. Find the HTML file for the page where you want your work to show up. If someone else built your site, ask them for it — or log into your hosting account (GoDaddy, Bluehost, Netlify, etc.) and look for "File Manager" or "Site Files."\n2. Right-click that file and choose Open With → Notepad (Windows) or TextEdit (Mac). Don’t use Microsoft Word — it can break the file.\n3. Press Ctrl+F (Cmd+F on Mac) and search for </body>. That’s a marker near the end of the file.\n4. Click right before </body> and paste the code below.\n5. Save the file, then upload it back to your host the same way you found it. Most hosts show a Save or Publish button.\n6. Stuck? Your web host’s live chat can usually paste one snippet for you in a few minutes — just say "I need to add one HTML snippet before </body> on this page."',
 }
 
 function joinList(items: string[]): string {
@@ -1035,7 +1035,7 @@ export default function AccountPage() {
                     </button>
                   ))}
                 </div>
-                <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: 'var(--t2)', lineHeight: 1.65, marginBottom: 10 }}>
+                <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: 'var(--t2)', lineHeight: 1.65, marginBottom: 10, whiteSpace: 'pre-line' }}>
                   {WIDGET_PLATFORM_INSTRUCTIONS[widgetPlatform]}
                 </div>
                 <div style={{ background: 'var(--t1)', color: '#7DD3FC', borderRadius: 8, padding: '12px 14px', fontFamily: "'Courier New', monospace", fontSize: 11.5, lineHeight: 1.6, marginBottom: 10, overflowX: 'auto', whiteSpace: 'pre' }}>
