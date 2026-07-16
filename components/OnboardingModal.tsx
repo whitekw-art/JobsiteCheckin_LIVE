@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { tierHasFeature } from '@/lib/planVersions'
 
 const WIDGET_PLATFORM_INSTRUCTIONS: Record<string, string> = {
-  WordPress: 'In WordPress, open your page in the editor. Click the + button to add a new block, then search for "Custom HTML". Paste the code below into the block. Click Update or Publish to save.',
-  Squarespace: 'In Squarespace, open your page in the editor and click Edit. Click the + icon to add a new block, scroll down and select Code. Paste the code below and click Apply. Save and publish your page.',
-  Webflow: 'In Webflow, open your page in the Designer. In the left panel, drag an Embed element onto the canvas. Double-click the element to open the embed editor, paste the code below, and click Save & Close. Publish your site.',
-  'Plain HTML': 'Open your HTML file in a code editor. Find the location on the page where you want the widget. Paste the code below inside the <body> tag at that location. Save the file and upload it to your hosting provider.',
+  WordPress: '1. Log into WordPress and open the page where you want your work to show up (or create a new page).\n2. Click the + button to add a new block.\n3. Type "Custom HTML" in the search box and select it.\n4. Paste the code below into that block.\n5. Click Update (or Publish) in the top right to save your page.',
+  Squarespace: '1. Log into Squarespace and open the page where you want your work to show up.\n2. Click Edit on that page.\n3. Click the + icon where you want the widget to appear, scroll down, and choose Code.\n4. Paste the code below into the box that opens, then click Apply.\n5. Click Save, then Publish, in the top right.',
+  Webflow: '1. Open your site in the Webflow Designer and go to the page where you want your work to show up.\n2. In the left panel, find the Embed element and drag it onto the page.\n3. Double-click the Embed box you just added.\n4. Paste the code below into the box, then click Save & Close.\n5. Click Publish in the top right to make it live.',
+  'Plain HTML': '1. Find the HTML file for the page where you want your work to show up. If someone else built your site, ask them for it — or log into your hosting account (GoDaddy, Bluehost, Netlify, etc.) and look for "File Manager" or "Site Files."\n2. Right-click that file and choose Open With → Notepad (Windows) or TextEdit (Mac). Don’t use Microsoft Word — it can break the file.\n3. Press Ctrl+F (Cmd+F on Mac) and search for </body>. That’s a marker near the end of the file.\n4. Click right before </body> and paste the code below.\n5. Save the file, then upload it back to your host the same way you found it. Most hosts show a Save or Publish button.\n6. Stuck? Your web host’s live chat can usually paste one snippet for you in a few minutes — just say "I need to add one HTML snippet before </body> on this page."',
 }
 
 const TRADES = [
@@ -45,7 +45,7 @@ const PLAN_FEATURES: Record<string, string[]> = {
   free:  ['Job check-ins with photos (up to 5 per job)', 'Up to 5 published job pages on Google', 'Basic dashboard'],
   pro:   ['Unlimited published job pages with full SEO', 'Portfolio page', 'Analytics & click tracking', 'Google Business Profile post generator'],
   elite: ['Everything in Pro', 'Auto-formatted Google Business Profile posts', 'Professional before & after images', 'Ghost camera overlay', 'Drag-to-reveal widget'],
-  titan: ['Everything in Elite', 'Automatic Google Business review requests', 'Custom AI copywriting agent', 'Custom AI Review Request Manager', 'Custom subdomain & white-label branding'],
+  titan: ['Everything in Elite', 'Automatic Google Business review requests', 'Custom AI copywriting agent', 'Custom AI Review Request Manager', 'Custom website widget for local SEO', 'Custom subdomain & white-label branding'],
 }
 
 interface Props {
@@ -259,7 +259,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
     })
   }
 
-  // Save the portfolio URL if one was entered, then complete onboarding
+  // Save the portfolio URL if one was entered, then advance to the final onboarding step
   const handleWidgetFinish = async () => {
     const url = wUrl.trim()
     if (url) {
@@ -289,8 +289,9 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
         setWSaving(false)
         return
       }
+      setWSaving(false)
     }
-    await handleFinish()
+    setStep(6)
   }
 
   const tier = planTier || 'free'
@@ -715,8 +716,8 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
           </div>
         )}
 
-        {/* ── STEP 5: First steps ── */}
-        {!showAiResearch && step === 5 && (
+        {/* ── FINAL STEP: First steps / You're all set (step 5 of 5, or step 6 of 6 for Titan widget users) ── */}
+        {!showAiResearch && (hasWidgetStep ? step === 6 : step === 5) && (
           <div style={styles.body}>
             <div style={{ ...styles.welcomeIcon, background: '#F0FDF4', borderColor: '#A7F3D0' }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
@@ -774,8 +775,8 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
               )}
             </div>
 
-            <button style={styles.btnPrimary} onClick={hasWidgetStep ? () => setStep(6) : handleFinish}>
-              {hasWidgetStep ? 'Continue' : 'Go to my dashboard'}
+            <button style={styles.btnPrimary} onClick={handleFinish}>
+              Go to my dashboard
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
                 stroke="white" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/>
                 <polyline points="12 5 19 12 12 19"/></svg>
@@ -783,11 +784,11 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
           </div>
         )}
 
-        {/* ── STEP 6: Website Integration for Local SEO (Titan only, optional) ── */}
-        {!showAiResearch && step === 6 && hasWidgetStep && (
+        {/* ── STEP 5: Website Integration for Local SEO (Titan only, optional) ── */}
+        {!showAiResearch && step === 5 && hasWidgetStep && (
           <div style={styles.body}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' as const, color: '#F97316', marginBottom: 5 }}>
-              Step {maxStep} of {maxStep} — Optional
+              Step 5 of {maxStep} — Optional
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <h2 style={{ ...styles.stepTitle, marginBottom: 0 }}>Website Integration for Local SEO</h2>
@@ -854,7 +855,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                 </button>
               ))}
             </div>
-            <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: '#0C4A6E', lineHeight: 1.65, marginBottom: 10 }}>
+            <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: '#0C4A6E', lineHeight: 1.65, marginBottom: 10, whiteSpace: 'pre-line' as const }}>
               {WIDGET_PLATFORM_INSTRUCTIONS[wPlatform]}
             </div>
             <div style={{ background: '#0F172A', color: '#7DD3FC', borderRadius: 8, padding: '12px 14px', fontFamily: "'Courier New', monospace", fontSize: 11, lineHeight: 1.6, marginBottom: 10, overflowX: 'auto' as const, whiteSpace: 'pre' as const }}>
@@ -873,7 +874,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
             {/* Footer: skip left, save & finish right */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 20, paddingTop: 14, borderTop: '1px solid #E0F2FE' }}>
               <div>
-                <button onClick={handleFinish} style={{ ...styles.btnSkip, marginTop: 0, alignSelf: 'flex-start', textAlign: 'left' as const, padding: 0 }}>
+                <button onClick={() => setStep(6)} style={{ ...styles.btnSkip, marginTop: 0, alignSelf: 'flex-start', textAlign: 'left' as const, padding: 0 }}>
                   Skip — set up later in Account → Connections
                 </button>
                 <div style={{ fontSize: 11.5, color: '#4B7A94', lineHeight: 1.5, marginTop: 6 }}>
@@ -885,7 +886,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                 onClick={handleWidgetFinish}
                 disabled={wSaving}
               >
-                {wSaving ? 'Saving…' : 'Save & finish'}
+                {wSaving ? 'Saving…' : 'Continue'}
               </button>
             </div>
           </div>

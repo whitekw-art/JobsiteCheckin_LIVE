@@ -102,6 +102,7 @@
     '#pc-widget *{box-sizing:border-box;margin:0;padding:0}' +
     '.pcw-h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin-bottom:10px}' +
     '.pcw-intro{font-size:14.5px;color:#374151;line-height:1.7;margin-bottom:24px;max-width:820px}' +
+    '.pcw-empty{font-size:14px;color:#64748B;padding:20px 0}' +
     '.pcw-tabs{display:flex;gap:6px;margin-bottom:32px;flex-wrap:wrap}' +
     '.pcw-tab{padding:6px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;border:1.5px solid #E2E8F0;color:#475569;background:#fff;font-family:inherit}' +
     '.pcw-tab.pcw-on{background:#0F172A;color:#fff;border-color:#0F172A}' +
@@ -232,6 +233,7 @@
 
     function renderTabs() {
       tabs.textContent = '';
+      if (state.jobs.length === 0) return; // nothing to filter yet
       var types = [];
       state.jobs.forEach(function (j) {
         if (j.jobType && types.indexOf(j.jobType) === -1) types.push(j.jobType);
@@ -253,6 +255,10 @@
 
     function renderGroups() {
       groupsWrap.textContent = '';
+      if (state.jobs.length === 0) {
+        groupsWrap.appendChild(el('div', 'pcw-empty', 'No projects published yet — check back soon.'));
+        return;
+      }
       var jobs = state.filter ? state.jobs.filter(function (j) { return j.jobType === state.filter; }) : state.jobs;
 
       // Group by city+state, ordered by job count desc
