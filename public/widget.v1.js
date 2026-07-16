@@ -397,11 +397,14 @@
     var share = el('a', 'pcw-share', 'Share this job →');
     share.href = window.location.pathname + '#' + slug;
     links.appendChild(share);
-    var pck = el('a', 'pcw-pck', 'Also on projectcheckin.com →');
-    pck.href = job.pckUrl;
-    pck.target = '_blank';
-    pck.rel = 'noopener';
-    links.appendChild(pck);
+    var pckHref = safeHref(job.pckUrl);
+    if (pckHref) {
+      var pck = el('a', 'pcw-pck', 'Also on projectcheckin.com →');
+      pck.href = pckHref;
+      pck.target = '_blank';
+      pck.rel = 'noopener';
+      links.appendChild(pck);
+    }
     foot.appendChild(links);
     var estHref = state.org.portfolioPageUrl ? safeHref(state.org.portfolioPageUrl) : null;
     if (estHref) {
