@@ -75,6 +75,10 @@ export async function GET(
         slug: true,
         portfolioIntro: true,
         portfolioPageUrl: true,
+        phone: true,
+        website: true,
+        email: true,
+        gbpReviewLink: true,
       },
     })
 
@@ -148,6 +152,10 @@ export async function GET(
           portfolioIntro: org.portfolioIntro,
           portfolioPageUrl: org.portfolioPageUrl,
           introDefault: buildIntroDefault(org.name, checkIns),
+          ...(org.phone ? { phone: org.phone } : {}),
+          ...(org.website ? { website: org.website } : {}),
+          ...(org.email ? { email: org.email } : {}),
+          ...(org.gbpReviewLink ? { gbpReviewLink: org.gbpReviewLink } : {}),
         },
         jobs,
         total,

@@ -10,6 +10,16 @@ function cleanPhone(v: string | null | undefined): string | null {
   return t && /\d/.test(t) ? t : null
 }
 
+// Matches the normalization already applied at signup (app/api/organization/onboarding/route.ts)
+// so a website saved later from Account -> General can't end up scheme-less.
+function normalizeWebsite(v: string | null | undefined): string | null {
+  if (!v?.trim()) return null
+  const t = v.trim()
+  if (t.startsWith('http://') || t.startsWith('https://')) return t
+  if (t.startsWith('www.')) return `https://${t}`
+  return `https://www.${t}`
+}
+
 export async function GET() {
   try {
     const currentUser = await getCurrentUser()
@@ -135,7 +145,7 @@ export async function PATCH(request: NextRequest) {
       data: {
         ...(name !== undefined && name.trim() && { name: name.trim() }),
         phone: cleanPhone(phone),
-        website: website ?? null,
+        website: normalizeWebsite(website),
         ...(email !== undefined && { email: email.trim() || null }),
         ...(gbpReviewLink !== undefined && { gbpReviewLink: gbpReviewLink || null }),
         ...(portfolioPageUrl !== undefined && { portfolioPageUrl: portfolioPageUrl?.trim() || null }),
