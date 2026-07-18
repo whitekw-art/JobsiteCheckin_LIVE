@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
+function cleanPhone(v: string | null | undefined): string | null {
+  if (typeof v !== 'string') return null
+  const t = v.trim()
+  return t && /\d/.test(t) ? t : null
+}
+
 export async function PATCH(req: Request) {
   try {
     const currentUser = await getCurrentUser()
@@ -24,7 +30,7 @@ export async function PATCH(req: Request) {
       where: { id },
       data: {
         homeCustomerName: homeCustomerName || null,
-        homeCustomerPhone: homeCustomerPhone || null,
+        homeCustomerPhone: cleanPhone(homeCustomerPhone),
         homeCustomerEmail: homeCustomerEmail || null,
       },
       select: {

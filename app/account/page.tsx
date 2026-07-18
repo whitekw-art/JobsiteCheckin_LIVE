@@ -37,6 +37,14 @@ const WIDGET_PLATFORM_INSTRUCTIONS: Record<string, string> = {
   'Plain HTML': '1. Find the HTML file for the page where you want your work to show up. If someone else built your site, ask them for it — or log into your hosting account (GoDaddy, Bluehost, Netlify, etc.) and look for "File Manager" or "Site Files."\n2. Right-click that file and choose Open With → Notepad (Windows) or TextEdit (Mac). Don’t use Microsoft Word — it can break the file.\n3. Press Ctrl+F (Cmd+F on Mac) and search for </body>. That’s a marker near the end of the file.\n4. Click right before </body> and paste the code below.\n5. Save the file, then upload it back to your host the same way you found it. Most hosts show a Save or Publish button.\n6. Stuck? Your web host’s live chat can usually paste one snippet for you in a few minutes — just say "I need to add one HTML snippet before </body> on this page."',
 }
 
+function formatPhone(v: string): string {
+  const d = v.replace(/\D/g, '').slice(0, 10)
+  if (d.length === 0) return ''
+  if (d.length < 4)  return `(${d}`
+  if (d.length < 7)  return `(${d.slice(0,3)}) ${d.slice(3)}`
+  return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`
+}
+
 function joinList(items: string[]): string {
   if (items.length <= 1) return items[0] ?? ''
   if (items.length === 2) return `${items[0]} and ${items[1]}`
@@ -548,7 +556,7 @@ export default function AccountPage() {
                   className="db-shell-input"
                   style={{ width: '100%', minWidth: 0 }}
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(formatPhone(e.target.value))}
                   placeholder="(555) 123-4567"
                 />
               </div>

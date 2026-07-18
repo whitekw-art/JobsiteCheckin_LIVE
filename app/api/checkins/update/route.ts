@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
+function cleanPhone(v: string | null | undefined): string | null {
+  if (typeof v !== 'string') return null
+  const t = v.trim()
+  return t && /\d/.test(t) ? t : null
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
@@ -85,7 +91,7 @@ export async function PATCH(request: NextRequest) {
         ...(beforePhotoUrl !== undefined && { beforePhotoUrl }),
         ...(afterPhotoUrl !== undefined && { afterPhotoUrl }),
         ...(homeCustomerName !== undefined && { homeCustomerName: homeCustomerName?.trim() || null }),
-        ...(homeCustomerPhone !== undefined && { homeCustomerPhone: homeCustomerPhone?.trim() || null }),
+        ...(homeCustomerPhone !== undefined && { homeCustomerPhone: cleanPhone(homeCustomerPhone) }),
         ...(homeCustomerEmail !== undefined && { homeCustomerEmail: homeCustomerEmail?.trim() || null }),
         ...(aiDescriptionGeneratedAt !== undefined && {
           aiDescriptionGeneratedAt: aiDescriptionGeneratedAt ? new Date(aiDescriptionGeneratedAt) : null,

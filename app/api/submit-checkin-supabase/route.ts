@@ -3,6 +3,12 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { hasFeature } from '@/lib/planVersions'
 
+function cleanPhone(v: string | null | undefined): string | null {
+  if (typeof v !== 'string') return null
+  const t = v.trim()
+  return t && /\d/.test(t) ? t : null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
@@ -99,7 +105,7 @@ export async function POST(request: NextRequest) {
       beforePhotoUrl: typeof beforePhotoUrl === 'string' ? beforePhotoUrl : null,
       afterPhotoUrl: typeof afterPhotoUrl === 'string' ? afterPhotoUrl : null,
       homeCustomerName: typeof homeCustomerName === 'string' && homeCustomerName.trim() ? homeCustomerName.trim() : null,
-      homeCustomerPhone: typeof homeCustomerPhone === 'string' && homeCustomerPhone.trim() ? homeCustomerPhone.trim() : null,
+      homeCustomerPhone: cleanPhone(homeCustomerPhone),
       homeCustomerEmail: typeof homeCustomerEmail === 'string' && homeCustomerEmail.trim() ? homeCustomerEmail.trim() : null,
     }
     console.log('CHECKIN_CREATE_DATA', dataToCreate)
