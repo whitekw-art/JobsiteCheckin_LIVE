@@ -42,6 +42,14 @@ interface EditCustomer {
   emails: Array<{ type: string; addr: string }>
 }
 
+function formatPhone(v: string): string {
+  const d = v.replace(/\D/g, '').slice(0, 10)
+  if (d.length === 0) return ''
+  if (d.length < 4)  return `(${d}`
+  if (d.length < 7)  return `(${d.slice(0,3)}) ${d.slice(3)}`
+  return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`
+}
+
 function validateForPublish(checkIn: CheckIn): { hardBlocked: boolean; warnings: string[] } {
   if (!checkIn.city || !checkIn.state) {
     return { hardBlocked: true, warnings: [] }
@@ -1630,7 +1638,7 @@ export default function Dashboard() {
                                             type="tel"
                                             value={phone.num}
                                             placeholder="Phone number"
-                                            onChange={(e) => updateCustomerPhone(checkIn.id, idx, 'num', e.target.value)}
+                                            onChange={(e) => updateCustomerPhone(checkIn.id, idx, 'num', formatPhone(e.target.value))}
                                           />
                                           <button className="cust-remove-btn" onClick={() => removeCustomerPhone(checkIn.id, idx)}>−</button>
                                         </div>
@@ -2186,7 +2194,7 @@ export default function Dashboard() {
                       type="tel"
                       placeholder="(615) 555-0192"
                       value={reviewOverridePhone}
-                      onChange={(e) => setReviewOverridePhone(e.target.value)}
+                      onChange={(e) => setReviewOverridePhone(formatPhone(e.target.value))}
                     />
                   </div>
                   <div className="rrm-field-group">

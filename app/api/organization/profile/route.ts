@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
+// Reject text with no digits at all (e.g. a name typed into a phone field) — permissive
+// otherwise, since phone format varies (extensions, international, partial numbers).
+function cleanPhone(v: string | null | undefined): string | null {
+  if (typeof v !== 'string') return null
+  const t = v.trim()
+  return t && /\d/.test(t) ? t : null
+}
+
 export async function GET() {
   try {
     const currentUser = await getCurrentUser()
@@ -126,7 +134,7 @@ export async function PATCH(request: NextRequest) {
       where: { id: currentUser.organizationId },
       data: {
         ...(name !== undefined && name.trim() && { name: name.trim() }),
-        phone: phone ?? null,
+        phone: cleanPhone(phone),
         website: website ?? null,
         ...(email !== undefined && { email: email.trim() || null }),
         ...(gbpReviewLink !== undefined && { gbpReviewLink: gbpReviewLink || null }),
