@@ -10,6 +10,17 @@ function cleanPhone(v: string | null | undefined): string | null {
   return t && /\d/.test(t) ? t : null
 }
 
+// Same prefixing rule already used at registration/onboarding (app/auth/register/page.tsx) —
+// keeps this save path consistent so users never have to type https:// themselves.
+function normalizeWebsite(v: string | null | undefined): string | null {
+  if (typeof v !== 'string') return null
+  const t = v.trim()
+  if (!t) return null
+  if (t.startsWith('http://') || t.startsWith('https://')) return t
+  if (t.startsWith('www.')) return `https://${t}`
+  return `https://www.${t}`
+}
+
 export async function GET() {
   try {
     const currentUser = await getCurrentUser()
@@ -133,10 +144,10 @@ export async function PATCH(request: NextRequest) {
     const updated = await prisma.organization.update({
       where: { id: currentUser.organizationId },
       data: {
-        ...(name !== undefined && name.trim() && { name: name.trim() }),
+        ...(name !== undefined && name?.trim() && { name: name.trim() }),
         phone: cleanPhone(phone),
-        website: website ?? null,
-        ...(email !== undefined && { email: email.trim() || null }),
+        ...(website !== undefined && { website: normalizeWebsite(website) }),
+        ...(email !== undefined && { email: email?.trim() || null }),
         ...(gbpReviewLink !== undefined && { gbpReviewLink: gbpReviewLink || null }),
         ...(portfolioPageUrl !== undefined && { portfolioPageUrl: portfolioPageUrl?.trim() || null }),
         ...(portfolioIntro !== undefined && { portfolioIntro: portfolioIntro?.trim() || null }),
