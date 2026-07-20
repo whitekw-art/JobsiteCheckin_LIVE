@@ -32,6 +32,9 @@ model Organization {
   businessContextUpdatedAt DateTime?
   websiteScanHistory       Json      @default("[]")
   aiDescriptionHistory     Json      @default("[]")
+  customSubdomain          String?   @unique
+  subdomainStatus          String?
+  subdomainVerifiedAt      DateTime?
   Invitations Invitations[]
   users       User[]
   checkIns    CheckIn[]

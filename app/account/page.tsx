@@ -346,6 +346,78 @@ export default function AccountPage() {
     })
   }
 
+  // Hosted subdomain (CNAME) card state — Titan only
+  const [sdLabel,        setSdLabel]        = useState('our-work')
+  const [sdHost,         setSdHost]         = useState<string | null>(null)
+  const [sdStatus,       setSdStatus]       = useState<string | null>(null)
+  const [sdApex,         setSdApex]         = useState<string | null>(null)
+  const [sdCnameTarget,  setSdCnameTarget]  = useState('cname.vercel-dns.com')
+  const [sdSaving,       setSdSaving]       = useState(false)
+  const [sdError,        setSdError]        = useState<string | null>(null)
+  const [sdEditing,      setSdEditing]      = useState(false)
+  const [showSdSteps,    setShowSdSteps]    = useState(false)
+  const [sdTargetCopied, setSdTargetCopied] = useState(false)
+
+  useEffect(() => {
+    if (!hasWebsiteIntegration) return
+    fetch('/api/organization/subdomain')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return
+        setSdHost(d.customSubdomain ?? null)
+        setSdStatus(d.subdomainStatus ?? null)
+        setSdApex(d.apexDomain ?? null)
+        if (d.cnameTarget) setSdCnameTarget(d.cnameTarget)
+        if (d.customSubdomain && d.apexDomain) {
+          setSdLabel(d.customSubdomain.replace(`.${d.apexDomain}`, ''))
+        }
+      })
+      .catch(() => {})
+  }, [hasWebsiteIntegration])
+
+  // While pending, re-check every 30s — the API promotes to verified once
+  // the CNAME resolves and Vercel confirms the domain
+  useEffect(() => {
+    if (sdStatus !== 'pending') return
+    const t = setInterval(() => {
+      fetch('/api/organization/subdomain')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => { if (d?.subdomainStatus) setSdStatus(d.subdomainStatus) })
+        .catch(() => {})
+    }, 30000)
+    return () => clearInterval(t)
+  }, [sdStatus])
+
+  async function handleSaveSubdomain() {
+    setSdError(null)
+    setSdSaving(true)
+    try {
+      const res = await fetch('/api/organization/subdomain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: sdLabel }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || 'Failed to save')
+      setSdHost(data.customSubdomain)
+      setSdStatus(data.subdomainStatus)
+      setSdApex(data.apexDomain)
+      if (data.cnameTarget) setSdCnameTarget(data.cnameTarget)
+      setSdEditing(false)
+    } catch (err: any) {
+      setSdError(err.message || 'Failed to save')
+    } finally {
+      setSdSaving(false)
+    }
+  }
+
+  function handleCopyCnameTarget() {
+    navigator.clipboard.writeText(sdCnameTarget).then(() => {
+      setSdTargetCopied(true)
+      setTimeout(() => setSdTargetCopied(false), 1500)
+    })
+  }
+
   // Connections tab state (localStorage-backed, Phase 1)
   const [gbpConnected, setGbpConnected] = useState(false)
   const [postMode, setPostMode] = useState<'draft' | 'auto'>('draft')
@@ -1151,6 +1223,164 @@ export default function AccountPage() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* ── Host Your Work On Your Own Site (CNAME subdomain, Titan only) ── */}
+          {hasWebsiteIntegration && (
+            <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Host Your Work Directly On Your Own Site</div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>A real page on your domain — built for Google and AI search, not just a widget</div>
+                  </div>
+                </div>
+                <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, flexShrink: 0, background: '#FFF7ED', color: '#C2410C', border: '1px solid rgba(194,65,12,.2)' }}>
+                  Titan
+                </span>
+              </div>
+
+              {/* State: verified & live */}
+              {sdStatus === 'verified' && !sdEditing ? (
+                <div style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
+                      Live
+                    </span>
+                    <button
+                      onClick={() => setSdEditing(true)}
+                      style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', padding: 0 }}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--t3)', fontFamily: 'monospace', letterSpacing: '-0.2px', marginTop: 7 }}>
+                    <a href={`https://${sdHost}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--sky-text)' }}>{sdHost}</a>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.6, marginTop: 10, marginBottom: 0 }}>
+                    Your jobs are now live on your own domain — visible to Google and AI search immediately, no delay.
+                  </p>
+                </div>
+              ) : sdStatus === 'pending' && !sdEditing ? (
+                /* State: pending DNS */
+                <div style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: '#FFFBEB', color: '#D97706' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                      Waiting on DNS…
+                    </span>
+                    <button
+                      onClick={() => setSdEditing(true)}
+                      style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', padding: 0 }}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--t3)', fontFamily: 'monospace', letterSpacing: '-0.2px', marginTop: 7 }}>{sdHost}</div>
+                  <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '12px 14px', marginTop: 12 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>Add this record at your domain provider</div>
+                    <div style={{ display: 'flex', gap: 10, fontSize: 12, padding: '4px 0' }}><span style={{ color: 'var(--t3)', width: 44, flexShrink: 0, fontWeight: 600 }}>Type</span><span style={{ fontFamily: 'monospace', color: 'var(--t1)' }}>CNAME</span></div>
+                    <div style={{ display: 'flex', gap: 10, fontSize: 12, padding: '4px 0' }}><span style={{ color: 'var(--t3)', width: 44, flexShrink: 0, fontWeight: 600 }}>Host</span><span style={{ fontFamily: 'monospace', color: 'var(--t1)' }}>{sdHost && sdApex ? sdHost.replace(`.${sdApex}`, '') : sdLabel}</span></div>
+                    <div style={{ display: 'flex', gap: 10, fontSize: 12, padding: '4px 0', alignItems: 'center' }}>
+                      <span style={{ color: 'var(--t3)', width: 44, flexShrink: 0, fontWeight: 600 }}>Value</span>
+                      <span style={{ fontFamily: 'monospace', color: 'var(--t1)', wordBreak: 'break-all' }}>{sdCnameTarget}</span>
+                      <button
+                        onClick={handleCopyCnameTarget}
+                        style={{ marginLeft: 'auto', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, fontSize: 11.5, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: sdTargetCopied ? 'var(--green)' : 'var(--sky-text)', color: '#fff', border: 'none' }}
+                      >
+                        {sdTargetCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--t3)', lineHeight: 1.6, marginTop: 10, marginBottom: 0 }}>
+                    DNS changes can take up to 48 hours to fully take effect. This page checks automatically — you don&apos;t need to keep refreshing.
+                  </p>
+                </div>
+              ) : (
+                /* State: not set up (or editing) */
+                <div style={{ padding: '16px 20px' }}>
+                  <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, marginBottom: 14, marginTop: 0 }}>
+                    This gives your job pages their own address on your domain — like <span style={{ fontFamily: 'monospace', color: 'var(--t1)' }}>our-work.{sdApex || 'yourdomain.com'}</span> — with no code to paste and no plugin to install. Just one setting at your domain provider.
+                  </p>
+                  {!sdApex ? (
+                    <div style={{ background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', fontSize: 12, color: '#92400E', lineHeight: 1.55 }}>
+                      Add your website in Account → General first — your subdomain is built from your domain.
+                    </div>
+                  ) : (
+                    <>
+                      <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Choose your subdomain</label>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                        <input
+                          type="text"
+                          value={sdLabel}
+                          onChange={(e) => { setSdLabel(e.target.value.toLowerCase()); setSdError(null) }}
+                          placeholder="our-work"
+                          style={{ flex: 1, minWidth: 0, background: 'var(--surface)', border: '1px solid var(--border-2)', borderRight: 'none', borderRadius: '8px 0 0 8px', padding: '9px 13px', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', outline: 'none' }}
+                        />
+                        <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border-2)', borderRadius: '0 8px 8px 0', padding: '9px 13px', fontSize: 13, color: 'var(--t3)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                          .{sdApex}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <button
+                          onClick={handleSaveSubdomain}
+                          disabled={sdSaving}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: sdSaving ? 'default' : 'pointer', background: 'var(--sky-text)', color: '#fff', border: 'none' }}
+                        >
+                          {sdSaving ? 'Saving…' : 'Get My DNS Record'}
+                        </button>
+                        {sdEditing && (
+                          <button
+                            onClick={() => { setSdEditing(false); setSdError(null) }}
+                            style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--t3)', cursor: 'pointer', padding: 0 }}
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                      {sdError && <div style={{ fontSize: 12, color: 'var(--red, #DC2626)', marginTop: 8 }}>{sdError}</div>}
+
+                      {/* Collapsible: how to add the record */}
+                      <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', marginTop: 12 }}>
+                        <button
+                          onClick={() => setShowSdSteps(!showSdSteps)}
+                          style={{ width: '100%', background: 'none', border: 'none', padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                        >
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            How to add a DNS record (GoDaddy, Namecheap, Cloudflare, etc.)
+                          </span>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: 'transform .2s', transform: showSdSteps ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        {showSdSteps && (
+                          <div style={{ padding: '0 14px 12px', borderTop: '1px solid var(--border)' }}>
+                            {[
+                              'Log in to whoever you bought your domain from (GoDaddy, Namecheap, Cloudflare, etc.) — not your website builder.',
+                              'Find DNS Settings or Manage DNS for your domain.',
+                              'Click "Get My DNS Record" above, then add a new record using the exact Type, Host, and Value shown, and save.',
+                            ].map((txt, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--t2)', lineHeight: 1.55, marginTop: 10 }}>
+                                <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--sky-dim)', color: 'var(--sky-text)', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                                <div>{txt}</div>
+                              </div>
+                            ))}
+                            <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                              Don&apos;t see DNS settings at all? Some website builder plans don&apos;t allow this — if that&apos;s you, keep using the embed widget above instead. No action needed on your end.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
