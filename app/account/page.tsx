@@ -637,12 +637,12 @@ export default function AccountPage() {
                 <label htmlFor="business-website" className="db-shell-label">Business Website</label>
                 <input
                   id="business-website"
-                  type="url"
+                  type="text"
                   className="db-shell-input"
                   style={{ width: '100%', minWidth: 0 }}
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
-                  placeholder="https://example.com"
+                  placeholder="yourwebsite.com"
                 />
               </div>
 
