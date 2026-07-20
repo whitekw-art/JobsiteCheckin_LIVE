@@ -1,11 +1,50 @@
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
 
+// Hostnames the app itself is served on. Anything else is a customer's
+// CNAME'd subdomain (Website Integration Phase 2) and gets the hosted
+// tenant site — fully public, never auth-gated.
+function isAppHost(host: string): boolean {
+  return (
+    host === 'projectcheckin.com' ||
+    host === 'www.projectcheckin.com' ||
+    host.endsWith('.vercel.app') ||
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host === '127.0.0.1'
+  )
+}
+
 export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token
     const rawPathname = req.nextUrl.pathname
     const pathname = rawPathname.replace(/\/$/, '')
+
+    // ── Customer subdomain hosting (CNAME) ──
+    const host = (req.headers.get('host') || '').toLowerCase().split(':')[0]
+    if (host && !isAppHost(host)) {
+      const url = req.nextUrl.clone()
+      if (pathname === '/robots.txt') {
+        url.pathname = '/api/tenant/robots'
+        url.search = `?host=${host}`
+      } else if (pathname === '/sitemap.xml') {
+        url.pathname = '/api/tenant/sitemap'
+        url.search = `?host=${host}`
+      } else if (pathname === '' || pathname === '/') {
+        url.pathname = `/tenant-site/${host}`
+        url.search = ''
+      } else {
+        // Single-page site — send any other path back to its root
+        return NextResponse.redirect(new URL('/', req.url))
+      }
+      return NextResponse.rewrite(url)
+    }
+
+    // Never serve the tenant route on the app's own domain (duplicate content)
+    if (pathname.startsWith('/tenant-site')) {
+      return NextResponse.redirect(new URL('/', req.url))
+    }
 
     // Redirect to signin if not authenticated
     const publicPaths = [
