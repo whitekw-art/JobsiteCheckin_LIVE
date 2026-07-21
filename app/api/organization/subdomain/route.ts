@@ -9,12 +9,30 @@ import {
   checkDnsPointsToUs,
   CNAME_TARGET,
 } from '@/lib/vercelDomains'
+import { safeFetch } from '@/lib/ssrf'
 
 // One DNS label: letters/digits, optional inner hyphens, max 63 chars
 const LABEL_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/
 
 // Hosts we serve the app on — a customer subdomain can never be one of these
 const RESERVED_HOSTS = ['projectcheckin.com', 'www.projectcheckin.com']
+
+// Checks whether the customer's own homepage contains a link pointing at
+// their subdomain — a cheap best-effort signal, not a guarantee. Returns
+// null (not true/false) when the check itself couldn't run, so the UI can
+// tell "confirmed not linked" apart from "couldn't check right now."
+async function checkHomepageLinksToSubdomain(website: string | null, host: string): Promise<boolean | null> {
+  if (!website) return null
+  const url = website.startsWith('http') ? website : `https://${website}`
+  try {
+    const res = await safeFetch(url)
+    if (!res?.ok) return null
+    const html = await res.text()
+    return html.toLowerCase().includes(host.toLowerCase())
+  } catch {
+    return null
+  }
+}
 
 function apexFromWebsite(website: string | null): string | null {
   if (!website) return null
@@ -81,10 +99,16 @@ export async function GET() {
       }
     }
 
+    const homepageLinked =
+      customSubdomain && subdomainStatus === 'verified'
+        ? await checkHomepageLinksToSubdomain(org.website, customSubdomain)
+        : null
+
     return NextResponse.json({
       customSubdomain,
       subdomainStatus,
       subdomainVerifiedAt,
+      homepageLinked,
       apexDomain,
       cnameTarget: CNAME_TARGET,
     })
