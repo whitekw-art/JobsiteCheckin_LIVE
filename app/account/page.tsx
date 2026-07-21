@@ -357,6 +357,9 @@ export default function AccountPage() {
   const [sdEditing,      setSdEditing]      = useState(false)
   const [showSdSteps,    setShowSdSteps]    = useState(false)
   const [sdTargetCopied, setSdTargetCopied] = useState(false)
+  const [sdHomepageLinked, setSdHomepageLinked] = useState<boolean | null>(null)
+  const [sdCheckingLink,   setSdCheckingLink]   = useState(false)
+  const [showSdLinkSteps,  setShowSdLinkSteps]  = useState(false)
 
   useEffect(() => {
     if (!hasWebsiteIntegration) return
@@ -367,6 +370,7 @@ export default function AccountPage() {
         setSdHost(d.customSubdomain ?? null)
         setSdStatus(d.subdomainStatus ?? null)
         setSdApex(d.apexDomain ?? null)
+        setSdHomepageLinked(d.homepageLinked ?? null)
         if (d.cnameTarget) setSdCnameTarget(d.cnameTarget)
         if (d.customSubdomain && d.apexDomain) {
           setSdLabel(d.customSubdomain.replace(`.${d.apexDomain}`, ''))
@@ -375,6 +379,15 @@ export default function AccountPage() {
       .catch(() => {})
   }, [hasWebsiteIntegration])
 
+  function handleRecheckHomepageLink() {
+    setSdCheckingLink(true)
+    fetch('/api/organization/subdomain')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setSdHomepageLinked(d.homepageLinked ?? null) })
+      .catch(() => {})
+      .finally(() => setSdCheckingLink(false))
+  }
+
   // While pending, re-check every 30s — the API promotes to verified once
   // the CNAME resolves and Vercel confirms the domain
   useEffect(() => {
@@ -382,7 +395,11 @@ export default function AccountPage() {
     const t = setInterval(() => {
       fetch('/api/organization/subdomain')
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => { if (d?.subdomainStatus) setSdStatus(d.subdomainStatus) })
+        .then((d) => {
+          if (!d?.subdomainStatus) return
+          setSdStatus(d.subdomainStatus)
+          setSdHomepageLinked(d.homepageLinked ?? null)
+        })
         .catch(() => {})
     }, 30000)
     return () => clearInterval(t)
@@ -402,6 +419,7 @@ export default function AccountPage() {
       setSdHost(data.customSubdomain)
       setSdStatus(data.subdomainStatus)
       setSdApex(data.apexDomain)
+      setSdHomepageLinked(null)
       if (data.cnameTarget) setSdCnameTarget(data.cnameTarget)
       setSdEditing(false)
     } catch (err: any) {
@@ -1267,6 +1285,58 @@ export default function AccountPage() {
                   <p style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.6, marginTop: 10, marginBottom: 0 }}>
                     Your jobs are now live on your own domain — visible to Google and AI search immediately, no delay.
                   </p>
+
+                  {/* One last step: make sure people can actually find this new page from the homepage */}
+                  <div style={{ background: sdHomepageLinked === true ? 'var(--green-bg)' : 'var(--surface-3)', border: `1px solid ${sdHomepageLinked === true ? 'rgba(22,163,74,.25)' : 'var(--border)'}`, borderRadius: 8, padding: '12px 14px', marginTop: 14 }}>
+                    {sdHomepageLinked === true ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 700, color: 'var(--green)' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        Your homepage links to this page
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 700, color: sdHomepageLinked === false ? '#D97706' : 'var(--t2)' }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                          {sdHomepageLinked === false ? "One more step: add a link on your homepage" : "We couldn't check this automatically"}
+                        </div>
+                        <p style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.6, margin: '8px 0 0' }}>
+                          Right now this new page has no link pointing to it from your main website. Add one link — like "Our Work" in your menu — so visitors (and Google) can actually find it. This page already links back to your homepage on its own; this is just the other direction.
+                        </p>
+                        <button
+                          onClick={() => setShowSdLinkSteps(!showSdLinkSteps)}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', background: 'none', border: 'none', padding: 0, marginTop: 10 }}
+                        >
+                          How do I add this link?
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform .2s', transform: showSdLinkSteps ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        {showSdLinkSteps && (
+                          <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.65, marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+                            Add a menu link with a label like "Our Work" pointing to <span style={{ fontFamily: 'monospace', color: 'var(--t1)' }}>https://{sdHost}</span>. Where to do this depends on how your site is built:
+                            <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                              <li><strong>WordPress:</strong> Appearance → Menus → Add Custom Link</li>
+                              <li><strong>Squarespace:</strong> Pages → click + next to your navigation</li>
+                              <li><strong>Wix:</strong> Editor → Manage Menu → + Add Item → Link</li>
+                              <li><strong>Webflow:</strong> Designer → your navbar → add a Nav Link</li>
+                              <li><strong>Plain HTML site:</strong> add a link in your page's navigation section, then re-upload the file</li>
+                            </ul>
+                            Not sure how your site works? Tell whoever manages it: <em>&quot;Please add a menu link labeled &apos;Our Work&apos; pointing to https://{sdHost}.&quot;</em>
+                          </div>
+                        )}
+                        <button
+                          onClick={handleRecheckHomepageLink}
+                          disabled={sdCheckingLink}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, fontSize: 11.5, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: sdCheckingLink ? 'default' : 'pointer', background: 'var(--sky-text)', color: '#fff', border: 'none', marginTop: 10 }}
+                        >
+                          {sdCheckingLink ? 'Checking…' : "I've Added It — Check Again"}
+                        </button>
+                        {sdHomepageLinked === null && (
+                          <p style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.5, margin: '8px 0 0' }}>
+                            This check only looks at your homepage's basic code and can occasionally miss fancy drag-and-drop menus. If you've already added the link, you're all set either way.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               ) : sdStatus === 'pending' && !sdEditing ? (
                 /* State: pending DNS */
