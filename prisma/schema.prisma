@@ -35,6 +35,11 @@ model Organization {
   customSubdomain          String?   @unique
   subdomainStatus          String?
   subdomainVerifiedAt      DateTime?
+  wpSiteUrl                String?
+  wpUsername               String?
+  wpApplicationPassword    String?
+  wpConnectionStatus       String?
+  wpConnectedAt            DateTime?
   Invitations Invitations[]
   users       User[]
   checkIns    CheckIn[]
@@ -86,6 +91,12 @@ model CheckIn {
   afterPhotoUrl            String?
   aiDescriptionGeneratedAt DateTime?
   aiDescriptionCount       Int       @default(0)
+  featuredPhotoUrl         String?
+  wpPostId                 Int?
+  wpPostUrl                String?
+  wpMedia                  String?
+  wpSyncedAt               DateTime?
+  wpSyncStatus             String?
   events                   CheckInEvent[]
 
   @@index([organizationId])

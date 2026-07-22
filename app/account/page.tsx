@@ -436,6 +436,78 @@ export default function AccountPage() {
     })
   }
 
+  // WordPress native publishing card state — Titan only
+  const [wpSiteUrl,      setWpSiteUrl]      = useState('')
+  const [wpUsername,     setWpUsername]     = useState('')
+  const [wpPassword,     setWpPassword]     = useState('')
+  const [wpStatus,       setWpStatus]       = useState<string | null>(null)
+  const [wpConnectedUrl, setWpConnectedUrl] = useState<string | null>(null)
+  const [wpSyncedCount,  setWpSyncedCount]  = useState(0)
+  const [wpFailedCount,  setWpFailedCount]  = useState(0)
+  const [wpSaving,       setWpSaving]       = useState(false)
+  const [wpError,        setWpError]        = useState<string | null>(null)
+  const [wpDisconnecting, setWpDisconnecting] = useState(false)
+  const [showWpSteps,    setShowWpSteps]    = useState(false)
+
+  useEffect(() => {
+    if (!hasWebsiteIntegration) return
+    fetch('/api/organization/wordpress')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return
+        setWpStatus(d.wpConnectionStatus ?? null)
+        setWpConnectedUrl(d.wpSiteUrl ?? null)
+        setWpUsername(d.wpUsername ?? '')
+        setWpSyncedCount(d.syncedCount ?? 0)
+        setWpFailedCount(d.failedCount ?? 0)
+        if (d.wpSiteUrl) setWpSiteUrl(d.wpSiteUrl)
+      })
+      .catch(() => {})
+  }, [hasWebsiteIntegration])
+
+  async function handleConnectWordPress() {
+    setWpError(null)
+    setWpSaving(true)
+    try {
+      const res = await fetch('/api/organization/wordpress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          siteUrl: wpSiteUrl,
+          username: wpUsername,
+          applicationPassword: wpPassword,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || 'Connection failed — double-check your site address and Application Password, then try again.')
+      setWpStatus('connected')
+      setWpConnectedUrl(data.wpSiteUrl)
+      setWpPassword('') // never keep the credential in component state after use
+    } catch (err: any) {
+      setWpError(err.message)
+      setWpStatus('failed')
+    } finally {
+      setWpSaving(false)
+    }
+  }
+
+  async function handleDisconnectWordPress() {
+    setWpDisconnecting(true)
+    try {
+      const res = await fetch('/api/organization/wordpress', { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to disconnect')
+      setWpStatus(null)
+      setWpConnectedUrl(null)
+      setWpPassword('')
+      setWpSyncedCount(0)
+      setWpFailedCount(0)
+    } catch {
+      setWpError('Could not disconnect right now. Please try again.')
+    } finally {
+      setWpDisconnecting(false)
+    }
+  }
+
   // Connections tab state (localStorage-backed, Phase 1)
   const [gbpConnected, setGbpConnected] = useState(false)
   const [postMode, setPostMode] = useState<'draft' | 'auto'>('draft')
@@ -1454,6 +1526,158 @@ export default function AccountPage() {
             </div>
           )}
 
+          {/* ── Publish Directly to Your WordPress Site (Phase 3, Titan only) ── */}
+          {hasWebsiteIntegration && (
+            <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                      <circle cx="12" cy="12" r="11" fill="#21759B"/>
+                      <path fill="#fff" d="M3.9 12a8.1 8.1 0 0 0 4.56 7.29L4.86 8.98A8.06 8.06 0 0 0 3.9 12zm14.03-.42c0-.95-.34-1.6-.63-2.11-.39-.63-.75-1.16-.75-1.79 0-.7.53-1.35 1.28-1.35.03 0 .07 0 .1.01A8.1 8.1 0 0 0 12 3.9a8.11 8.11 0 0 0-6.78 3.65c.18 0 .35.01.5.01.8 0 2.05-.1 2.05-.1.41-.02.46.58.05.63 0 0-.41.05-.87.07l2.78 8.26 1.67-5.01-1.19-3.25c-.41-.02-.8-.07-.8-.07-.41-.02-.36-.65.05-.63 0 0 1.27.1 2.03.1.8 0 2.05-.1 2.05-.1.41-.02.46.58.05.63 0 0-.42.05-.87.07l2.76 8.2.76-2.55c.35-1.05.53-1.86.53-2.52zm-5.51 1.16-2.29 6.65c.68.2 1.41.31 2.16.31.89 0 1.75-.15 2.55-.44a.71.71 0 0 1-.06-.11l-2.36-6.41zm7.22-4.77c.03.24.05.5.05.78 0 .77-.14 1.63-.58 2.71l-2.32 6.71A8.1 8.1 0 0 0 20.1 12a8.05 8.05 0 0 0-.46-4.03z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Publish Directly to Your WordPress Site</div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Real posts in your own theme — the deepest SEO and AI search integration we offer</div>
+                  </div>
+                </div>
+                <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, flexShrink: 0, background: '#FFF7ED', color: '#C2410C', border: '1px solid rgba(194,65,12,.2)' }}>
+                  Titan
+                </span>
+              </div>
+
+              {wpStatus === 'connected' ? (
+                /* State: connected */
+                <div style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                      Connected
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (confirm('Disconnecting removes the job posts and photos we published from your WordPress site. Nothing is deleted from ProjectCheckin. Continue?')) {
+                          handleDisconnectWordPress()
+                        }
+                      }}
+                      disabled={wpDisconnecting}
+                      style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--red, #DC2626)', cursor: wpDisconnecting ? 'default' : 'pointer', padding: 0 }}
+                    >
+                      {wpDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--t3)', fontFamily: 'monospace', letterSpacing: '-0.2px', marginTop: 7 }}>{wpConnectedUrl}</div>
+
+                  <p style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.6, marginTop: 10, marginBottom: 0 }}>
+                    {wpSyncedCount > 0
+                      ? `${wpSyncedCount} ${wpSyncedCount === 1 ? 'job is' : 'jobs are'} live on your site. New jobs you publish appear automatically.`
+                      : 'New jobs you publish will appear on your site automatically. Jobs published before you connected are not included.'}
+                  </p>
+
+                  {wpFailedCount > 0 && (
+                    <div style={{ background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', marginTop: 12, fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
+                      {wpFailedCount} {wpFailedCount === 1 ? 'job' : 'jobs'} couldn&apos;t be published to your site. Reconnect below with a new Application Password and we&apos;ll try again automatically.
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: 'var(--sky-dim)', border: '1px solid rgba(14,165,233,.25)', borderRadius: 8, padding: '12px 14px', marginTop: 14, fontSize: 12, color: 'var(--t2)', lineHeight: 1.6 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    <span>Reminder: if you ever need to downgrade or cancel, nothing will be deleted from ProjectCheckin, but job content will no longer be displayed on your site. Everything is restored to your site automatically the moment you resubscribe to Titan.</span>
+                  </div>
+                </div>
+              ) : (
+                /* State: not connected (also covers a failed attempt) */
+                <div style={{ padding: '16px 20px' }}>
+                  <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, marginTop: 0, marginBottom: 14 }}>
+                    Connect your WordPress site and every job you publish from now on becomes a real post on your own site — in your own theme, at your own address. Nothing to install.
+                  </p>
+
+                  {wpError && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: 'var(--red, #DC2626)', lineHeight: 1.5, marginBottom: 12 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      <span>{wpError}</span>
+                    </div>
+                  )}
+
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Your WordPress site address</label>
+                  <input
+                    type="text"
+                    value={wpSiteUrl}
+                    onChange={(e) => setWpSiteUrl(e.target.value)}
+                    placeholder="https://yourbusiness.com"
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--t1)', outline: 'none', marginBottom: 14 }}
+                  />
+
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>WordPress username</label>
+                  <input
+                    type="text"
+                    value={wpUsername}
+                    onChange={(e) => setWpUsername(e.target.value)}
+                    placeholder="your-wordpress-username"
+                    autoComplete="off"
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', outline: 'none', marginBottom: 14 }}
+                  />
+
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Application Password</label>
+                  <input
+                    type="password"
+                    value={wpPassword}
+                    onChange={(e) => setWpPassword(e.target.value)}
+                    placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"
+                    autoComplete="new-password"
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--t1)', outline: 'none', marginBottom: 14 }}
+                  />
+
+                  {/* Collapsible: how to generate an Application Password */}
+                  <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', marginBottom: 14 }}>
+                    <button
+                      onClick={() => setShowWpSteps(!showWpSteps)}
+                      style={{ width: '100%', background: 'none', border: 'none', padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        How to generate an Application Password
+                      </span>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: 'transform .2s', transform: showWpSteps ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    {showWpSteps && (
+                      <div style={{ padding: '0 14px 12px', borderTop: '1px solid var(--border)' }}>
+                        {[
+                          'Log in to your WordPress admin area — usually yoursite.com/wp-admin.',
+                          'Go to Users → Profile.',
+                          'Scroll down to Application Passwords, type "ProjectCheckin" as the name, and click Add New Application Password.',
+                          "Copy the password it shows you — it's only displayed once — and paste it above with your username and site address.",
+                        ].map((txt, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--t2)', lineHeight: 1.55, marginTop: 10 }}>
+                            <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--sky-dim)', color: 'var(--sky-text)', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                            <div>{txt}</div>
+                          </div>
+                        ))}
+                        <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                          Don&apos;t see Application Passwords on your profile page? Some websites have this turned off by default — reach out to ProjectCheckin support and we&apos;ll help you get it turned on.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: 'var(--sky-dim)', border: '1px solid rgba(14,165,233,.25)', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: 12, color: 'var(--t2)', lineHeight: 1.6 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    <span>Jobs you publish while connected stay live on your WordPress site as long as you&apos;re on the Titan plan. If you ever need to downgrade or cancel, nothing will be deleted from ProjectCheckin, but job content will no longer be displayed on your site. Everything is restored to your site automatically the moment you resubscribe to Titan.</span>
+                  </div>
+
+                  <button
+                    onClick={handleConnectWordPress}
+                    disabled={wpSaving}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: wpSaving ? 'default' : 'pointer', background: 'var(--sky-text)', color: '#fff', border: 'none' }}
+                  >
+                    {wpSaving ? 'Connecting…' : 'Connect WordPress'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Share Your Project Check-In Portfolio ── */}
           {profile?.slug && (
             <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -1593,6 +1817,12 @@ export default function AccountPage() {
             <ul style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.7, paddingLeft: 18, marginBottom: 14 }}>
               <li>Published job pages beyond your plan limit will be unpublished</li>
               <li>Higher-tier features will be turned off</li>
+              {wpStatus === 'connected' && (
+                <li>
+                  Job posts and photos published to <strong>{wpConnectedUrl}</strong> will no longer be
+                  displayed on your site
+                </li>
+              )}
               <li>Your data is preserved — resubscribing restores everything instantly</li>
             </ul>
             <div style={{ display: 'flex', gap: 8 }}>

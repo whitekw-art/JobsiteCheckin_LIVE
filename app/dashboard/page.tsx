@@ -24,6 +24,7 @@ interface CheckIn {
   doorType?: string | null
   isPublic: boolean
   photoUrls?: string[]
+  featuredPhotoUrl?: string | null
   homeCustomerName?: string | null
   homeCustomerPhone?: string | null
   homeCustomerEmail?: string | null
@@ -1197,13 +1198,40 @@ export default function Dashboard() {
       if (!res.ok) throw new Error(data.error || 'Failed to delete photo')
       setCheckIns((prev) =>
         prev.map((c) =>
-          c.id === checkIn.id ? { ...c, photoUrls: data.photoUrls ?? [] } : c
+          c.id === checkIn.id
+            ? { ...c, photoUrls: data.photoUrls ?? [], featuredPhotoUrl: data.featuredPhotoUrl ?? null }
+            : c
         )
       )
     } catch (err: any) {
       alert(err.message || 'Failed to delete photo')
     } finally {
       setDeletingPhotoKey(null)
+    }
+  }
+
+  // Cover photo — used as the WordPress featured image and the share preview.
+  // Clicking the current cover clears it and returns to automatic selection.
+  const handleSetCoverPhoto = async (checkIn: CheckIn, url: string) => {
+    const next = checkIn.featuredPhotoUrl === url ? null : url
+    const previous = checkIn.featuredPhotoUrl ?? null
+
+    // Optimistic — this is a low-stakes toggle and should feel instant.
+    setCheckIns((prev) =>
+      prev.map((c) => (c.id === checkIn.id ? { ...c, featuredPhotoUrl: next } : c))
+    )
+    try {
+      const res = await fetch('/api/checkins/featured-photo', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkIn.id, url: next }),
+      })
+      if (!res.ok) throw new Error('Failed to set cover photo')
+    } catch {
+      setCheckIns((prev) =>
+        prev.map((c) => (c.id === checkIn.id ? { ...c, featuredPhotoUrl: previous } : c))
+      )
+      alert('Could not set the cover photo. Please try again.')
     }
   }
 
@@ -1969,8 +1997,12 @@ export default function Dashboard() {
                               <div className="db-photo-grid">
                                 {checkIn.photoUrls!.map((url, idx) => {
                                   const photoKey = `${checkIn.id}:${url}`
+                                  const isCover = checkIn.featuredPhotoUrl === url
                                   return (
-                                    <div key={idx} className="db-photo-thumb-wrap">
+                                    <div
+                                      key={idx}
+                                      className={`db-photo-thumb-wrap${isCover ? ' is-cover' : ''}`}
+                                    >
                                       <a
                                         className="db-photo-thumb"
                                         href={url}
@@ -1992,12 +2024,33 @@ export default function Dashboard() {
                                       >
                                         {deletingPhotoKey === photoKey ? '\u2026' : '\u00d7'}
                                       </button>
+                                      <button
+                                        className="db-photo-cover-btn"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleSetCoverPhoto(checkIn, url)
+                                        }}
+                                        aria-pressed={isCover}
+                                        title={isCover ? 'Cover photo \u2014 click to clear' : 'Set as cover photo'}
+                                      >
+                                        <svg width="9" height="9" viewBox="0 0 24 24" fill={isCover ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                        </svg>
+                                        {isCover ? 'Cover' : 'Set cover'}
+                                      </button>
                                     </div>
                                   )
                                 })}
                               </div>
                             ) : (
                               <div className="db-photo-empty">No photos attached</div>
+                            )}
+                            {(checkIn.photoUrls?.length ?? 0) > 0 && (
+                              <div className="db-photo-cover-note">
+                                {checkIn.featuredPhotoUrl
+                                  ? 'Cover photo set — used as the main image when this job is shared or published to your website.'
+                                  : 'No cover photo chosen — the "after" photo is used automatically, or the first photo.'}
+                              </div>
                             )}
 
                             <div className="db-detail-btns">

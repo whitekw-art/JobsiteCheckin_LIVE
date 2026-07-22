@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { syncCheckIn } from '@/lib/wordpressSync'
 
 function cleanPhone(v: string | null | undefined): string | null {
   if (typeof v !== 'string') return null
@@ -98,6 +99,18 @@ export async function PATCH(request: NextRequest) {
         }),
       },
     })
+
+    // Keep the customer's WordPress post in step with the edit. Only published
+    // jobs sync — syncCheckIn itself re-checks that and the Titan gate.
+    if (updated.isPublic) {
+      after(async () => {
+        try {
+          await syncCheckIn(checkIn.id)
+        } catch (err) {
+          console.error('WordPress resync failed after job edit:', err)
+        }
+      })
+    }
 
     return NextResponse.json({ success: true, id: updated.id })
   } catch (error) {
