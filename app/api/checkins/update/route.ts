@@ -9,6 +9,41 @@ function cleanPhone(v: string | null | undefined): string | null {
   return t && /\d/.test(t) ? t : null
 }
 
+// Photo URLs arrive from the client, so they must be pinned to our own storage
+// before being saved. Without this, an arbitrary URL ends up rendered as an
+// <img src> on public job pages and fetched server-side by the WordPress
+// publisher — the root cause behind VULN-2026-001.
+// Pinned to this project's own storage host and bucket path. Matching
+// *.supabase.co would be no real restriction at all — anyone can create a free
+// Supabase project and get a valid subdomain on that domain.
+const STORAGE_PREFIX = '/storage/v1/object/public/checkin-photos/'
+
+function ownStorageHost(): string | null {
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!raw) return null
+  try {
+    return new URL(raw).hostname
+  } catch {
+    return null
+  }
+}
+
+function isOwnStorageUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const host = ownStorageHost()
+  if (!host) return false
+  try {
+    const u = new URL(value.trim())
+    return (
+      u.protocol === 'https:' &&
+      u.hostname === host &&
+      u.pathname.startsWith(STORAGE_PREFIX)
+    )
+  } catch {
+    return false
+  }
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
@@ -76,7 +111,14 @@ export async function PATCH(request: NextRequest) {
     const existing = checkIn.photoUrls
       ? checkIn.photoUrls.split(',').map((u) => u.trim()).filter(Boolean)
       : []
-    const combined = [...existing, ...(appendPhotoUrls ?? [])]
+    const incoming = (appendPhotoUrls ?? []).filter(isOwnStorageUrl)
+    if ((appendPhotoUrls?.length ?? 0) !== incoming.length) {
+      return NextResponse.json(
+        { error: 'Photos must be uploaded through ProjectCheckin' },
+        { status: 400 }
+      )
+    }
+    const combined = [...existing, ...incoming]
 
     const updated = await prisma.checkIn.update({
       where: { id: checkIn.id },
@@ -89,8 +131,14 @@ export async function PATCH(request: NextRequest) {
         ...(doorType !== undefined && { doorType }),
         ...(notes !== undefined && { notes }),
         photoUrls: combined.join(','),
-        ...(beforePhotoUrl !== undefined && { beforePhotoUrl }),
-        ...(afterPhotoUrl !== undefined && { afterPhotoUrl }),
+        // Same origin pinning as appendPhotoUrls — these feed the same
+        // public rendering and server-side fetch paths.
+        ...(beforePhotoUrl !== undefined && {
+          beforePhotoUrl: isOwnStorageUrl(beforePhotoUrl) ? beforePhotoUrl : null,
+        }),
+        ...(afterPhotoUrl !== undefined && {
+          afterPhotoUrl: isOwnStorageUrl(afterPhotoUrl) ? afterPhotoUrl : null,
+        }),
         ...(homeCustomerName !== undefined && { homeCustomerName: homeCustomerName?.trim() || null }),
         ...(homeCustomerPhone !== undefined && { homeCustomerPhone: cleanPhone(homeCustomerPhone) }),
         ...(homeCustomerEmail !== undefined && { homeCustomerEmail: homeCustomerEmail?.trim() || null }),
