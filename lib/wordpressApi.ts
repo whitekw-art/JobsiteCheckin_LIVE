@@ -1,4 +1,4 @@
-import { validateSsrfUrl } from '@/lib/ssrf'
+import { safeFetch, validateSsrfUrl } from '@/lib/ssrf'
 
 // Low-level WordPress REST API client for Phase 3 of Website Integration for
 // Local SEO ("the plugin" in customer-facing copy — technically an API
@@ -186,15 +186,22 @@ export async function uploadMedia(
   filename: string,
   altText: string
 ): Promise<WpResult<{ id: number; sourceUrl: string }>> {
-  const check = await validateSsrfUrl(sourceUrl)
-  if (!check.ok) return { ok: false, error: 'Could not read that photo.' }
-
+  // Must go through safeFetch, not a bare fetch: a photo URL can reach this
+  // point from client-supplied input (appendPhotoUrls on the check-in update
+  // route), so validating only the first URL would let a public host redirect
+  // us to an internal address whose response we'd then upload to the
+  // customer's Media Library. safeFetch re-validates every redirect hop.
   let bytes: ArrayBuffer
   let contentType: string
   try {
-    const src = await fetch(sourceUrl, { signal: AbortSignal.timeout(TIMEOUT_MS) })
-    if (!src.ok) return { ok: false, error: 'Could not read that photo.', transient: true }
+    const src = await safeFetch(sourceUrl)
+    if (!src || !src.ok) return { ok: false, error: 'Could not read that photo.', transient: true }
     contentType = src.headers.get('content-type') || 'image/jpeg'
+    // Only ever forward real images — never an HTML error page or a JSON
+    // credential blob that happened to sit behind the URL.
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      return { ok: false, error: 'Could not read that photo.' }
+    }
     bytes = await src.arrayBuffer()
   } catch {
     return { ok: false, error: 'Could not read that photo.', transient: true }
