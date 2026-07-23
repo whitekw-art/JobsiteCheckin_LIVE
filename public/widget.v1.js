@@ -44,7 +44,9 @@
   // if a non-validated value ever reaches this API response.
   function safeHref(raw) {
     try {
-      var u = new URL(String(raw), window.location.href);
+      // No base argument: a scheme-less string (e.g. "example.com") must throw here
+      // rather than silently resolve as a relative path against the host page's own origin.
+      var u = new URL(String(raw));
       return (u.protocol === 'https:' || u.protocol === 'http:') ? u.href : null;
     } catch (e) {
       return null;
@@ -79,6 +81,9 @@
     var parts = [slugify(job.jobType), slugify(job.city), slugify(job.state)].filter(Boolean).join('-');
     var d = jobDate(job);
     if (d) parts += '-' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    // Short id suffix guarantees uniqueness — two jobs of the same type/city/date would
+    // otherwise collide on an identical slug (and, now, an identical schema.org URL).
+    if (job.id) parts += '-' + String(job.id).slice(-6);
     return parts;
   }
 
@@ -149,35 +154,69 @@
   function injectJsonLd(state) {
     var old = document.getElementById('pcw-jsonld');
     if (old) old.parentNode.removeChild(old);
+
+    // Namespaced (not just "#business") so this doesn't collide with any other JSON-LD
+    // already present on the host page.
+    var business = { '@type': 'LocalBusiness', '@id': '#pcw-business', name: state.org.name };
+    var bizUrl = state.org.website && safeHref(state.org.website);
+    if (bizUrl) business.url = bizUrl;
+    if (state.org.phone) business.telephone = state.org.phone;
+    if (state.org.email) business.email = state.org.email;
+    var reviewLink = state.org.gbpReviewLink && safeHref(state.org.gbpReviewLink);
+    if (reviewLink) business.sameAs = [reviewLink];
+
+    var pageUrl = window.location.origin + window.location.pathname;
+    var collectionName = state.org.name + ' — Completed Jobs';
+
     var items = state.jobs.map(function (job, i) {
+      var areaServed = {
+        '@type': 'City',
+        name: job.city || '',
+        containedInPlace: { '@type': 'State', name: job.state || '' }
+      };
+      if (job.latitude != null && job.longitude != null) {
+        areaServed.geo = { '@type': 'GeoCoordinates', latitude: String(job.latitude), longitude: String(job.longitude) };
+      }
       var item = {
         '@type': 'Service',
         name: job.jobType,
-        areaServed: {
-          '@type': 'City',
-          name: job.city || '',
-          containedInPlace: { '@type': 'State', name: job.state || '' }
-        },
-        provider: { '@type': 'LocalBusiness', name: state.org.name }
+        areaServed: areaServed,
+        provider: { '@id': '#pcw-business' }
       };
-      if (job.latitude != null && job.longitude != null) {
-        item.provider.geo = { '@type': 'GeoCoordinates', latitude: String(job.latitude), longitude: String(job.longitude) };
-      }
-      var photo = cardPhoto(job);
-      if (photo) {
+      if (job.description) item.description = job.description;
+      if (job.createdAt) item.datePublished = job.createdAt;
+      var photoHref = safeHref(cardPhoto(job));
+      if (photoHref) {
         item.image = {
           '@type': 'ImageObject',
-          url: photo,
+          url: photoHref,
           description: job.jobType + ' in ' + cityLabel(job)
         };
       }
-      return { '@type': 'ListItem', position: i + 1, item: item };
+      return {
+        '@type': 'ListItem',
+        position: i + 1,
+        url: pageUrl + '#' + hashSlug(job),
+        item: item
+      };
     });
+
+    var page = {
+      '@type': 'CollectionPage',
+      '@id': '#pcw-page',
+      url: pageUrl,
+      name: collectionName,
+      mainEntity: { '@id': '#pcw-itemlist' }
+    };
+    var itemList = {
+      '@type': 'ItemList',
+      '@id': '#pcw-itemlist',
+      name: collectionName,
+      itemListElement: items
+    };
     var schema = {
       '@context': 'https://schema.org',
-      '@type': 'ItemList',
-      name: state.org.name + ' — Completed Jobs',
-      itemListElement: items
+      '@graph': [business, page, itemList]
     };
     var script = document.createElement('script');
     script.type = 'application/ld+json';
