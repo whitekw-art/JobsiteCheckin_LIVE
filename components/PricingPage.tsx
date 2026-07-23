@@ -133,11 +133,11 @@ export default function PricingPage() {
             <div className="tier-price">$0<sub>/mo</sub></div>
             <div style={{ height: 18 }} />
             <p className="tier-tagline">Try it on your first 5 jobs. No card, no commitment.</p>
-            <ul className="tier-list">
-              {['5 published job pages', '5 photos per job', '50 photos per month', 'Public portfolio page', 'No credit card required'].map(item => (
-                <li key={item}><span className="li-check"><Ck /></span>{item}</li>
+            <div className="pc-feats">
+              {['5 published job pages', '5 photos per job', '50 photos per month', 'Owner publish controls', 'Each job page built for Google search', 'Public portfolio page', 'No credit card required'].map(item => (
+                <div className="pf" key={item}><span className="pf-ck">&#10003;</span>{item}</div>
               ))}
-            </ul>
+            </div>
           </div>
 
           {/* PRO */}
@@ -150,11 +150,12 @@ export default function PricingPage() {
               : <div className="tier-was">Was $99/mo</div>
             }
             <p className="tier-tagline">Unlimited jobs and Google Business Profile posts.</p>
-            <ul className="tier-list">
+            <div className="pc-feats">
+              <div className="pf-inherit">Everything in Free, plus:</div>
               {['Unlimited published pages', 'Unlimited photos per job', '500 photos per month', 'Google Business Profile post generator', 'Performance dashboard'].map(item => (
-                <li key={item}><span className="li-check"><Ck /></span>{item}</li>
+                <div className="pf" key={item}><span className="pf-ck">&#10003;</span>{item}</div>
               ))}
-            </ul>
+            </div>
           </div>
 
           {/* ELITE — MOST POPULAR */}
@@ -168,11 +169,13 @@ export default function PricingPage() {
               : <div className="tier-was">Was $149/mo</div>
             }
             <p className="tier-tagline">Before &amp; after proof that closes quotes and wins jobs.</p>
-            <ul className="tier-list">
-              {['Everything in Pro', 'Before & after photo tagging', 'Ghost camera overlay', '2,000 photos per month', 'Drag-to-reveal widget on job pages'].map(item => (
-                <li key={item}><span className="li-check"><Ck /></span>{item}</li>
+            <div className="pc-feats">
+              <div className="pf-inherit">Everything in Pro, plus:</div>
+              {['Before & after photo tagging', 'Ghost camera overlay', '2,000 photos per month', 'Drag-to-reveal widget on job pages'].map(item => (
+                <div className="pf" key={item}><span className="pf-ck">&#10003;</span>{item}</div>
               ))}
-            </ul>
+              <div className="pf"><span className="pf-ck">&#10003;</span>Google Business Profile auto-posts <span className="soon-badge">Soon</span></div>
+            </div>
           </div>
 
           {/* TITAN */}
@@ -185,19 +188,16 @@ export default function PricingPage() {
               : <div className="tier-was">Was $299/mo</div>
             }
             <p className="tier-tagline">Review requests, unlimited photos, and AI agents that work for you.</p>
-            <ul className="tier-list">
-              {['Everything in Elite', 'One-tap review requests', 'Automated Google review requests', 'Unlimited photos per month'].map(item => (
-                <li key={item}><span className="li-check"><Ck /></span>{item}</li>
+            <div className="pc-feats">
+              <div className="pf-inherit">Everything in Elite, plus:</div>
+              {['One-tap review requests', 'Automated Google review requests', 'Unlimited photos per month', 'Priority support + strategy calls'].map(item => (
+                <div className="pf" key={item}><span className="pf-ck">&#10003;</span>{item}</div>
               ))}
-              <li className="li-soon-row">
-                <span className="li-soon-dot" />
-                AI copywriting agent <span className="soon-pill">Soon</span>
-              </li>
-              <li className="li-soon-row">
-                <span className="li-soon-dot" />
-                AI review request agent <span className="soon-pill">Soon</span>
-              </li>
-            </ul>
+              <div className="pf"><span className="pf-ck">&#10003;</span>AI copywriting agent <span className="new-badge">New</span></div>
+              <div className="pf"><span className="pf-ck">&#10003;</span>AI review request agent <span className="soon-badge">Soon</span></div>
+              <div className="pf"><span className="pf-ck">&#10003;</span>CRM &amp; QuickBooks integration <span className="soon-badge">Soon</span></div>
+              <div className="pf"><span className="pf-ck">&#10003;</span>Website Integration for Local SEO</div>
+            </div>
           </div>
 
         </div>
@@ -352,7 +352,7 @@ export default function PricingPage() {
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
-                  <td><span className="cs">Soon</span></td>
+                  <td><span className="ck">✓</span></td>
                 </tr>
                 <tr>
                   <td>AI-personalized review request message</td>

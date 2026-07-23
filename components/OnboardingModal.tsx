@@ -1,6 +1,14 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { tierHasFeature } from '@/lib/planVersions'
+
+const WIDGET_PLATFORM_INSTRUCTIONS: Record<string, string> = {
+  WordPress: '1. Log into WordPress and open the page where you want your work to show up (or create a new page).\n2. Click the + button to add a new block.\n3. Type "Custom HTML" in the search box and select it.\n4. Paste the code below into that block.\n5. Click Update (or Publish) in the top right to save your page.',
+  Squarespace: '1. Log into Squarespace and open the page where you want your work to show up.\n2. Click Edit on that page.\n3. Click the + icon where you want the widget to appear, scroll down, and choose Code.\n4. Paste the code below into the box that opens, then click Apply.\n5. Click Save, then Publish, in the top right.',
+  Webflow: '1. Open your site in the Webflow Designer and go to the page where you want your work to show up.\n2. In the left panel, find the Embed element and drag it onto the page.\n3. Double-click the Embed box you just added.\n4. Paste the code below into the box, then click Save & Close.\n5. Click Publish in the top right to make it live.',
+  'Plain HTML': '1. Find the HTML file for the page where you want your work to show up. If someone else built your site, ask them for it — or log into your hosting account (GoDaddy, Bluehost, Netlify, etc.) and look for "File Manager" or "Site Files."\n2. Right-click that file and choose Open With → Notepad (Windows) or TextEdit (Mac). Don’t use Microsoft Word — it can break the file.\n3. Press Ctrl+F (Cmd+F on Mac) and search for </body>. That’s a marker near the end of the file.\n4. Click right before </body> and paste the code below.\n5. Save the file, then upload it back to your host the same way you found it. Most hosts show a Save or Publish button.\n6. Stuck? Your web host’s live chat can usually paste one snippet for you in a few minutes — just say "I need to add one HTML snippet before </body> on this page."',
+}
 
 const TRADES = [
   'Door Installation',
@@ -37,7 +45,7 @@ const PLAN_FEATURES: Record<string, string[]> = {
   free:  ['Job check-ins with photos (up to 5 per job)', 'Up to 5 published job pages on Google', 'Basic dashboard'],
   pro:   ['Unlimited published job pages with full SEO', 'Portfolio page', 'Analytics & click tracking', 'Google Business Profile post generator'],
   elite: ['Everything in Pro', 'Auto-formatted Google Business Profile posts', 'Professional before & after images', 'Ghost camera overlay', 'Drag-to-reveal widget'],
-  titan: ['Everything in Elite', 'Automatic Google Business review requests', 'Custom AI copywriting agent', 'Custom AI Review Request Manager', 'Custom subdomain & white-label branding'],
+  titan: ['Everything in Elite', 'Automatic Google Business review requests', 'Custom AI copywriting agent', 'Custom AI Review Request Manager', 'Custom website widget for local SEO', 'Custom subdomain & white-label branding'],
 }
 
 interface Props {
@@ -49,11 +57,15 @@ const ONBOARDING_STEP_KEY = 'pc_onboarding_step'
 
 export default function OnboardingModal({ planTier, orgSlug }: Props) {
   const isTitan = (planTier ?? 'free').toLowerCase() === 'titan'
+  // Widget setup step (step 6) — Titan only, gated by the website_integration feature
+  const hasWidgetStep = tierHasFeature(planTier, 'website_integration')
+  const maxStep = hasWidgetStep ? 6 : 5
 
   const [step, setStepState] = useState<number>(() => {
     if (typeof window === 'undefined') return 1
     const saved = parseInt(localStorage.getItem(ONBOARDING_STEP_KEY) || '1', 10)
-    return (saved >= 1 && saved <= 5) ? saved : 1
+    const max = tierHasFeature(planTier, 'website_integration') ? 6 : 5
+    return (saved >= 1 && saved <= max) ? saved : 1
   })
 
   const setStep = (n: number) => {
@@ -76,6 +88,16 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
   const [submitting,   setSubmitting]   = useState(false)
   const [error,        setError]        = useState<string | null>(null)
   const [savedSlug,    setSavedSlug]    = useState<string | null>(orgSlug ?? null)
+
+  // Widget setup step state (step 6, Titan only)
+  const [wUrl,            setWUrl]            = useState('')
+  const [wSaving,         setWSaving]         = useState(false)
+  const [wError,          setWError]          = useState<string | null>(null)
+  const [wPlatform,       setWPlatform]       = useState<string>('WordPress')
+  const [wCopied,         setWCopied]         = useState(false)
+  const [wShowInfo,       setWShowInfo]       = useState(false)
+  const [wShowUrlInstr,   setWShowUrlInstr]   = useState(false)
+  const [wShowEmbedInstr, setWShowEmbedInstr] = useState(false)
 
   // AI research step state (Titan only — shown between step 2 and step 3)
   const [showAiResearch,  setShowAiResearch]  = useState(false)
@@ -226,6 +248,52 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
     window.location.href = '/dashboard'
   }
 
+  const widgetSlug = savedSlug || orgSlug || 'your-business'
+  const widgetBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://projectcheckin.com').replace(/\/$/, '')
+
+  const handleWidgetCopy = () => {
+    const snippet = `<!-- ProjectCheckin: Website Integration for Local SEO -->\n<div id="pc-widget" data-org="${widgetSlug}"></div>\n<script src="${widgetBaseUrl}/widget.v1.js" defer></script>`
+    navigator.clipboard.writeText(snippet).then(() => {
+      setWCopied(true)
+      setTimeout(() => setWCopied(false), 2000)
+    })
+  }
+
+  // Save the portfolio URL if one was entered, then advance to the final onboarding step
+  const handleWidgetFinish = async () => {
+    const url = wUrl.trim()
+    if (url) {
+      let valid = false
+      try {
+        const parsed = new URL(url)
+        valid = parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      } catch { valid = false }
+      if (!valid) {
+        setWError('Enter a full URL starting with https:// (e.g. https://yourwebsite.com/our-work)')
+        return
+      }
+      setWSaving(true)
+      setWError(null)
+      try {
+        const res = await fetch('/api/organization/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ portfolioPageUrl: url }),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => null)
+          throw new Error(data?.error || 'Failed to save. Please try again.')
+        }
+      } catch (err: any) {
+        setWError(err.message)
+        setWSaving(false)
+        return
+      }
+      setWSaving(false)
+    }
+    setStep(6)
+  }
+
   const tier = planTier || 'free'
   const planLabel = PLAN_LABELS[tier] || 'Free Starter'
   const features = PLAN_FEATURES[tier] || PLAN_FEATURES.free
@@ -234,9 +302,9 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
     <div style={styles.backdrop} aria-modal="true" role="dialog" aria-label="Account setup">
       <div style={styles.modal}>
 
-        {/* Progress dots — 6 for Titan (has AI step), 5 for all others */}
+        {/* Progress dots — 5 base, +1 for Titan AI step, +1 for Titan widget step */}
         {(() => {
-          const totalDots = isTitan ? 6 : 5
+          const totalDots = (isTitan ? 6 : 5) + (hasWidgetStep ? 1 : 0)
           // For Titan: AI step = dot 3, GBP steps shift to 4 and 5, done = 6
           const activeDot = showAiResearch ? 3 : (isTitan && step >= 3 ? step + 1 : step)
           return (
@@ -648,8 +716,8 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
           </div>
         )}
 
-        {/* ── STEP 5: First steps ── */}
-        {!showAiResearch && step === 5 && (
+        {/* ── FINAL STEP: First steps / You're all set (step 5 of 5, or step 6 of 6 for Titan widget users) ── */}
+        {!showAiResearch && (hasWidgetStep ? step === 6 : step === 5) && (
           <div style={styles.body}>
             <div style={{ ...styles.welcomeIcon, background: '#F0FDF4', borderColor: '#A7F3D0' }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
@@ -713,6 +781,114 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                 stroke="white" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/>
                 <polyline points="12 5 19 12 12 19"/></svg>
             </button>
+          </div>
+        )}
+
+        {/* ── STEP 5: Website Integration for Local SEO (Titan only, optional) ── */}
+        {!showAiResearch && step === 5 && hasWidgetStep && (
+          <div style={styles.body}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' as const, color: '#F97316', marginBottom: 5 }}>
+              Step 5 of {maxStep} — Optional
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <h2 style={{ ...styles.stepTitle, marginBottom: 0 }}>Website Integration for Local SEO</h2>
+              <button
+                onClick={() => setWShowInfo(!wShowInfo)}
+                aria-label="What is this?"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: wShowInfo ? '#0EA5E9' : '#94A3B8', padding: 0, display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </button>
+            </div>
+            {wShowInfo && (
+              <div style={{ background: '#0F172A', color: '#E8F0F8', borderRadius: 10, padding: '13px 34px 13px 15px', fontSize: 12.5, lineHeight: 1.65, position: 'relative' as const, marginBottom: 12 }}>
+                <button onClick={() => setWShowInfo(false)} style={{ position: 'absolute', top: 8, right: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 3px' }}>×</button>
+                Deliver geo-content and authority to your own domain. Publish jobs to build local SEO, so customers find you faster. Link your Google Business Profile posts from ProjectCheckin to your own website.
+              </div>
+            )}
+            <div style={{ height: 8 }} />
+
+            {/* Section 1: portfolio URL */}
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0C4A6E', marginBottom: 6 }}>Paste your portfolio page URL here</div>
+            <button
+              onClick={() => setWShowUrlInstr(!wShowUrlInstr)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: '#0EA5E9', cursor: 'pointer', background: 'none', border: 'none', padding: 0, marginBottom: 8, fontFamily: "'Plus Jakarta Sans', sans-serif", alignSelf: 'flex-start' }}
+            >
+              Instructions
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform .2s', transform: wShowUrlInstr ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {wShowUrlInstr && (
+              <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: '#0C4A6E', lineHeight: 1.65, marginBottom: 10 }}>
+                Create a page on your website (e.g. yourwebsite.com/our-work) and paste its URL here. This is where your new portfolio of work will show up on your website and will automatically start generating local SEO for your page. You can always opt out at any time if you&rsquo;d like, and remove the page.
+              </div>
+            )}
+            <input
+              type="url"
+              style={{ ...styles.input, fontFamily: 'monospace', fontSize: 13, marginBottom: 14 }}
+              placeholder="https://yourwebsite.com/our-work"
+              value={wUrl}
+              onChange={e => { setWUrl(e.target.value); setWError(null) }}
+            />
+
+            {/* Section 2: embed code */}
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0C4A6E', marginBottom: 6 }}>Add the widget to your website</div>
+            <button
+              onClick={() => setWShowEmbedInstr(!wShowEmbedInstr)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: '#0EA5E9', cursor: 'pointer', background: 'none', border: 'none', padding: 0, marginBottom: 8, fontFamily: "'Plus Jakarta Sans', sans-serif", alignSelf: 'flex-start' }}
+            >
+              Instructions
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform .2s', transform: wShowEmbedInstr ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {wShowEmbedInstr && (
+              <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: '#0C4A6E', lineHeight: 1.65, marginBottom: 10 }}>
+                After you create a new page on your website (e.g., yourwebsite.com/our-work), select the website builder by clicking one of the options below. Then, paste the code below into that new page you created. Your published jobs will appear automatically — no updates needed.
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' as const }}>
+              {Object.keys(WIDGET_PLATFORM_INSTRUCTIONS).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setWPlatform(p)}
+                  style={{ padding: '5px 12px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif", border: wPlatform === p ? '1px solid rgba(14,165,233,.4)' : '1.5px solid #BAE6FD', color: wPlatform === p ? '#0284C7' : '#4B7A94', background: wPlatform === p ? '#F0F9FF' : '#fff' }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: '#0C4A6E', lineHeight: 1.65, marginBottom: 10, whiteSpace: 'pre-line' as const }}>
+              {WIDGET_PLATFORM_INSTRUCTIONS[wPlatform]}
+            </div>
+            <div style={{ background: '#0F172A', color: '#7DD3FC', borderRadius: 8, padding: '12px 14px', fontFamily: "'Courier New', monospace", fontSize: 11, lineHeight: 1.6, marginBottom: 10, overflowX: 'auto' as const, whiteSpace: 'pre' as const }}>
+              <span style={{ color: '#86EFAC' }}>&lt;div</span> <span style={{ color: '#FCA5A5' }}>id</span>=<span style={{ color: '#FDE68A' }}>&quot;pc-widget&quot;</span> <span style={{ color: '#FCA5A5' }}>data-org</span>=<span style={{ color: '#FDE68A' }}>&quot;{widgetSlug}&quot;</span><span style={{ color: '#86EFAC' }}>&gt;&lt;/div&gt;</span>{'\n'}
+              <span style={{ color: '#86EFAC' }}>&lt;script</span> <span style={{ color: '#FCA5A5' }}>src</span>=<span style={{ color: '#FDE68A' }}>&quot;{widgetBaseUrl}/widget.v1.js&quot;</span> <span style={{ color: '#FCA5A5' }}>defer</span><span style={{ color: '#86EFAC' }}>&gt;&lt;/script&gt;</span>
+            </div>
+            <button
+              onClick={handleWidgetCopy}
+              style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: '#F0F9FF', color: wCopied ? '#059669' : '#4B7A94', border: '1px solid #BAE6FD' }}
+            >
+              {wCopied ? 'Copied!' : 'Copy code'}
+            </button>
+
+            {wError && <div style={{ ...styles.errorBox, marginTop: 14 }}>{wError}</div>}
+
+            {/* Footer: skip left, save & finish right */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 20, paddingTop: 14, borderTop: '1px solid #E0F2FE' }}>
+              <div>
+                <button onClick={() => setStep(6)} style={{ ...styles.btnSkip, marginTop: 0, alignSelf: 'flex-start', textAlign: 'left' as const, padding: 0 }}>
+                  Skip — set up later in Account → Connections
+                </button>
+                <div style={{ fontSize: 11.5, color: '#4B7A94', lineHeight: 1.5, marginTop: 6 }}>
+                  No website yet? Your GBP posts are still building your Google presence.
+                </div>
+              </div>
+              <button
+                style={{ ...styles.btnPrimary, width: 'auto', height: 44, padding: '0 20px', marginTop: 0, flexShrink: 0, ...(wSaving ? styles.btnDisabled : {}) }}
+                onClick={handleWidgetFinish}
+                disabled={wSaving}
+              >
+                {wSaving ? 'Saving…' : 'Continue'}
+              </button>
+            </div>
           </div>
         )}
 

@@ -38,17 +38,29 @@ export async function generateMetadata(
       ? `View ${article} ${doorType} installation completed in ${city}, ${state}${organization?.name ? ` by ${organization.name}` : ''}. See photos, details, and get a free estimate.`
       : 'View completed job details, photos, and request a free estimate.')
 
-  const photos = photoUrls
+  const allPhotos = photoUrls
     ? photoUrls.split(',').map((url) => url.trim()).filter(Boolean)
     : []
+
+  // The owner's chosen cover photo leads, so it's what shows in link previews.
+  const cover = checkIn.featuredPhotoUrl
+  const photos = cover && allPhotos.includes(cover)
+    ? [cover, ...allPhotos.filter((u) => u !== cover)]
+    : allPhotos
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
   const pageUrl = appUrl ? `${appUrl}/jobs/${location}/${slug}` : undefined
 
+  // When this job is also live on the customer's own WordPress site, that copy
+  // is canonical — search authority should accrue to their domain, not ours
+  // (design spec §5). Falls back to this page whenever it isn't synced.
+  const canonicalUrl =
+    checkIn.wpSyncStatus === 'synced' && checkIn.wpPostUrl ? checkIn.wpPostUrl : pageUrl
+
   return {
     title,
     description,
-    ...(pageUrl && { alternates: { canonical: pageUrl } }),
+    ...(canonicalUrl && { alternates: { canonical: canonicalUrl } }),
     openGraph: {
       title,
       description,

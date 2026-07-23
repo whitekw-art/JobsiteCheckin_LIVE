@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest) {
 
     const checkIn = await prisma.checkIn.findUnique({
       where: { id },
-      select: { photoUrls: true, organizationId: true },
+      select: { photoUrls: true, organizationId: true, featuredPhotoUrl: true },
     })
 
     if (!checkIn || checkIn.organizationId !== currentUser.organizationId) {
@@ -44,15 +44,22 @@ export async function PATCH(request: NextRequest) {
       where: { id },
       data: {
         photoUrls: updatedUrls.length ? updatedUrls.join(', ') : null,
+        // Deleting the cover photo clears the choice so it can't point at a
+        // photo that no longer exists — selection falls back to automatic.
+        ...(checkIn.featuredPhotoUrl === url && { featuredPhotoUrl: null }),
       },
-      select: { id: true, photoUrls: true },
+      select: { id: true, photoUrls: true, featuredPhotoUrl: true },
     })
 
     const responseUrls = updated.photoUrls
       ? updated.photoUrls.split(',').map((value) => value.trim()).filter(Boolean)
       : []
 
-    return NextResponse.json({ success: true, photoUrls: responseUrls })
+    return NextResponse.json({
+      success: true,
+      photoUrls: responseUrls,
+      featuredPhotoUrl: updated.featuredPhotoUrl,
+    })
   } catch (error: any) {
     console.error('Error deleting check-in photo:', error)
     return NextResponse.json(

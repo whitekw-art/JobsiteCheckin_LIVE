@@ -3,6 +3,7 @@
 import { useEffect, useState, FormEvent } from 'react'
 import { useSession } from 'next-auth/react'
 import DashboardShell from '@/components/DashboardShell'
+import { tierHasFeature } from '@/lib/planVersions'
 
 type Tab = 'general' | 'team' | 'billing' | 'connections'
 
@@ -13,9 +14,47 @@ interface OrganizationProfile {
   website: string | null
   email: string | null
   gbpReviewLink: string | null
+  portfolioPageUrl: string | null
+  portfolioIntro: string | null
   businessContext: string | null
   businessContextUpdatedAt: string | null
   websiteScanHistory: string[] | null
+}
+
+interface WidgetJobsSummary {
+  introDefault: string | null
+  primaryType: string | null
+  primaryCity: string | null
+  primaryState: string | null
+  types: string[]
+  cities: string[]
+}
+
+const WIDGET_PLATFORM_INSTRUCTIONS: Record<string, string> = {
+  WordPress: '1. Log into WordPress and open the page where you want your work to show up (or create a new page).\n2. Click the + button to add a new block.\n3. Type "Custom HTML" in the search box and select it.\n4. Paste the code below into that block.\n5. Click Update (or Publish) in the top right to save your page.',
+  Squarespace: '1. Log into Squarespace and open the page where you want your work to show up.\n2. Click Edit on that page.\n3. Click the + icon where you want the widget to appear, scroll down, and choose Code.\n4. Paste the code below into the box that opens, then click Apply.\n5. Click Save, then Publish, in the top right.',
+  Webflow: '1. Open your site in the Webflow Designer and go to the page where you want your work to show up.\n2. In the left panel, find the Embed element and drag it onto the page.\n3. Double-click the Embed box you just added.\n4. Paste the code below into the box, then click Save & Close.\n5. Click Publish in the top right to make it live.',
+  'Plain HTML': '1. Find the HTML file for the page where you want your work to show up. If someone else built your site, ask them for it — or log into your hosting account (GoDaddy, Bluehost, Netlify, etc.) and look for "File Manager" or "Site Files."\n2. Right-click that file and choose Open With → Notepad (Windows) or TextEdit (Mac). Don’t use Microsoft Word — it can break the file.\n3. Press Ctrl+F (Cmd+F on Mac) and search for </body>. That’s a marker near the end of the file.\n4. Click right before </body> and paste the code below.\n5. Save the file, then upload it back to your host the same way you found it. Most hosts show a Save or Publish button.\n6. Stuck? Your web host’s live chat can usually paste one snippet for you in a few minutes — just say "I need to add one HTML snippet before </body> on this page."',
+}
+
+function formatPhone(v: string): string {
+  const d = v.replace(/\D/g, '').slice(0, 10)
+  if (d.length === 0) return ''
+  if (d.length < 4)  return `(${d}`
+  if (d.length < 7)  return `(${d.slice(0,3)}) ${d.slice(3)}`
+  return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`
+}
+
+function joinList(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? ''
+  if (items.length === 2) return `${items[0]} and ${items[1]}`
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`
+}
+
+function byFrequency(values: string[]): string[] {
+  const counts = new Map<string, number>()
+  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1)
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([v]) => v)
 }
 
 const PLAN_LABELS: Record<string, string> = {
@@ -206,6 +245,269 @@ export default function AccountPage() {
     })
   }
 
+  // Website Integration (widget) card state — Titan only
+  const hasWebsiteIntegration = tierHasFeature(planTier, 'website_integration')
+  const [portfolioUrlInput,   setPortfolioUrlInput]   = useState('')
+  const [portfolioUrlSaving,  setPortfolioUrlSaving]  = useState(false)
+  const [portfolioUrlError,   setPortfolioUrlError]   = useState<string | null>(null)
+  const [showWidgetInfo,      setShowWidgetInfo]      = useState(false)
+  const [showUrlInstructions, setShowUrlInstructions] = useState(false)
+  const [showEmbedInstructions, setShowEmbedInstructions] = useState(false)
+  const [widgetPlatform,      setWidgetPlatform]      = useState<string>('WordPress')
+  const [embedCopied,         setEmbedCopied]         = useState(false)
+  const [introEditing,        setIntroEditing]        = useState(false)
+  const [introText,           setIntroText]           = useState('')
+  const [introSaving,         setIntroSaving]         = useState(false)
+  const [titleCopied,         setTitleCopied]         = useState(false)
+  const [metaCopied,          setMetaCopied]          = useState(false)
+  const [widgetJobs,          setWidgetJobs]          = useState<WidgetJobsSummary | null>(null)
+
+  // Load recent published jobs summary (drives intro preview + title/meta templates).
+  // Reuses the public embed API so the preview always matches what the widget renders.
+  useEffect(() => {
+    if (!hasWebsiteIntegration || !profile?.slug) return
+    fetch(`/api/embed/${profile.slug}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d?.jobs) return
+        const jobs = d.jobs as Array<{ jobType: string; city: string | null; state: string | null }>
+        const types = byFrequency(jobs.map((j) => (j.jobType || '').trim()).filter(Boolean))
+        const cities = byFrequency(jobs.map((j) => (j.city || '').trim()).filter(Boolean))
+        const primaryCityJob = jobs.find((j) => (j.city || '').trim() === cities[0])
+        setWidgetJobs({
+          introDefault: d.org?.introDefault ?? null,
+          primaryType: types[0] ?? null,
+          primaryCity: cities[0] ?? null,
+          primaryState: primaryCityJob?.state?.trim() || null,
+          types,
+          cities,
+        })
+      })
+      .catch(() => {})
+  }, [hasWebsiteIntegration, profile?.slug])
+
+  async function handleSavePortfolioUrl() {
+    const url = portfolioUrlInput.trim()
+    setPortfolioUrlError(null)
+    if (url) {
+      let valid = false
+      try {
+        const parsed = new URL(url)
+        valid = parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      } catch { valid = false }
+      if (!valid) {
+        setPortfolioUrlError('Enter a full URL starting with https:// (e.g. https://yourwebsite.com/our-work)')
+        return
+      }
+    }
+    setPortfolioUrlSaving(true)
+    try {
+      const res = await fetch('/api/organization/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ portfolioPageUrl: url || null }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || 'Failed to save')
+      setProfile((prev) => prev ? { ...prev, portfolioPageUrl: data.organization.portfolioPageUrl } : prev)
+    } catch (err: any) {
+      setPortfolioUrlError(err.message || 'Failed to save')
+    } finally {
+      setPortfolioUrlSaving(false)
+    }
+  }
+
+  async function handleSaveIntro(value: string | null) {
+    setIntroSaving(true)
+    try {
+      const res = await fetch('/api/organization/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ portfolioIntro: value }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || 'Failed to save')
+      setProfile((prev) => prev ? { ...prev, portfolioIntro: data.organization.portfolioIntro } : prev)
+      setIntroEditing(false)
+    } catch {
+      // keep editor open so the user can retry
+    } finally {
+      setIntroSaving(false)
+    }
+  }
+
+  function handleCopyEmbedCode() {
+    if (!profile?.slug) return
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://projectcheckin.com').replace(/\/$/, '')
+    const snippet = `<!-- ProjectCheckin: Website Integration for Local SEO -->\n<div id="pc-widget" data-org="${profile.slug}"></div>\n<script src="${baseUrl}/widget.v1.js" defer></script>`
+    navigator.clipboard.writeText(snippet).then(() => {
+      setEmbedCopied(true)
+      setTimeout(() => setEmbedCopied(false), 2000)
+    })
+  }
+
+  // Hosted subdomain (CNAME) card state — Titan only
+  const [sdLabel,        setSdLabel]        = useState('our-work')
+  const [sdHost,         setSdHost]         = useState<string | null>(null)
+  const [sdStatus,       setSdStatus]       = useState<string | null>(null)
+  const [sdApex,         setSdApex]         = useState<string | null>(null)
+  const [sdCnameTarget,  setSdCnameTarget]  = useState('cname.vercel-dns.com')
+  const [sdSaving,       setSdSaving]       = useState(false)
+  const [sdError,        setSdError]        = useState<string | null>(null)
+  const [sdEditing,      setSdEditing]      = useState(false)
+  const [showSdSteps,    setShowSdSteps]    = useState(false)
+  const [sdTargetCopied, setSdTargetCopied] = useState(false)
+  const [sdHomepageLinked, setSdHomepageLinked] = useState<boolean | null>(null)
+  const [sdCheckingLink,   setSdCheckingLink]   = useState(false)
+  const [showSdLinkSteps,  setShowSdLinkSteps]  = useState(false)
+
+  useEffect(() => {
+    if (!hasWebsiteIntegration) return
+    fetch('/api/organization/subdomain')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return
+        setSdHost(d.customSubdomain ?? null)
+        setSdStatus(d.subdomainStatus ?? null)
+        setSdApex(d.apexDomain ?? null)
+        setSdHomepageLinked(d.homepageLinked ?? null)
+        if (d.cnameTarget) setSdCnameTarget(d.cnameTarget)
+        if (d.customSubdomain && d.apexDomain) {
+          setSdLabel(d.customSubdomain.replace(`.${d.apexDomain}`, ''))
+        }
+      })
+      .catch(() => {})
+  }, [hasWebsiteIntegration])
+
+  function handleRecheckHomepageLink() {
+    setSdCheckingLink(true)
+    fetch('/api/organization/subdomain')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setSdHomepageLinked(d.homepageLinked ?? null) })
+      .catch(() => {})
+      .finally(() => setSdCheckingLink(false))
+  }
+
+  // While pending, re-check every 30s — the API promotes to verified once
+  // the CNAME resolves and Vercel confirms the domain
+  useEffect(() => {
+    if (sdStatus !== 'pending') return
+    const t = setInterval(() => {
+      fetch('/api/organization/subdomain')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!d?.subdomainStatus) return
+          setSdStatus(d.subdomainStatus)
+          setSdHomepageLinked(d.homepageLinked ?? null)
+        })
+        .catch(() => {})
+    }, 30000)
+    return () => clearInterval(t)
+  }, [sdStatus])
+
+  async function handleSaveSubdomain() {
+    setSdError(null)
+    setSdSaving(true)
+    try {
+      const res = await fetch('/api/organization/subdomain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: sdLabel }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || 'Failed to save')
+      setSdHost(data.customSubdomain)
+      setSdStatus(data.subdomainStatus)
+      setSdApex(data.apexDomain)
+      setSdHomepageLinked(null)
+      if (data.cnameTarget) setSdCnameTarget(data.cnameTarget)
+      setSdEditing(false)
+    } catch (err: any) {
+      setSdError(err.message || 'Failed to save')
+    } finally {
+      setSdSaving(false)
+    }
+  }
+
+  function handleCopyCnameTarget() {
+    navigator.clipboard.writeText(sdCnameTarget).then(() => {
+      setSdTargetCopied(true)
+      setTimeout(() => setSdTargetCopied(false), 1500)
+    })
+  }
+
+  // WordPress native publishing card state — Titan only
+  const [wpSiteUrl,      setWpSiteUrl]      = useState('')
+  const [wpUsername,     setWpUsername]     = useState('')
+  const [wpPassword,     setWpPassword]     = useState('')
+  const [wpStatus,       setWpStatus]       = useState<string | null>(null)
+  const [wpConnectedUrl, setWpConnectedUrl] = useState<string | null>(null)
+  const [wpSyncedCount,  setWpSyncedCount]  = useState(0)
+  const [wpFailedCount,  setWpFailedCount]  = useState(0)
+  const [wpSaving,       setWpSaving]       = useState(false)
+  const [wpError,        setWpError]        = useState<string | null>(null)
+  const [wpDisconnecting, setWpDisconnecting] = useState(false)
+  const [showWpSteps,    setShowWpSteps]    = useState(false)
+
+  useEffect(() => {
+    if (!hasWebsiteIntegration) return
+    fetch('/api/organization/wordpress')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return
+        setWpStatus(d.wpConnectionStatus ?? null)
+        setWpConnectedUrl(d.wpSiteUrl ?? null)
+        setWpUsername(d.wpUsername ?? '')
+        setWpSyncedCount(d.syncedCount ?? 0)
+        setWpFailedCount(d.failedCount ?? 0)
+        if (d.wpSiteUrl) setWpSiteUrl(d.wpSiteUrl)
+      })
+      .catch(() => {})
+  }, [hasWebsiteIntegration])
+
+  async function handleConnectWordPress() {
+    setWpError(null)
+    setWpSaving(true)
+    try {
+      const res = await fetch('/api/organization/wordpress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          siteUrl: wpSiteUrl,
+          username: wpUsername,
+          applicationPassword: wpPassword,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || 'Connection failed — double-check your site address and Application Password, then try again.')
+      setWpStatus('connected')
+      setWpConnectedUrl(data.wpSiteUrl)
+      setWpPassword('') // never keep the credential in component state after use
+    } catch (err: any) {
+      setWpError(err.message)
+      setWpStatus('failed')
+    } finally {
+      setWpSaving(false)
+    }
+  }
+
+  async function handleDisconnectWordPress() {
+    setWpDisconnecting(true)
+    try {
+      const res = await fetch('/api/organization/wordpress', { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to disconnect')
+      setWpStatus(null)
+      setWpConnectedUrl(null)
+      setWpPassword('')
+      setWpSyncedCount(0)
+      setWpFailedCount(0)
+    } catch {
+      setWpError('Could not disconnect right now. Please try again.')
+    } finally {
+      setWpDisconnecting(false)
+    }
+  }
+
   // Connections tab state (localStorage-backed, Phase 1)
   const [gbpConnected, setGbpConnected] = useState(false)
   const [postMode, setPostMode] = useState<'draft' | 'auto'>('draft')
@@ -230,6 +532,7 @@ export default function AccountPage() {
         setPhone(org.phone || '')
         setWebsite(org.website || '')
         setGbpReviewLinkInput(org.gbpReviewLink || '')
+        setPortfolioUrlInput(org.portfolioPageUrl || '')
         // Parse AI business context if present
         if (org.businessContext) {
           try {
@@ -415,7 +718,7 @@ export default function AccountPage() {
                   className="db-shell-input"
                   style={{ width: '100%', minWidth: 0 }}
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(formatPhone(e.target.value))}
                   placeholder="(555) 123-4567"
                 />
               </div>
@@ -424,12 +727,12 @@ export default function AccountPage() {
                 <label htmlFor="business-website" className="db-shell-label">Business Website</label>
                 <input
                   id="business-website"
-                  type="url"
+                  type="text"
                   className="db-shell-input"
                   style={{ width: '100%', minWidth: 0 }}
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
-                  placeholder="https://example.com"
+                  placeholder="yourwebsite.com"
                 />
               </div>
 
@@ -442,7 +745,7 @@ export default function AccountPage() {
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 10.5, fontWeight: 700, background: '#FFF7ED', color: '#C2410C', border: '1px solid #FED7AA' }}>Titan</span>
                     </div>
                     <p style={{ fontSize: 12, color: 'var(--t3)', lineHeight: 1.55, marginBottom: 16 }}>
-                      Used by the AI copywriting agent to write accurate job descriptions. Populated automatically from your website \u2014 edit anytime.
+                      Used by the AI copywriting agent to write accurate job descriptions. Populated automatically from your website {'\u2014'} edit anytime.
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
                       <div>
@@ -793,6 +1096,588 @@ export default function AccountPage() {
             </div>
           </div>
 
+          {/* ── Website Integration for Local SEO (Titan only) ── */}
+          {hasWebsiteIntegration && (
+            <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
+
+              {/* Card header */}
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 9, background: '#FFF7ED', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      Website Integration for Local SEO
+                      <button
+                        onClick={() => setShowWidgetInfo(!showWidgetInfo)}
+                        aria-label="What is this?"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: showWidgetInfo ? 'var(--sky-text)' : 'var(--t3)', padding: 0, display: 'inline-flex', alignItems: 'center', lineHeight: 1 }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Grow your site&apos;s local ranking with every job you complete</div>
+                  </div>
+                </div>
+                <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, flexShrink: 0, background: '#FFF7ED', color: '#C2410C', border: '1px solid rgba(194,65,12,.2)' }}>
+                  Titan
+                </span>
+              </div>
+
+              {/* Info dropdown */}
+              {showWidgetInfo && (
+                <div style={{ margin: '12px 18px 0', background: 'var(--t1)', color: '#E8F0F8', borderRadius: 10, padding: '13px 34px 13px 15px', fontSize: 12.5, lineHeight: 1.65, position: 'relative' }}>
+                  <button onClick={() => setShowWidgetInfo(false)} style={{ position: 'absolute', top: 8, right: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 3px' }}>×</button>
+                  Deliver geo-content and authority to your own domain. Publish jobs to build local SEO, so customers find you faster. Link your Google Business Profile posts from ProjectCheckin to your own website.
+                </div>
+              )}
+
+              {/* Section 1: Portfolio page URL */}
+              <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', marginTop: showWidgetInfo ? 12 : 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--t1)', marginBottom: 8 }}>Paste your portfolio page URL here</div>
+                <button
+                  onClick={() => setShowUrlInstructions(!showUrlInstructions)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', background: 'none', border: 'none', padding: 0, marginBottom: 10, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                >
+                  Instructions
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform .2s', transform: showUrlInstructions ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                {showUrlInstructions && (
+                  <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: 'var(--t2)', lineHeight: 1.65, marginBottom: 12 }}>
+                    Create a page on your website (e.g. yourwebsite.com/our-work) and paste its URL here. This is where your new portfolio of work will show up on your website and will automatically start generating local SEO for your page. You can always opt out at any time if you&apos;d like, and remove the page.
+                  </div>
+                )}
+                {(() => {
+                  const urlSaved = !!profile?.portfolioPageUrl && portfolioUrlInput.trim() === profile.portfolioPageUrl
+                  return (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        type="url"
+                        value={portfolioUrlInput}
+                        onChange={(e) => { setPortfolioUrlInput(e.target.value); setPortfolioUrlError(null) }}
+                        placeholder="https://yourwebsite.com/our-work"
+                        style={{ flex: 1, minWidth: 0, background: urlSaved ? 'var(--surface-2)' : 'var(--surface)', border: urlSaved ? '1px solid rgba(14,165,233,.2)' : '1px solid var(--border-2)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: urlSaved ? 'var(--sky-text)' : 'var(--t1)', fontWeight: urlSaved ? 600 : 400, outline: 'none' }}
+                      />
+                      <button
+                        onClick={handleSavePortfolioUrl}
+                        disabled={portfolioUrlSaving || urlSaved}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 16px', height: 34, borderRadius: 8, fontSize: 11.5, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", border: 'none', cursor: portfolioUrlSaving || urlSaved ? 'default' : 'pointer', background: urlSaved ? 'var(--green)' : 'var(--sky-text)', color: '#fff', flexShrink: 0 }}
+                      >
+                        {urlSaved ? (
+                          <>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Saved
+                          </>
+                        ) : portfolioUrlSaving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  )
+                })()}
+                {portfolioUrlError && <div style={{ fontSize: 12, color: 'var(--red, #DC2626)', marginTop: 8 }}>{portfolioUrlError}</div>}
+              </div>
+
+              {/* Section 2: Embed code */}
+              <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--t1)', marginBottom: 8 }}>Add the widget to your website</div>
+                <button
+                  onClick={() => setShowEmbedInstructions(!showEmbedInstructions)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', background: 'none', border: 'none', padding: 0, marginBottom: 10, fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                >
+                  Instructions
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform .2s', transform: showEmbedInstructions ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                {showEmbedInstructions && (
+                  <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: 'var(--t2)', lineHeight: 1.65, marginBottom: 12 }}>
+                    After you create a new page on your website (e.g., yourwebsite.com/our-work), select the website builder by clicking one of the options below. Then, paste the code below into that new page you created. Your published jobs will appear automatically — no updates needed.
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
+                  {Object.keys(WIDGET_PLATFORM_INSTRUCTIONS).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setWidgetPlatform(p)}
+                      style={{ padding: '5px 12px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif", border: widgetPlatform === p ? '1px solid rgba(14,165,233,.3)' : '1px solid var(--border)', color: widgetPlatform === p ? 'var(--sky-text)' : 'var(--t3)', background: widgetPlatform === p ? 'var(--sky-dim)' : 'var(--surface)' }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: 'var(--t2)', lineHeight: 1.65, marginBottom: 10, whiteSpace: 'pre-line' }}>
+                  {WIDGET_PLATFORM_INSTRUCTIONS[widgetPlatform]}
+                </div>
+                <div style={{ background: 'var(--t1)', color: '#7DD3FC', borderRadius: 8, padding: '12px 14px', fontFamily: "'Courier New', monospace", fontSize: 11.5, lineHeight: 1.6, marginBottom: 10, overflowX: 'auto', whiteSpace: 'pre' }}>
+                  <span style={{ color: '#4B6378' }}>&lt;!-- ProjectCheckin: Website Integration for Local SEO --&gt;</span>{'\n'}
+                  <span style={{ color: '#86EFAC' }}>&lt;div</span> <span style={{ color: '#FCA5A5' }}>id</span>=<span style={{ color: '#FDE68A' }}>&quot;pc-widget&quot;</span> <span style={{ color: '#FCA5A5' }}>data-org</span>=<span style={{ color: '#FDE68A' }}>&quot;{profile?.slug || 'your-business'}&quot;</span><span style={{ color: '#86EFAC' }}>&gt;&lt;/div&gt;</span>{'\n'}
+                  <span style={{ color: '#86EFAC' }}>&lt;script</span> <span style={{ color: '#FCA5A5' }}>src</span>=<span style={{ color: '#FDE68A' }}>&quot;{(process.env.NEXT_PUBLIC_APP_URL || 'https://projectcheckin.com').replace(/\/$/, '')}/widget.v1.js&quot;</span> <span style={{ color: '#FCA5A5' }}>defer</span><span style={{ color: '#86EFAC' }}>&gt;&lt;/script&gt;</span>
+                </div>
+                <button
+                  onClick={handleCopyEmbedCode}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: 'var(--surface-3)', color: embedCopied ? 'var(--green)' : 'var(--t2)', border: '1px solid var(--border)' }}
+                >
+                  {embedCopied ? 'Copied!' : 'Copy code'}
+                </button>
+              </div>
+
+              {/* Section 3: Portfolio page intro */}
+              <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--t1)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  Portfolio page intro
+                  <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--t3)', background: 'var(--surface-3)', padding: '2px 7px', borderRadius: 10 }}>Optional</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--t2)', marginBottom: 10, lineHeight: 1.55 }}>
+                  This paragraph appears at the top of your portfolio page, above your jobs. It&apos;s auto-generated from your business profile. Override it with your own text if you&apos;d like.
+                </div>
+
+                {!introEditing ? (
+                  <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: '11px 13px', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
+                      {profile?.portfolioIntro ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, color: '#D97706', background: '#FFFBEB', border: '1px solid rgba(217,119,6,.2)', borderRadius: 20, padding: '2px 8px' }}>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#D97706' }} />Custom
+                        </span>
+                      ) : (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, color: 'var(--green)', background: 'var(--green-bg)', border: '1px solid rgba(22,163,74,.15)', borderRadius: 20, padding: '2px 8px' }}>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--green)' }} />Auto-generated
+                        </span>
+                      )}
+                      <button
+                        onClick={() => { setIntroText(profile?.portfolioIntro || widgetJobs?.introDefault || ''); setIntroEditing(true) }}
+                        style={{ background: 'none', border: 'none', padding: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 11.5, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer' }}
+                      >
+                        Edit
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.65 }}>
+                      {profile?.portfolioIntro || widgetJobs?.introDefault || 'Publish your first job and your intro will be generated automatically from your business profile.'}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ marginBottom: 10 }}>
+                    <textarea
+                      value={introText}
+                      onChange={(e) => setIntroText(e.target.value)}
+                      placeholder="Write a short intro for your portfolio page. Keep it under 200 words. Use your city and trade names naturally."
+                      style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', resize: 'vertical', minHeight: 80, lineHeight: 1.6, outline: 'none' }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                      <button onClick={() => setIntroEditing(false)} style={{ background: 'none', border: 'none', padding: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 11.5, fontWeight: 600, color: 'var(--t3)', cursor: 'pointer' }}>Cancel</button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <button onClick={() => handleSaveIntro(null)} disabled={introSaving} style={{ background: 'none', border: 'none', padding: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 11.5, fontWeight: 600, color: 'var(--t3)', cursor: 'pointer' }}>Reset to auto-generated</button>
+                        <button
+                          onClick={() => handleSaveIntro(introText.trim() || null)}
+                          disabled={introSaving}
+                          style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: 'var(--sky-text)', color: '#fff', border: 'none' }}
+                        >
+                          {introSaving ? 'Saving…' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Title tag + meta description templates */}
+                {widgetJobs?.primaryType && widgetJobs?.primaryCity && (
+                  <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '11px 13px', marginTop: 12 }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--t3)', marginBottom: 6 }}>Recommended page title tag</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--t1)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 9px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <span>{`${widgetJobs.primaryType} in ${widgetJobs.primaryCity}${widgetJobs.primaryState ? `, ${widgetJobs.primaryState}` : ''} — ${profile?.name || ''} Portfolio`}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${widgetJobs.primaryType} in ${widgetJobs.primaryCity}${widgetJobs.primaryState ? `, ${widgetJobs.primaryState}` : ''} — ${profile?.name || ''} Portfolio`).then(() => {
+                            setTitleCopied(true); setTimeout(() => setTitleCopied(false), 2000)
+                          })
+                        }}
+                        style={{ background: 'none', border: 'none', padding: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 11.5, fontWeight: 600, color: titleCopied ? 'var(--green)' : 'var(--sky-text)', cursor: 'pointer', flexShrink: 0 }}
+                      >
+                        {titleCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--t3)', margin: '10px 0 6px' }}>Recommended meta description</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--t1)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 9px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5 }}>
+                      <span style={{ lineHeight: 1.5 }}>{`See completed ${joinList(widgetJobs.types.slice(0, 3).map((t) => t.toLowerCase()))} jobs across ${joinList(widgetJobs.cities.slice(0, 3))} — with photos from every project.`}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`See completed ${joinList(widgetJobs.types.slice(0, 3).map((t) => t.toLowerCase()))} jobs across ${joinList(widgetJobs.cities.slice(0, 3))} — with photos from every project.`).then(() => {
+                            setMetaCopied(true); setTimeout(() => setMetaCopied(false), 2000)
+                          })
+                        }}
+                        style={{ background: 'none', border: 'none', padding: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 11.5, fontWeight: 600, color: metaCopied ? 'var(--green)' : 'var(--sky-text)', cursor: 'pointer', alignSelf: 'flex-end' }}
+                      >
+                        {metaCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 8 }}>Paste these into your page settings in your website builder. They tell Google exactly what your page is about.</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Host Your Work On Your Own Site (CNAME subdomain, Titan only) ── */}
+          {hasWebsiteIntegration && (
+            <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Host Your Work Directly On Your Own Site</div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>A real page on your domain — built for Google and AI search, not just a widget</div>
+                  </div>
+                </div>
+                <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, flexShrink: 0, background: '#FFF7ED', color: '#C2410C', border: '1px solid rgba(194,65,12,.2)' }}>
+                  Titan
+                </span>
+              </div>
+
+              {/* State: verified & live */}
+              {sdStatus === 'verified' && !sdEditing ? (
+                <div style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
+                      Live
+                    </span>
+                    <button
+                      onClick={() => setSdEditing(true)}
+                      style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', padding: 0 }}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--t3)', fontFamily: 'monospace', letterSpacing: '-0.2px', marginTop: 7 }}>
+                    <a href={`https://${sdHost}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--sky-text)' }}>{sdHost}</a>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.6, marginTop: 10, marginBottom: 0 }}>
+                    Your jobs are now live on your own domain — visible to Google and AI search immediately, no delay.
+                  </p>
+
+                  {/* One last step: make sure people can actually find this new page from the homepage */}
+                  <div style={{ background: sdHomepageLinked === true ? 'var(--green-bg)' : 'var(--surface-3)', border: `1px solid ${sdHomepageLinked === true ? 'rgba(22,163,74,.25)' : 'var(--border)'}`, borderRadius: 8, padding: '12px 14px', marginTop: 14 }}>
+                    {sdHomepageLinked === true ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 700, color: 'var(--green)' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        Your homepage links to this page
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 700, color: sdHomepageLinked === false ? '#D97706' : 'var(--t2)' }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                          {sdHomepageLinked === false ? "One more step: add a link on your homepage" : "We couldn't check this automatically"}
+                        </div>
+                        <p style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.6, margin: '8px 0 0' }}>
+                          Right now this new page has no link pointing to it from your main website. Add one link — like "Our Work" in your menu — so visitors (and Google) can actually find it. This page already links back to your homepage on its own; this is just the other direction.
+                        </p>
+                        <button
+                          onClick={() => setShowSdLinkSteps(!showSdLinkSteps)}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', background: 'none', border: 'none', padding: 0, marginTop: 10 }}
+                        >
+                          How do I add this link?
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform .2s', transform: showSdLinkSteps ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        {showSdLinkSteps && (
+                          <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.65, marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+                            Add a menu link with a label like "Our Work" pointing to <span style={{ fontFamily: 'monospace', color: 'var(--t1)' }}>https://{sdHost}</span>. Where to do this depends on how your site is built:
+                            <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                              <li><strong>WordPress:</strong> Appearance → Menus → Add Custom Link</li>
+                              <li><strong>Squarespace:</strong> Pages → click + next to your navigation</li>
+                              <li><strong>Wix:</strong> Editor → Manage Menu → + Add Item → Link</li>
+                              <li><strong>Webflow:</strong> Designer → your navbar → add a Nav Link</li>
+                              <li><strong>Plain HTML site:</strong> add a link in your page's navigation section, then re-upload the file</li>
+                            </ul>
+                            Not sure how your site works? Tell whoever manages it: <em>&quot;Please add a menu link labeled &apos;Our Work&apos; pointing to https://{sdHost}.&quot;</em>
+                          </div>
+                        )}
+                        <button
+                          onClick={handleRecheckHomepageLink}
+                          disabled={sdCheckingLink}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, fontSize: 11.5, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: sdCheckingLink ? 'default' : 'pointer', background: 'var(--sky-text)', color: '#fff', border: 'none', marginTop: 10 }}
+                        >
+                          {sdCheckingLink ? 'Checking…' : "I've Added It — Check Again"}
+                        </button>
+                        {sdHomepageLinked === null && (
+                          <p style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.5, margin: '8px 0 0' }}>
+                            This check only looks at your homepage's basic code and can occasionally miss fancy drag-and-drop menus. If you've already added the link, you're all set either way.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : sdStatus === 'pending' && !sdEditing ? (
+                /* State: pending DNS */
+                <div style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: '#FFFBEB', color: '#D97706' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                      Waiting on DNS…
+                    </span>
+                    <button
+                      onClick={() => setSdEditing(true)}
+                      style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', padding: 0 }}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--t3)', fontFamily: 'monospace', letterSpacing: '-0.2px', marginTop: 7 }}>{sdHost}</div>
+                  <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '12px 14px', marginTop: 12 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>Add this record at your domain provider</div>
+                    <div style={{ display: 'flex', gap: 10, fontSize: 12, padding: '4px 0' }}><span style={{ color: 'var(--t3)', width: 44, flexShrink: 0, fontWeight: 600 }}>Type</span><span style={{ fontFamily: 'monospace', color: 'var(--t1)' }}>CNAME</span></div>
+                    <div style={{ display: 'flex', gap: 10, fontSize: 12, padding: '4px 0' }}><span style={{ color: 'var(--t3)', width: 44, flexShrink: 0, fontWeight: 600 }}>Host</span><span style={{ fontFamily: 'monospace', color: 'var(--t1)' }}>{sdHost && sdApex ? sdHost.replace(`.${sdApex}`, '') : sdLabel}</span></div>
+                    <div style={{ display: 'flex', gap: 10, fontSize: 12, padding: '4px 0', alignItems: 'center' }}>
+                      <span style={{ color: 'var(--t3)', width: 44, flexShrink: 0, fontWeight: 600 }}>Value</span>
+                      <span style={{ fontFamily: 'monospace', color: 'var(--t1)', wordBreak: 'break-all' }}>{sdCnameTarget}</span>
+                      <button
+                        onClick={handleCopyCnameTarget}
+                        style={{ marginLeft: 'auto', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, fontSize: 11.5, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: sdTargetCopied ? 'var(--green)' : 'var(--sky-text)', color: '#fff', border: 'none' }}
+                      >
+                        {sdTargetCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--t3)', lineHeight: 1.6, marginTop: 10, marginBottom: 0 }}>
+                    DNS changes can take up to 48 hours to fully take effect. This page checks automatically — you don&apos;t need to keep refreshing.
+                  </p>
+                </div>
+              ) : (
+                /* State: not set up (or editing) */
+                <div style={{ padding: '16px 20px' }}>
+                  <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, marginBottom: 14, marginTop: 0 }}>
+                    This gives your job pages their own address on your domain — like <span style={{ fontFamily: 'monospace', color: 'var(--t1)' }}>our-work.{sdApex || 'yourdomain.com'}</span> — with no code to paste and no plugin to install. Just one setting at your domain provider.
+                  </p>
+                  {!sdApex ? (
+                    <div style={{ background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', fontSize: 12, color: '#92400E', lineHeight: 1.55 }}>
+                      Add your website in Account → General first — your subdomain is built from your domain.
+                    </div>
+                  ) : (
+                    <>
+                      <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Choose your subdomain</label>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                        <input
+                          type="text"
+                          value={sdLabel}
+                          onChange={(e) => { setSdLabel(e.target.value.toLowerCase()); setSdError(null) }}
+                          placeholder="our-work"
+                          style={{ flex: 1, minWidth: 0, background: 'var(--surface)', border: '1px solid var(--border-2)', borderRight: 'none', borderRadius: '8px 0 0 8px', padding: '9px 13px', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', outline: 'none' }}
+                        />
+                        <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border-2)', borderRadius: '0 8px 8px 0', padding: '9px 13px', fontSize: 13, color: 'var(--t3)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                          .{sdApex}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <button
+                          onClick={handleSaveSubdomain}
+                          disabled={sdSaving}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: sdSaving ? 'default' : 'pointer', background: 'var(--sky-text)', color: '#fff', border: 'none' }}
+                        >
+                          {sdSaving ? 'Saving…' : 'Get My DNS Record'}
+                        </button>
+                        {sdEditing && (
+                          <button
+                            onClick={() => { setSdEditing(false); setSdError(null) }}
+                            style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--t3)', cursor: 'pointer', padding: 0 }}
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                      {sdError && <div style={{ fontSize: 12, color: 'var(--red, #DC2626)', marginTop: 8 }}>{sdError}</div>}
+
+                      {/* Collapsible: how to add the record */}
+                      <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', marginTop: 12 }}>
+                        <button
+                          onClick={() => setShowSdSteps(!showSdSteps)}
+                          style={{ width: '100%', background: 'none', border: 'none', padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                        >
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            How to add a DNS record (GoDaddy, Namecheap, Cloudflare, etc.)
+                          </span>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: 'transform .2s', transform: showSdSteps ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        {showSdSteps && (
+                          <div style={{ padding: '0 14px 12px', borderTop: '1px solid var(--border)' }}>
+                            {[
+                              'Log in to whoever you bought your domain from (GoDaddy, Namecheap, Cloudflare, etc.) — not your website builder.',
+                              'Find DNS Settings or Manage DNS for your domain.',
+                              'Click "Get My DNS Record" above, then add a new record using the exact Type, Host, and Value shown, and save.',
+                            ].map((txt, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--t2)', lineHeight: 1.55, marginTop: 10 }}>
+                                <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--sky-dim)', color: 'var(--sky-text)', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                                <div>{txt}</div>
+                              </div>
+                            ))}
+                            <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                              Don&apos;t see DNS settings at all? Some website builder plans don&apos;t allow this — if that&apos;s you, keep using the embed widget above instead. No action needed on your end.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Publish Directly to Your WordPress Site (Phase 3, Titan only) ── */}
+          {hasWebsiteIntegration && (
+            <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                      <circle cx="12" cy="12" r="11" fill="#21759B"/>
+                      <path fill="#fff" d="M3.9 12a8.1 8.1 0 0 0 4.56 7.29L4.86 8.98A8.06 8.06 0 0 0 3.9 12zm14.03-.42c0-.95-.34-1.6-.63-2.11-.39-.63-.75-1.16-.75-1.79 0-.7.53-1.35 1.28-1.35.03 0 .07 0 .1.01A8.1 8.1 0 0 0 12 3.9a8.11 8.11 0 0 0-6.78 3.65c.18 0 .35.01.5.01.8 0 2.05-.1 2.05-.1.41-.02.46.58.05.63 0 0-.41.05-.87.07l2.78 8.26 1.67-5.01-1.19-3.25c-.41-.02-.8-.07-.8-.07-.41-.02-.36-.65.05-.63 0 0 1.27.1 2.03.1.8 0 2.05-.1 2.05-.1.41-.02.46.58.05.63 0 0-.42.05-.87.07l2.76 8.2.76-2.55c.35-1.05.53-1.86.53-2.52zm-5.51 1.16-2.29 6.65c.68.2 1.41.31 2.16.31.89 0 1.75-.15 2.55-.44a.71.71 0 0 1-.06-.11l-2.36-6.41zm7.22-4.77c.03.24.05.5.05.78 0 .77-.14 1.63-.58 2.71l-2.32 6.71A8.1 8.1 0 0 0 20.1 12a8.05 8.05 0 0 0-.46-4.03z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Publish Directly to Your WordPress Site</div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Real posts in your own theme — the deepest SEO and AI search integration we offer</div>
+                  </div>
+                </div>
+                <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, flexShrink: 0, background: '#FFF7ED', color: '#C2410C', border: '1px solid rgba(194,65,12,.2)' }}>
+                  Titan
+                </span>
+              </div>
+
+              {wpStatus === 'connected' ? (
+                /* State: connected */
+                <div style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                      Connected
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (confirm('Disconnecting removes the job posts and photos we published from your WordPress site. Nothing is deleted from ProjectCheckin. Continue?')) {
+                          handleDisconnectWordPress()
+                        }
+                      }}
+                      disabled={wpDisconnecting}
+                      style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--red, #DC2626)', cursor: wpDisconnecting ? 'default' : 'pointer', padding: 0 }}
+                    >
+                      {wpDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--t3)', fontFamily: 'monospace', letterSpacing: '-0.2px', marginTop: 7 }}>{wpConnectedUrl}</div>
+
+                  <p style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.6, marginTop: 10, marginBottom: 0 }}>
+                    {wpSyncedCount > 0
+                      ? `${wpSyncedCount} ${wpSyncedCount === 1 ? 'job is' : 'jobs are'} live on your site. New jobs you publish appear automatically.`
+                      : 'New jobs you publish will appear on your site automatically. Jobs published before you connected are not included.'}
+                  </p>
+
+                  {wpFailedCount > 0 && (
+                    <div style={{ background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', marginTop: 12, fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
+                      {wpFailedCount} {wpFailedCount === 1 ? 'job' : 'jobs'} couldn&apos;t be published to your site. Reconnect below with a new Application Password and we&apos;ll try again automatically.
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: 'var(--sky-dim)', border: '1px solid rgba(14,165,233,.25)', borderRadius: 8, padding: '12px 14px', marginTop: 14, fontSize: 12, color: 'var(--t2)', lineHeight: 1.6 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    <span>Reminder: if you ever need to downgrade or cancel, nothing will be deleted from ProjectCheckin, but job content will no longer be displayed on your site. Everything is restored to your site automatically the moment you resubscribe to Titan.</span>
+                  </div>
+                </div>
+              ) : (
+                /* State: not connected (also covers a failed attempt) */
+                <div style={{ padding: '16px 20px' }}>
+                  <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, marginTop: 0, marginBottom: 14 }}>
+                    Connect your WordPress site and every job you publish from now on becomes a real post on your own site — in your own theme, at your own address. Nothing to install.
+                  </p>
+
+                  {wpError && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: 'var(--red, #DC2626)', lineHeight: 1.5, marginBottom: 12 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      <span>{wpError}</span>
+                    </div>
+                  )}
+
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Your WordPress site address</label>
+                  <input
+                    type="text"
+                    value={wpSiteUrl}
+                    onChange={(e) => setWpSiteUrl(e.target.value)}
+                    placeholder="https://yourbusiness.com"
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--t1)', outline: 'none', marginBottom: 14 }}
+                  />
+
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>WordPress username</label>
+                  <input
+                    type="text"
+                    value={wpUsername}
+                    onChange={(e) => setWpUsername(e.target.value)}
+                    placeholder="your-wordpress-username"
+                    autoComplete="off"
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', outline: 'none', marginBottom: 14 }}
+                  />
+
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Application Password</label>
+                  <input
+                    type="password"
+                    value={wpPassword}
+                    onChange={(e) => setWpPassword(e.target.value)}
+                    placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"
+                    autoComplete="new-password"
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--t1)', outline: 'none', marginBottom: 14 }}
+                  />
+
+                  {/* Collapsible: how to generate an Application Password */}
+                  <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', marginBottom: 14 }}>
+                    <button
+                      onClick={() => setShowWpSteps(!showWpSteps)}
+                      style={{ width: '100%', background: 'none', border: 'none', padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        How to generate an Application Password
+                      </span>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: 'transform .2s', transform: showWpSteps ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    {showWpSteps && (
+                      <div style={{ padding: '0 14px 12px', borderTop: '1px solid var(--border)' }}>
+                        {[
+                          'Log in to your WordPress admin area — usually yoursite.com/wp-admin.',
+                          'Go to Users → Profile.',
+                          'Scroll down to Application Passwords, type "ProjectCheckin" as the name, and click Add New Application Password.',
+                          "Copy the password it shows you — it's only displayed once — and paste it above with your username and site address.",
+                        ].map((txt, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--t2)', lineHeight: 1.55, marginTop: 10 }}>
+                            <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--sky-dim)', color: 'var(--sky-text)', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                            <div>{txt}</div>
+                          </div>
+                        ))}
+                        <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                          Don&apos;t see Application Passwords on your profile page? Some websites have this turned off by default — reach out to ProjectCheckin support and we&apos;ll help you get it turned on.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: 'var(--sky-dim)', border: '1px solid rgba(14,165,233,.25)', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: 12, color: 'var(--t2)', lineHeight: 1.6 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    <span>Jobs you publish while connected stay live on your WordPress site as long as you&apos;re on the Titan plan. If you ever need to downgrade or cancel, nothing will be deleted from ProjectCheckin, but job content will no longer be displayed on your site. Everything is restored to your site automatically the moment you resubscribe to Titan.</span>
+                  </div>
+
+                  <button
+                    onClick={handleConnectWordPress}
+                    disabled={wpSaving}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: wpSaving ? 'default' : 'pointer', background: 'var(--sky-text)', color: '#fff', border: 'none' }}
+                  >
+                    {wpSaving ? 'Connecting…' : 'Connect WordPress'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Share Your Project Check-In Portfolio ── */}
           {profile?.slug && (
             <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -932,6 +1817,12 @@ export default function AccountPage() {
             <ul style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.7, paddingLeft: 18, marginBottom: 14 }}>
               <li>Published job pages beyond your plan limit will be unpublished</li>
               <li>Higher-tier features will be turned off</li>
+              {wpStatus === 'connected' && (
+                <li>
+                  Job posts and photos published to <strong>{wpConnectedUrl}</strong> will no longer be
+                  displayed on your site
+                </li>
+              )}
               <li>Your data is preserved — resubscribing restores everything instantly</li>
             </ul>
             <div style={{ display: 'flex', gap: 8 }}>

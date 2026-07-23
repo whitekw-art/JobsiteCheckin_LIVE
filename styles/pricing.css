@@ -325,63 +325,59 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-.tier-list {
-  list-style: none;
+.pc-feats {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
+  margin-bottom: 4px;
 }
 
-.tier-list li {
+.pf {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 7px;
   font-size: 0.8rem;
+  font-weight: 500;
   color: var(--ink);
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
-.li-check {
-  flex-shrink: 0;
-  width: 15px;
-  height: 15px;
-  background: var(--green);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.li-check svg { width: 8px; height: 8px; }
-
-.tier-list .li-soon-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
-  color: var(--mid);
-  line-height: 1.35;
-}
-
-.li-soon-dot {
-  flex-shrink: 0;
-  width: 15px;
-  height: 15px;
-  border: 1.5px solid var(--orange);
-  border-radius: 50%;
-  background: rgba(249,115,22,.08);
-}
-
-.soon-pill {
-  display: inline-block;
-  background: rgba(249,115,22,.1);
-  color: var(--orange);
-  font-size: 0.6rem;
+.pf-ck {
+  color: var(--green);
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: .04em;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.pf-inherit {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--mid);
   text-transform: uppercase;
-  padding: 1px 6px;
-  border-radius: 4px;
+  letter-spacing: .06em;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+.soon-badge {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--mid);
+  background: var(--bg-soft);
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 3px;
+}
+
+.new-badge {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--green);
+  background: rgba(16,185,129,.10);
+  padding: 1px 5px;
+  border-radius: 3px;
   margin-left: 3px;
 }
 
@@ -435,8 +431,8 @@ body {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  background: var(--bg);
-  border: 1.5px solid var(--border);
+  background: #EEF0F2;
+  border: 1.5px solid #D6D9DE;
   border-radius: var(--r);
   padding: 14px 20px;
   font-family: var(--font-b);
@@ -452,8 +448,8 @@ body {
 }
 
 .compare-toggle-btn:hover {
-  border-color: var(--ink);
-  background: rgba(13,27,42,.02);
+  border-color: var(--mid);
+  background: #E6E9EC;
 }
 
 .toggle-arrow {

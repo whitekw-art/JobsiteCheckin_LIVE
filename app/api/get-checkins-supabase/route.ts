@@ -29,6 +29,7 @@ export async function GET() {
         timestamp: true,
         isPublic: true,
         photoUrls: true,
+        featuredPhotoUrl: true,
         homeCustomerName: true,
         homeCustomerPhone: true,
         homeCustomerEmail: true,

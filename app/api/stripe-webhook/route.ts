@@ -1,13 +1,39 @@
 export const runtime = 'nodejs'
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
-import { CURRENT_PLAN_VERSION } from '@/lib/planVersions'
+import { CURRENT_PLAN_VERSION, tierHasFeature } from '@/lib/planVersions'
+import { revokeOrgWordPress, restoreOrgWordPress } from '@/lib/wordpressSync'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-11-17.clover',
 })
+
+/**
+ * Keep the customer's WordPress site in step with their subscription.
+ *
+ * Titan is what entitles published jobs to live on the customer's own site
+ * (design spec §8). Dropping out of Titan pulls everything down; coming back to
+ * Titan restores it. Runs after the webhook response — a bulk restore is paced
+ * and would otherwise risk a Stripe delivery timeout.
+ */
+function syncWordPressEntitlement(orgId: string, wasTitan: boolean, isTitan: boolean): void {
+  if (wasTitan === isTitan) return
+  after(async () => {
+    try {
+      if (isTitan) {
+        const { restored } = await restoreOrgWordPress(orgId)
+        if (restored) console.info('Webhook: restored WordPress posts on Titan resubscribe', { orgId, restored })
+      } else {
+        const { removed } = await revokeOrgWordPress(orgId)
+        if (removed) console.info('Webhook: revoked WordPress posts on loss of Titan', { orgId, removed })
+      }
+    } catch (err) {
+      console.error('WordPress entitlement sync failed:', err)
+    }
+  })
+}
 
 function getPlanTier(priceId: string): string {
   const entries: [string | undefined, string][] = [
@@ -64,6 +90,11 @@ export async function POST(request: NextRequest) {
         const user = await prisma.user.findUnique({ where: { email } })
         if (!user?.organizationId) break
 
+        const priorOrg = await prisma.organization.findUnique({
+          where: { id: user.organizationId },
+          select: { planTier: true },
+        })
+
         await prisma.organization.update({
           where: { id: user.organizationId },
           data: {
@@ -75,6 +106,14 @@ export async function POST(request: NextRequest) {
             planVersion: CURRENT_PLAN_VERSION,
           },
         })
+
+        // Resubscribe path: a returning Titan customer gets everything that was
+        // revoked put back automatically.
+        syncWordPressEntitlement(
+          user.organizationId,
+          tierHasFeature(priorOrg?.planTier, 'website_integration'),
+          tierHasFeature(planTier, 'website_integration')
+        )
 
         console.info('Webhook: organization updated', { orgId: user.organizationId, planTier, status: subscription.status })
         break
@@ -100,6 +139,15 @@ export async function POST(request: NextRequest) {
             planTier,
           },
         })
+
+        // Upgrade to Titan restores; downgrade away from Titan revokes. A
+        // subscription that is no longer in good standing counts as not-Titan.
+        const inGoodStanding = ['active', 'trialing'].includes(subscription.status)
+        syncWordPressEntitlement(
+          org.id,
+          tierHasFeature(org.planTier, 'website_integration'),
+          inGoodStanding && tierHasFeature(planTier, 'website_integration')
+        )
         break
       }
 
@@ -119,6 +167,15 @@ export async function POST(request: NextRequest) {
             planTier: 'free',
           },
         })
+
+        // Cancellation: pull all published job content off the customer's own
+        // WordPress site immediately. Nothing is deleted on our side — every
+        // job stays marked 'revoked' and comes back if they return to Titan.
+        syncWordPressEntitlement(
+          org.id,
+          tierHasFeature(org.planTier, 'website_integration'),
+          false
+        )
 
         // Downgrade enforcement: free tier allows max 5 published job pages.
         // Keep the 5 most recently timestamped published pages; unpublish the rest.

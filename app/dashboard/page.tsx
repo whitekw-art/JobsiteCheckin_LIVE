@@ -24,6 +24,7 @@ interface CheckIn {
   doorType?: string | null
   isPublic: boolean
   photoUrls?: string[]
+  featuredPhotoUrl?: string | null
   homeCustomerName?: string | null
   homeCustomerPhone?: string | null
   homeCustomerEmail?: string | null
@@ -40,6 +41,14 @@ interface EditCustomer {
   name: string
   phones: Array<{ type: string; num: string }>
   emails: Array<{ type: string; addr: string }>
+}
+
+function formatPhone(v: string): string {
+  const d = v.replace(/\D/g, '').slice(0, 10)
+  if (d.length === 0) return ''
+  if (d.length < 4)  return `(${d}`
+  if (d.length < 7)  return `(${d.slice(0,3)}) ${d.slice(3)}`
+  return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`
 }
 
 function validateForPublish(checkIn: CheckIn): { hardBlocked: boolean; warnings: string[] } {
@@ -255,10 +264,12 @@ function IcoGbp() {
 function GbpPostModal({
   checkIn,
   publicUrl,
+  portfolioPageUrl,
   onClose,
 }: {
   checkIn: CheckIn
   publicUrl: string
+  portfolioPageUrl: string | null
   onClose: () => void
 }) {
   const [copied, setCopied] = useState(false)
@@ -266,10 +277,15 @@ function GbpPostModal({
 
   const location = [checkIn.city, checkIn.state].filter(Boolean).join(', ')
   const jobType = checkIn.doorType || 'Job'
+  // When a portfolio page URL is configured, GBP posts link to the customer's
+  // own domain (with UTM tracking) instead of the PCK job page
+  const postLink = portfolioPageUrl
+    ? `${portfolioPageUrl}${portfolioPageUrl.includes('?') ? '&' : '?'}utm_source=googlebusiness&utm_medium=post&utm_campaign=projectcheckin`
+    : publicUrl
   const postText = [
     `${jobType} completed${location ? ` in ${location}` : ''}.`,
     checkIn.notes?.trim() ? checkIn.notes.trim() : null,
-    `See the full job details and photos: ${publicUrl}`,
+    `See the full job details and photos: ${postLink}`,
   ]
     .filter(Boolean)
     .join('\n\n')
@@ -334,13 +350,24 @@ function GbpPostModal({
           </div>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', padding: 4, lineHeight: 1 }}
+            style={{ background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', lineHeight: 1, minWidth: 40, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
         </div>
+
+        {portfolioPageUrl && (
+          <div style={{
+            background: 'var(--green-bg, #F0FDF4)', border: '1px solid rgba(22,163,74,.2)',
+            borderRadius: 8, padding: '10px 13px', fontSize: 12, color: 'var(--green, #16A34A)',
+            fontWeight: 600, display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 14,
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Portfolio URL set — link sends traffic to <strong>your website</strong></span>
+          </div>
+        )}
 
         <div style={{
           background: 'var(--surface-2)', border: '1px solid var(--border)',
@@ -369,9 +396,9 @@ function GbpPostModal({
                     onClick={() => downloadPhoto(url, i)}
                     title="Download photo"
                     style={{
-                      position: 'absolute', bottom: 5, right: 5,
+                      position: 'absolute', bottom: 4, right: 4,
                       background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)',
-                      border: 'none', borderRadius: 5, padding: '4px 5px',
+                      border: 'none', borderRadius: 6, width: 36, height: 36,
                       cursor: 'pointer', color: '#fff', lineHeight: 1,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
@@ -546,6 +573,7 @@ export default function Dashboard() {
   const [orgPhone, setOrgPhone] = useState('')
   const [orgEmail, setOrgEmail] = useState('')
   const [gbpReviewLink, setGbpReviewLink] = useState('')
+  const [orgPortfolioUrl, setOrgPortfolioUrl] = useState<string | null>(null)
 
   // Review request modal
   const [reviewModalCheckIn, setReviewModalCheckIn] = useState<CheckIn | null>(null)
@@ -619,6 +647,7 @@ export default function Dashboard() {
         if (d.organization?.phone) setOrgPhone(d.organization.phone)
         if (d.organization?.email) setOrgEmail(d.organization.email)
         if (d.organization?.gbpReviewLink) setGbpReviewLink(d.organization.gbpReviewLink)
+        if (d.organization?.portfolioPageUrl) setOrgPortfolioUrl(d.organization.portfolioPageUrl)
       })
       .catch(() => {})
   }, [])
@@ -1169,13 +1198,40 @@ export default function Dashboard() {
       if (!res.ok) throw new Error(data.error || 'Failed to delete photo')
       setCheckIns((prev) =>
         prev.map((c) =>
-          c.id === checkIn.id ? { ...c, photoUrls: data.photoUrls ?? [] } : c
+          c.id === checkIn.id
+            ? { ...c, photoUrls: data.photoUrls ?? [], featuredPhotoUrl: data.featuredPhotoUrl ?? null }
+            : c
         )
       )
     } catch (err: any) {
       alert(err.message || 'Failed to delete photo')
     } finally {
       setDeletingPhotoKey(null)
+    }
+  }
+
+  // Cover photo — used as the WordPress featured image and the share preview.
+  // Clicking the current cover clears it and returns to automatic selection.
+  const handleSetCoverPhoto = async (checkIn: CheckIn, url: string) => {
+    const next = checkIn.featuredPhotoUrl === url ? null : url
+    const previous = checkIn.featuredPhotoUrl ?? null
+
+    // Optimistic — this is a low-stakes toggle and should feel instant.
+    setCheckIns((prev) =>
+      prev.map((c) => (c.id === checkIn.id ? { ...c, featuredPhotoUrl: next } : c))
+    )
+    try {
+      const res = await fetch('/api/checkins/featured-photo', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkIn.id, url: next }),
+      })
+      if (!res.ok) throw new Error('Failed to set cover photo')
+    } catch {
+      setCheckIns((prev) =>
+        prev.map((c) => (c.id === checkIn.id ? { ...c, featuredPhotoUrl: previous } : c))
+      )
+      alert('Could not set the cover photo. Please try again.')
     }
   }
 
@@ -1610,7 +1666,7 @@ export default function Dashboard() {
                                             type="tel"
                                             value={phone.num}
                                             placeholder="Phone number"
-                                            onChange={(e) => updateCustomerPhone(checkIn.id, idx, 'num', e.target.value)}
+                                            onChange={(e) => updateCustomerPhone(checkIn.id, idx, 'num', formatPhone(e.target.value))}
                                           />
                                           <button className="cust-remove-btn" onClick={() => removeCustomerPhone(checkIn.id, idx)}>−</button>
                                         </div>
@@ -1941,8 +1997,12 @@ export default function Dashboard() {
                               <div className="db-photo-grid">
                                 {checkIn.photoUrls!.map((url, idx) => {
                                   const photoKey = `${checkIn.id}:${url}`
+                                  const isCover = checkIn.featuredPhotoUrl === url
                                   return (
-                                    <div key={idx} className="db-photo-thumb-wrap">
+                                    <div
+                                      key={idx}
+                                      className={`db-photo-thumb-wrap${isCover ? ' is-cover' : ''}`}
+                                    >
                                       <a
                                         className="db-photo-thumb"
                                         href={url}
@@ -1964,12 +2024,33 @@ export default function Dashboard() {
                                       >
                                         {deletingPhotoKey === photoKey ? '\u2026' : '\u00d7'}
                                       </button>
+                                      <button
+                                        className="db-photo-cover-btn"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleSetCoverPhoto(checkIn, url)
+                                        }}
+                                        aria-pressed={isCover}
+                                        title={isCover ? 'Cover photo \u2014 click to clear' : 'Set as cover photo'}
+                                      >
+                                        <svg width="9" height="9" viewBox="0 0 24 24" fill={isCover ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                        </svg>
+                                        {isCover ? 'Cover' : 'Set cover'}
+                                      </button>
                                     </div>
                                   )
                                 })}
                               </div>
                             ) : (
                               <div className="db-photo-empty">No photos attached</div>
+                            )}
+                            {(checkIn.photoUrls?.length ?? 0) > 0 && (
+                              <div className="db-photo-cover-note">
+                                {checkIn.featuredPhotoUrl
+                                  ? 'Cover photo set — used as the main image when this job is shared or published to your website.'
+                                  : 'No cover photo chosen — the "after" photo is used automatically, or the first photo.'}
+                              </div>
                             )}
 
                             <div className="db-detail-btns">
@@ -2104,6 +2185,7 @@ export default function Dashboard() {
           <GbpPostModal
             checkIn={ci}
             publicUrl={getPublicUrl(ci)}
+            portfolioPageUrl={orgPortfolioUrl}
             onClose={() => setGbpPostId(null)}
           />
         )
@@ -2165,7 +2247,7 @@ export default function Dashboard() {
                       type="tel"
                       placeholder="(615) 555-0192"
                       value={reviewOverridePhone}
-                      onChange={(e) => setReviewOverridePhone(e.target.value)}
+                      onChange={(e) => setReviewOverridePhone(formatPhone(e.target.value))}
                     />
                   </div>
                   <div className="rrm-field-group">

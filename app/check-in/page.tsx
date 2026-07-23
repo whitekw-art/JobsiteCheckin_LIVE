@@ -10,6 +10,14 @@ import BeforeAfterCamera from '@/components/BeforeAfterCamera'
 import { tierHasFeature } from '@/lib/planVersions'
 import '@/styles/checkin.css'
 
+function formatPhone(v: string): string {
+  const d = v.replace(/\D/g, '').slice(0, 10)
+  if (d.length === 0) return ''
+  if (d.length < 4)  return `(${d}`
+  if (d.length < 7)  return `(${d.slice(0,3)}) ${d.slice(3)}`
+  return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`
+}
+
 function CheckInContent() {
   const { data: session } = useSession()
   const searchParams = useSearchParams()
@@ -513,7 +521,7 @@ function CheckInContent() {
                     onClick={handlePickContact}
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: 5,
-                      padding: '4px 10px', borderRadius: 6,
+                      padding: '10px 14px', minHeight: 40, borderRadius: 6,
                       border: '1px solid var(--border)', background: 'var(--card)',
                       color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 600,
                       cursor: 'pointer',
@@ -538,7 +546,7 @@ function CheckInContent() {
                 placeholder="Customer phone"
                 type="tel"
                 value={homeCustomerPhone}
-                onChange={(e) => setHomeCustomerPhone(e.target.value)}
+                onChange={(e) => setHomeCustomerPhone(formatPhone(e.target.value))}
                 style={{ marginBottom: 6 }}
               />
               <input

@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
+// Reject text with no digits at all (e.g. a name typed into a phone field) — permissive
+// otherwise, since phone format varies (extensions, international, partial numbers).
+function cleanPhone(v: string | null | undefined): string | null {
+  if (typeof v !== 'string') return null
+  const t = v.trim()
+  return t && /\d/.test(t) ? t : null
+}
+
+// Same prefixing rule already used at registration/onboarding (app/auth/register/page.tsx) —
+// keeps this save path consistent so users never have to type https:// themselves.
+function normalizeWebsite(v: string | null | undefined): string | null {
+  if (typeof v !== 'string') return null
+  const t = v.trim()
+  if (!t) return null
+  if (t.startsWith('http://') || t.startsWith('https://')) return t
+  if (t.startsWith('www.')) return `https://${t}`
+  return `https://www.${t}`
+}
+
 export async function GET() {
   try {
     const currentUser = await getCurrentUser()
@@ -22,6 +41,8 @@ export async function GET() {
         website: true,
         email: true,
         gbpReviewLink: true,
+        portfolioPageUrl: true,
+        portfolioIntro: true,
         businessContext: true,
         businessContextUpdatedAt: true,
         websiteScanHistory: true,
@@ -63,16 +84,36 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const { name, phone, website, email, gbpReviewLink, services, products, serviceArea, businessDescription } = (await request.json()) as {
+    const { name, phone, website, email, gbpReviewLink, portfolioPageUrl, portfolioIntro, services, products, serviceArea, businessDescription } = (await request.json()) as {
       name?: string
       phone?: string
       website?: string
       email?: string
       gbpReviewLink?: string
+      portfolioPageUrl?: string | null
+      portfolioIntro?: string | null
       services?: string
       products?: string
       serviceArea?: string
       businessDescription?: string
+    }
+
+    // Validate portfolio page URL before saving — it becomes the link target
+    // in GBP posts and the widget's estimate button
+    if (portfolioPageUrl !== undefined && portfolioPageUrl !== null && portfolioPageUrl.trim()) {
+      let validUrl = false
+      try {
+        const parsed = new URL(portfolioPageUrl.trim())
+        validUrl = parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      } catch {
+        validUrl = false
+      }
+      if (!validUrl) {
+        return NextResponse.json(
+          { error: 'Portfolio page URL must be a valid URL starting with http:// or https://' },
+          { status: 400 }
+        )
+      }
     }
 
     // If any AI business context fields are present, serialize them into businessContext
@@ -103,11 +144,13 @@ export async function PATCH(request: NextRequest) {
     const updated = await prisma.organization.update({
       where: { id: currentUser.organizationId },
       data: {
-        ...(name !== undefined && name.trim() && { name: name.trim() }),
-        phone: phone ?? null,
-        website: website ?? null,
-        ...(email !== undefined && { email: email.trim() || null }),
+        ...(name !== undefined && name?.trim() && { name: name.trim() }),
+        phone: cleanPhone(phone),
+        ...(website !== undefined && { website: normalizeWebsite(website) }),
+        ...(email !== undefined && { email: email?.trim() || null }),
         ...(gbpReviewLink !== undefined && { gbpReviewLink: gbpReviewLink || null }),
+        ...(portfolioPageUrl !== undefined && { portfolioPageUrl: portfolioPageUrl?.trim() || null }),
+        ...(portfolioIntro !== undefined && { portfolioIntro: portfolioIntro?.trim() || null }),
         ...businessContextUpdate,
       },
       select: {
@@ -117,6 +160,8 @@ export async function PATCH(request: NextRequest) {
         website: true,
         email: true,
         gbpReviewLink: true,
+        portfolioPageUrl: true,
+        portfolioIntro: true,
         businessContext: true,
       },
     })
