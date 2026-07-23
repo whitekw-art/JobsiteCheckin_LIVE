@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import '@/styles/register.css'
 
 function EyeOpen() {
@@ -34,7 +33,6 @@ export default function SignIn() {
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,7 +56,11 @@ export default function SignIn() {
           setError('invalid')
         }
       } else {
-        router.push('/dashboard')
+        // Full document load (not router.push) so the dashboard route's CSS is
+        // present in the initial payload. A soft navigation here renders the
+        // DashboardShell before its client-imported dashboard.css applies,
+        // leaving the sidebar unstyled/full-width until a manual refresh.
+        window.location.assign('/dashboard')
       }
     } catch {
       setError('Something went wrong. Please try again.')

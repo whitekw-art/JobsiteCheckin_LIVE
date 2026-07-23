@@ -90,6 +90,21 @@ export default function MarketingNav() {
           <li>
             <Link href="/pricing" className="nav-link" onClick={closeAll}>Pricing</Link>
           </li>
+
+          {/* Mobile-only: auth actions live inside the drawer (hidden on desktop) */}
+          <li className="nav-mobile-auth">
+            <Link href="/auth/signin" className="nav-link" onClick={closeAll}>Sign In</Link>
+            <Link href="/auth/register" className="nav-link" onClick={closeAll}>Register</Link>
+            <a
+              href="https://calendly.com/projectcheckin-/30min"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-sm-link nav-mobile-demo"
+              onClick={closeAll}
+            >
+              Book a Demo
+            </a>
+          </li>
         </ul>
 
         <div className={`nav-right${navOpen ? ' open' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

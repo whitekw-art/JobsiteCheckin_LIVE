@@ -84,6 +84,7 @@ nav {
 .logo-img { width: 30px; height: 30px; object-fit: contain; }
 .nav-links { display: flex; align-items: center; gap: 32px; list-style: none; }
 .nav-right { display: flex; align-items: center; gap: 16px; }
+.nav-mobile-auth { display: none; }
 .nav-link { font-size: 0.875rem; font-weight: 500; color: var(--muted); text-decoration: none; transition: color 150ms; }
 .nav-link:hover { color: var(--ink); }
 .btn-ghost {
@@ -215,6 +216,9 @@ nav {
   padding-left: var(--px);
   padding-right: var(--px);
   text-align: center;
+  /* Clip the decorative ::before bleed (inset: 0 -80px) so it can't create a
+     horizontal scrollbar / sideways scroll on any viewport, mobile especially. */
+  overflow: hidden;
   background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(14,165,233,0.06) 0%, transparent 60%);
 }
 .lp-root .hero::before {
@@ -728,6 +732,17 @@ footer { background:#07283D;padding:44px 0; position: relative; z-index: 1; }
   .nav-links.open .feat-item { padding: 10px 0; border-bottom: 1px solid var(--border); border-radius: 0; }
   .nav-links.open .feat-item.sub { padding-left: 12px; }
   .nav-links.open .feat-divider { margin: 6px 0; }
+  /* Auth actions inside the mobile drawer — the only way to reach Sign In /
+     Register on a phone (the desktop .nav-right buttons are display:none here). */
+  .nav-links.open .nav-mobile-auth {
+    display: flex; flex-direction: column; align-items: stretch;
+    width: 100%; gap: 0; margin-top: 6px;
+  }
+  .nav-links.open .nav-mobile-auth .nav-link { display: block; }
+  .nav-links.open .nav-mobile-auth .btn-sm-link {
+    display: inline-flex; justify-content: center; width: 100%;
+    height: 46px; margin-top: 16px;
+  }
   .pricing-grid { grid-template-columns: 1fr; }
   .stats-inner { grid-template-columns: 1fr 1fr; }
   .hero { padding-top: calc(60px + 56px); padding-bottom: 48px; }
