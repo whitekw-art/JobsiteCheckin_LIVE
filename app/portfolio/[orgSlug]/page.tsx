@@ -42,7 +42,13 @@ export async function generateMetadata({ params }: PortfolioPageProps): Promise<
       : `View ${org.name}'s portfolio of ${jobCount} completed ${jobWord}. Browse project photos, service details, and get a free estimate.`
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
-  const firstPhoto = org.checkIns.find((c) => c.photoUrls)?.photoUrls?.split(',')[0]?.trim()
+  // Prefer the first job's chosen cover photo (if set) over its first uploaded photo.
+  const firstJobWithPhotos = org.checkIns.find((c) => c.photoUrls)
+  const firstJobPhotos = firstJobWithPhotos?.photoUrls?.split(',').map((u) => u.trim()).filter(Boolean) || []
+  const firstPhoto =
+    (firstJobWithPhotos?.featuredPhotoUrl && firstJobPhotos.includes(firstJobWithPhotos.featuredPhotoUrl)
+      ? firstJobWithPhotos.featuredPhotoUrl
+      : firstJobPhotos[0]) || undefined
 
   const canonicalUrl = `${baseUrl}/portfolio/${orgSlug}`
 
@@ -95,6 +101,11 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
         ? `${cities.join(', ')}`
         : ''
 
+  // The owner's chosen cover photo leads if set and still part of the job; otherwise
+  // fall back to the first uploaded photo. Same rule used on the individual job page.
+  const coverOf = (photos: string[], featuredPhotoUrl: string | null) =>
+    (featuredPhotoUrl && photos.includes(featuredPhotoUrl) ? featuredPhotoUrl : photos[0]) || null
+
   // Collect hero photos: one per job, up to 6, prioritizing jobs with more photos
   const jobsWithPhotos = jobs
     .map((job) => ({
@@ -105,10 +116,11 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
     .sort((a, b) => b.photos.length - a.photos.length)
 
   const heroPhotos: string[] = []
-  for (const { photos } of jobsWithPhotos) {
+  for (const { job, photos } of jobsWithPhotos) {
     if (heroPhotos.length >= 6) break
-    if (photos[0] && !heroPhotos.includes(photos[0])) {
-      heroPhotos.push(photos[0])
+    const cover = coverOf(photos, job.featuredPhotoUrl)
+    if (cover && !heroPhotos.includes(cover)) {
+      heroPhotos.push(cover)
     }
   }
 
@@ -133,7 +145,7 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
       city: job.city || '',
       state: job.state || '',
       photos,
-      thumbnail: photos[0] || null,
+      thumbnail: coverOf(photos, job.featuredPhotoUrl),
       jobPath,
       notes: job.notes || null,
       timestamp: job.timestamp ? job.timestamp.toISOString() : null,
