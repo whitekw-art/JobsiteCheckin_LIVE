@@ -58,6 +58,15 @@ function IcoAdmin() {
     </svg>
   )
 }
+function IcoHelp() {
+  return (
+    <svg className="db-nav-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="8" cy="8" r="6.5"/>
+      <path d="M6 6.2a2 2 0 1 1 3.2 1.6c-.7.55-1.2 1-1.2 1.9" strokeLinecap="round"/>
+      <circle cx="8" cy="11.4" r="0.6" fill="currentColor" stroke="none"/>
+    </svg>
+  )
+}
 function IcoMoon() {
   return (
     <svg className="db-icon-moon" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -200,6 +209,11 @@ export default function DashboardShell({ title, children, action }: Props) {
               Admin
             </Link>
           )}
+
+          <Link className={navItem('/help')} href="/help" onClick={() => setSidebarOpen(false)}>
+            <IcoHelp />
+            Help
+          </Link>
 
           <button className="db-nav-item" onClick={() => { setSidebarOpen(false); signOut() }}>
             <IcoSignOut />
