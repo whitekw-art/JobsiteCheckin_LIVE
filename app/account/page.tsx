@@ -1945,6 +1945,7 @@ export default function AccountPage() {
                 </li>
               )}
               <li>Your data is preserved — resubscribing restores everything instantly</li>
+              <li>If you have a discounted or promotional rate, re-enrolling later is priced at whatever&apos;s being offered at that time — your current rate isn&apos;t guaranteed to still be available</li>
             </ul>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
