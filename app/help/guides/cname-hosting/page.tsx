@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import DashboardShell from '@/components/DashboardShell'
-import { GuideBreadcrumb, GuideSection, Step, guideP, guidePLast, guideStrong, guideLink } from '@/components/HelpGuideSections'
+import { GuideBreadcrumb, GuideSection, GuideSubsection, Step, guideP, guidePLast, guideStrong, guideLink } from '@/components/HelpGuideSections'
 
 export const metadata: Metadata = { title: 'CNAME Subdomain Hosting Guide — Help & Support' }
 
@@ -99,6 +99,43 @@ export default function CnameHostingGuidePage() {
           <p style={guideP}><strong style={guideStrong}>Webflow:</strong> Open the Designer, click your navbar, select the Nav Menu element, add a new Nav Link, paste your subdomain address as the link&apos;s URL, and add a label.</p>
           <p style={guideP}><strong style={guideStrong}>Plain HTML site:</strong> Find the navigation section in your site&apos;s HTML (usually a <code>&lt;nav&gt;</code> or list of links near the top of the page). Add a new link following the same pattern as the others already there, then save and re-upload the file.</p>
           <p style={guidePLast}>If you&apos;re not sure how your specific site is built, tell whoever manages it: <em>&ldquo;Please add a menu link labeled &apos;Our Work&apos; pointing to [your subdomain address].&rdquo;</em></p>
+        </GuideSection>
+
+        <GuideSection title="Editing Your Subdomain">
+          <p style={guideP}>Come back to this section any time after your subdomain is already set up. There are three reasons you might need to: you want to use a different subdomain label, you want to remove your subdomain entirely, or you need to move your subdomain to a different ProjectCheckin account.</p>
+
+          <GuideSubsection title="Changing your subdomain label">
+            <Step n={1}>Log into ProjectCheckin.</Step>
+            <Step n={2}>Click <strong style={guideStrong}>Account</strong> in the left sidebar.</Step>
+            <Step n={3}>Click the <strong style={guideStrong}>Connections</strong> tab.</Step>
+            <Step n={4}>Find the section called <strong style={guideStrong}>Host Your Work Directly On Your Own Site</strong>.</Step>
+            <Step n={5}>Click <strong style={guideStrong}>Edit</strong>.</Step>
+            <Step n={6}>Type your new subdomain label and click <strong style={guideStrong}>Get My DNS Record</strong>.</Step>
+            <Step n={7}>Add a new DNS record at your domain company using the new Type, Host, and Value shown — follow the same steps as the registrar sections above.</Step>
+            <p style={guidePLast}>Once your new subdomain shows <strong style={guideStrong}>Live</strong> in ProjectCheckin, go back to your domain company and delete the DNS record for your old subdomain label — it&apos;s no longer used. This step is optional; an unused record doesn&apos;t cause any harm, it just sits there doing nothing.</p>
+          </GuideSubsection>
+
+          <GuideSubsection title="Removing your subdomain">
+            <Step n={1}>Log into ProjectCheckin.</Step>
+            <Step n={2}>Click <strong style={guideStrong}>Account</strong> in the left sidebar, then the <strong style={guideStrong}>Connections</strong> tab.</Step>
+            <Step n={3}>Find <strong style={guideStrong}>Host Your Work Directly On Your Own Site</strong>.</Step>
+            <Step n={4}>Click <strong style={guideStrong}>Remove</strong>.</Step>
+            <p style={guideP}>Your job pages stop being served at that address. Nothing about your account or your jobs is deleted — you can set up a subdomain again any time.</p>
+            <p style={guidePLast}>Optional: go to your domain company and delete the matching DNS record, since it&apos;s no longer doing anything. Not required — an unused record is harmless.</p>
+          </GuideSubsection>
+
+          <GuideSubsection title="Moving your subdomain to a different account">
+            <p style={guideP}>If your subdomain needs to work under a different ProjectCheckin account instead — for example, you originally set it up under the wrong one:</p>
+            <Step n={1}>Log into the account currently using the subdomain. Go to <strong style={guideStrong}>Account → Connections → Host Your Work Directly On Your Own Site</strong> and click <strong style={guideStrong}>Remove</strong>.</Step>
+            <Step n={2}>Log into the account you actually want to use it under.</Step>
+            <Step n={3}>Go to <strong style={guideStrong}>Account → Connections → Host Your Work Directly On Your Own Site</strong>.</Step>
+            <Step n={4}>Type the exact same subdomain label you used before, and click <strong style={guideStrong}>Get My DNS Record</strong>.</Step>
+            <p style={guidePLast}>Because the DNS record&apos;s Value never changes between ProjectCheckin accounts, using the same subdomain label means you don&apos;t need to touch your domain company&apos;s settings at all — your existing DNS record already works, and it will verify automatically.</p>
+          </GuideSubsection>
+
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', fontStyle: 'italic', marginTop: 16 }}>
+            Stuck? If you changed your subdomain and the old address still seems to load your page for a little while, that&apos;s normal — give it a few minutes. Some browsers also remember old answers for a bit, so try a different browser or your phone if it still looks wrong after that.
+          </p>
         </GuideSection>
 
         <GuideSection title="Optional — Speed Up Google Indexing">
