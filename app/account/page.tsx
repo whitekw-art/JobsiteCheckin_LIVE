@@ -37,6 +37,15 @@ const WIDGET_PLATFORM_INSTRUCTIONS: Record<string, string> = {
   'Plain HTML': '1. Find the HTML file for the page where you want your work to show up. If someone else built your site, ask them for it — or log into your hosting account (GoDaddy, Bluehost, Netlify, etc.) and look for "File Manager" or "Site Files."\n2. Right-click that file and choose Open With → Notepad (Windows) or TextEdit (Mac). Don’t use Microsoft Word — it can break the file.\n3. Press Ctrl+F (Cmd+F on Mac) and search for </body>. That’s a marker near the end of the file.\n4. Click right before </body> and paste the code below.\n5. Save the file, then upload it back to your host the same way you found it. Most hosts show a Save or Publish button.\n6. Stuck? Your web host’s live chat can usually paste one snippet for you in a few minutes — just say "I need to add one HTML snippet before </body> on this page."',
 }
 
+// Instructions shown when a customer already has the widget installed and needs to
+// swap the old snippet for a fresh one (per platform). Mirrors the install map above.
+const WIDGET_PLATFORM_UPDATE_INSTRUCTIONS: Record<string, string> = {
+  WordPress: '1. Log into WordPress, click Pages, and open the page where your work currently shows up, then click into it to edit.\n2. Find the Custom HTML block that holds your widget — it’s the one containing the pc-widget code. Can’t spot it? Click the list-view (outline) icon at the top left and look for "Custom HTML."\n3. Select everything inside that block and delete it, then paste the fresh code below in its place. Don’t retype or edit anything inside it — just swap the whole block, old for new.\n4. Click Update (or Publish) in the top right to save.',
+  Squarespace: '1. Log into Squarespace, open the page where your work currently shows up, and click Edit.\n2. Click the Code block that holds your widget — it shows your pc-widget code — to open it.\n3. Select everything in the box and delete it, then paste the fresh code below in its place. Don’t retype or edit anything inside it — just swap the whole block. Then click Apply.\n4. Click Save, then Publish, in the top right.',
+  Webflow: '1. Open your site in the Webflow Designer and go to the page where your work currently shows up.\n2. Click the Embed element that holds your widget — the box showing your pc-widget code — then double-click it to open the code editor.\n3. Select everything in the box and delete it, then paste the fresh code below in its place. Don’t retype or edit anything inside it — just swap the whole block. Then click Save & Close.\n4. Click Publish in the top right to make the change live.',
+  'Plain HTML': '1. Find the same HTML file you originally added the widget to.\n2. Open it with Notepad (Windows) or TextEdit (Mac) — not Microsoft Word, it can break the file.\n3. Press Ctrl+F (Cmd+F on Mac) and search for pc-widget. That’s your existing snippet — three lines: a comment, a <div id="pc-widget"…>, and a <script src="…">.\n4. Select all three lines and delete them, then paste in the fresh code below in their place. Don’t retype or edit anything inside it — just swap the whole block, old for new.\n5. Save the file, then upload it back to your host the same way you found it.\n6. Stuck? Your host’s live chat can usually swap one snippet for another in a few minutes — just say "I need to replace an existing HTML snippet with a new one on this page."',
+}
+
 function formatPhone(v: string): string {
   const d = v.replace(/\D/g, '').slice(0, 10)
   if (d.length === 0) return ''
@@ -140,11 +149,94 @@ const ChevronRight = () => (
   </svg>
 )
 
+// Connections status indicator — dot + text, no bubble (Coming soon / Active / Disabled)
+type ConnState = 'coming' | 'active' | 'disabled'
+function StatusDot({ state, label }: { state: ConnState; label: string }) {
+  const color = state === 'active' ? 'var(--green)' : state === 'disabled' ? 'var(--red)' : 'var(--t3)'
+  const dot   = state === 'coming' ? 'var(--t4)' : color
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color, whiteSpace: 'nowrap', flexShrink: 0 }}>
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+      {label}
+    </span>
+  )
+}
+
+// Soft, monochrome Good/Better/Best label for the website-integration family
+function TierLabel({ label }: { label: string }) {
+  return (
+    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.09em', textTransform: 'uppercase', color: 'var(--t3)', whiteSpace: 'nowrap' }}>{label}</span>
+  )
+}
+
+// Small accent "Active" chip used only on the currently-active website-integration option
+function ActiveTag() {
+  return (
+    <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', background: 'var(--sky-dim)', color: 'var(--sky-text)', whiteSpace: 'nowrap' }}>Active</span>
+  )
+}
+
+// Collapsible connections card. Header (icon + title + sub + status) toggles the body.
+function ConnCard({
+  icon, iconBg = 'var(--surface-3)', title, titleExtra, sub, status, open, onToggle,
+  locked = false, accent = false, cardStyle, children,
+}: {
+  icon: React.ReactNode
+  iconBg?: string
+  title: React.ReactNode
+  titleExtra?: React.ReactNode
+  sub: React.ReactNode
+  status?: React.ReactNode
+  open: boolean
+  onToggle: () => void
+  locked?: boolean
+  accent?: boolean
+  cardStyle?: React.CSSProperties
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      className="db-shell-card"
+      style={{
+        padding: 0, overflow: 'hidden', opacity: locked ? 0.72 : 1,
+        ...(accent ? { borderColor: 'var(--sky)', boxShadow: '0 0 0 1px var(--sky)' } : {}),
+        ...cardStyle,
+      }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif", padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}
+      >
+        <div style={{ width: 38, height: 38, borderRadius: 9, background: iconBg, display: 'grid', placeItems: 'center', flexShrink: 0 }}>{icon}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{title}{titleExtra}</div>
+          <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{sub}</div>
+        </div>
+        {status}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9" /></svg>
+      </button>
+      <div style={{ display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', transition: 'grid-template-rows .26s ease' }}>
+        <div style={{ minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ borderTop: '1px solid var(--border)' }}>{children}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AccountPage() {
   const { data: session } = useSession()
   const planTier = (session?.user as any)?.planTier as string | null | undefined
 
   const [activeTab, setActiveTab] = useState<Tab>('general')
+
+  // Connections cards collapse state — all collapsed by default
+  const [openCards, setOpenCards] = useState<Record<string, boolean>>({})
+  const toggleCard = (id: string) => setOpenCards((prev) => ({ ...prev, [id]: !prev[id] }))
+  // Widget instructions: first-time install vs. update an already-installed widget
+  const [widgetMode, setWidgetMode] = useState<'install' | 'update'>('install')
 
   // General tab state
   const [portalLoading, setPortalLoading] = useState(false)
@@ -250,7 +342,7 @@ export default function AccountPage() {
   const [portfolioUrlInput,   setPortfolioUrlInput]   = useState('')
   const [portfolioUrlSaving,  setPortfolioUrlSaving]  = useState(false)
   const [portfolioUrlError,   setPortfolioUrlError]   = useState<string | null>(null)
-  const [showWidgetInfo,      setShowWidgetInfo]      = useState(false)
+  const [portfolioUrlEditing, setPortfolioUrlEditing] = useState(false)
   const [showUrlInstructions, setShowUrlInstructions] = useState(false)
   const [showEmbedInstructions, setShowEmbedInstructions] = useState(false)
   const [widgetPlatform,      setWidgetPlatform]      = useState<string>('WordPress')
@@ -310,8 +402,30 @@ export default function AccountPage() {
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error || 'Failed to save')
       setProfile((prev) => prev ? { ...prev, portfolioPageUrl: data.organization.portfolioPageUrl } : prev)
+      setPortfolioUrlEditing(false)
     } catch (err: any) {
       setPortfolioUrlError(err.message || 'Failed to save')
+    } finally {
+      setPortfolioUrlSaving(false)
+    }
+  }
+
+  async function handleRemovePortfolioUrl() {
+    setPortfolioUrlError(null)
+    setPortfolioUrlSaving(true)
+    try {
+      const res = await fetch('/api/organization/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ portfolioPageUrl: null }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || 'Failed to remove')
+      setProfile((prev) => prev ? { ...prev, portfolioPageUrl: data.organization.portfolioPageUrl } : prev)
+      setPortfolioUrlInput('')
+      setPortfolioUrlEditing(false)
+    } catch (err: any) {
+      setPortfolioUrlError(err.message || 'Failed to remove')
     } finally {
       setPortfolioUrlSaving(false)
     }
@@ -424,6 +538,25 @@ export default function AccountPage() {
       setSdEditing(false)
     } catch (err: any) {
       setSdError(err.message || 'Failed to save')
+    } finally {
+      setSdSaving(false)
+    }
+  }
+
+  async function handleRemoveSubdomain() {
+    if (!confirm('Removing takes your branded page offline and frees the subdomain. Your jobs and data stay safe in ProjectCheckin — you can set it up again anytime. Continue?')) return
+    setSdError(null)
+    setSdSaving(true)
+    try {
+      const res = await fetch('/api/organization/subdomain', { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to remove')
+      setSdHost(null)
+      setSdStatus(null)
+      setSdHomepageLinked(null)
+      setSdEditing(false)
+      setSdLabel('our-work')
+    } catch (err: any) {
+      setSdError(err.message || 'Could not remove right now. Please try again.')
     } finally {
       setSdSaving(false)
     }
@@ -899,23 +1032,15 @@ export default function AccountPage() {
         <div style={{ maxWidth: 560 }}>
 
           {/* ── Connect Your Google Business Profile ── */}
-          <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden', opacity: GBP_API_READY ? 1 : 0.72 }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                  <GoogleGIcon />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Connect Your Google Business Profile</div>
-                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Publish job updates to your Google listing</div>
-                </div>
-              </div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, flexShrink: 0, background: !GBP_API_READY ? 'var(--surface-3)' : gbpConnected ? 'var(--green-bg)' : 'var(--surface-3)', color: !GBP_API_READY ? 'var(--t3)' : gbpConnected ? 'var(--green)' : 'var(--t3)' }}>
-                {!GBP_API_READY ? 'Coming soon' : (
-                  <><span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: gbpConnected ? 'var(--green)' : 'var(--t4)' }} />{gbpConnected ? 'Connected' : 'Not connected'}</>
-                )}
-              </span>
-            </div>
+          <ConnCard
+            icon={<GoogleGIcon />}
+            title="Connect Your Google Business Profile"
+            sub="Publish job updates to your Google listing"
+            status={!GBP_API_READY ? <StatusDot state="coming" label="Coming soon" /> : gbpConnected ? <StatusDot state="active" label="Active" /> : <StatusDot state="disabled" label="Disabled" />}
+            open={!!openCards['gbp']}
+            onToggle={() => toggleCard('gbp')}
+            locked={!GBP_API_READY}
+          >
             <div style={{ padding: '16px 20px', borderBottom: GBP_API_READY && !gbpConnected ? '1px solid var(--border)' : undefined }}>
               <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: 'var(--t2)', lineHeight: 1.6 }}>
                 Businesses with active GBP posts get <strong style={{ color: 'var(--t1)' }}>42% more direction requests</strong> and <strong style={{ color: 'var(--t1)' }}>35% more website clicks</strong>. — Google
@@ -995,27 +1120,17 @@ export default function AccountPage() {
                 </div>
               </>
             )}
-          </div>
+          </ConnCard>
 
           {/* ── Enable Google Business Review Requests ── */}
-          <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--amber)" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Enable Google Business Review Requests</div>
-                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Send customers directly to your Google Business Review page</div>
-                </div>
-              </div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, flexShrink: 0, background: 'var(--green-bg)', color: 'var(--green)' }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
-                Available now
-              </span>
-            </div>
+          <ConnCard
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="var(--amber)" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}
+            title="Enable Google Business Review Requests"
+            sub="Send customers directly to your Google Business Review page"
+            status={profile?.gbpReviewLink ? <StatusDot state="active" label="Active" /> : <StatusDot state="disabled" label="Disabled" />}
+            open={!!openCards['review']}
+            onToggle={() => toggleCard('review')}
+          >
             <div style={{ padding: '16px 20px' }}>
               {profile?.gbpReviewLink && !editingReviewLink ? (
                 /* Saved state */
@@ -1094,49 +1209,38 @@ export default function AccountPage() {
                 )}
               </div>
             </div>
-          </div>
+          </ConnCard>
 
-          {/* ── Website Integration for Local SEO (Titan only) ── */}
+          {/* ── Website Integration for Local SEO — family: mutually exclusive, Good/Better/Best ── */}
           {hasWebsiteIntegration && (
-            <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
-
-              {/* Card header */}
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 9, background: '#FFF7ED', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      Website Integration for Local SEO
-                      <button
-                        onClick={() => setShowWidgetInfo(!showWidgetInfo)}
-                        aria-label="What is this?"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: showWidgetInfo ? 'var(--sky-text)' : 'var(--t3)', padding: 0, display: 'inline-flex', alignItems: 'center', lineHeight: 1 }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                      </button>
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Grow your site&apos;s local ranking with every job you complete</div>
-                  </div>
+          <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface)', padding: '16px 16px 4px', marginBottom: 16, boxShadow: 'var(--shadow-card)' }}>
+            <div style={{ padding: '2px 4px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--t3)' }}>Website Integration for Local SEO</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--t1)', marginTop: 5 }}>Put your jobs on your own website</div>
                 </div>
-                <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, flexShrink: 0, background: '#FFF7ED', color: '#C2410C', border: '1px solid rgba(194,65,12,.2)' }}>
-                  Titan
-                </span>
+                <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: 'var(--surface-3)', color: 'var(--t2)' }}>Titan</span>
               </div>
+              <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.6, marginTop: 6 }}>Three ways to show your published jobs on your own site and build local SEO. You only need <strong style={{ color: 'var(--t1)', fontWeight: 700 }}>one at a time</strong> — at onboarding we set you up with the strongest option your website supports, and you can switch whenever you like.</div>
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 9 }}>Listed weakest to strongest for SEO: Good, Better, Best.</div>
+            </div>
 
-              {/* Info dropdown */}
-              {showWidgetInfo && (
-                <div style={{ margin: '12px 18px 0', background: 'var(--t1)', color: '#E8F0F8', borderRadius: 10, padding: '13px 34px 13px 15px', fontSize: 12.5, lineHeight: 1.65, position: 'relative' }}>
-                  <button onClick={() => setShowWidgetInfo(false)} style={{ position: 'absolute', top: 8, right: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 3px' }}>×</button>
-                  Deliver geo-content and authority to your own domain. Publish jobs to build local SEO, so customers find you faster. Link your Google Business Profile posts from ProjectCheckin to your own website.
-                </div>
-              )}
+            {/* GOOD · Embed widget (works on any website) */}
+            <ConnCard
+              icon={<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>}
+              title="Add a Jobs Gallery to Any Website"
+              titleExtra={<TierLabel label="Good" />}
+              sub="Paste one snippet — your published jobs appear automatically in a gallery on your site. Works anywhere."
+              status={profile?.portfolioPageUrl ? <ActiveTag /> : undefined}
+              accent={!!profile?.portfolioPageUrl}
+              open={!!openCards['widget']}
+              onToggle={() => toggleCard('widget')}
+              cardStyle={{ marginBottom: 12 }}
+            >
 
               {/* Section 1: Portfolio page URL */}
-              <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', marginTop: showWidgetInfo ? 12 : 0 }}>
+              <div style={{ padding: '14px 20px' }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--t1)', marginBottom: 8 }}>Paste your portfolio page URL here</div>
                 <button
                   onClick={() => setShowUrlInstructions(!showUrlInstructions)}
@@ -1150,32 +1254,56 @@ export default function AccountPage() {
                     Create a page on your website (e.g. yourwebsite.com/our-work) and paste its URL here. This is where your new portfolio of work will show up on your website and will automatically start generating local SEO for your page. You can always opt out at any time if you&apos;d like, and remove the page.
                   </div>
                 )}
-                {(() => {
-                  const urlSaved = !!profile?.portfolioPageUrl && portfolioUrlInput.trim() === profile.portfolioPageUrl
-                  return (
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input
-                        type="url"
-                        value={portfolioUrlInput}
-                        onChange={(e) => { setPortfolioUrlInput(e.target.value); setPortfolioUrlError(null) }}
-                        placeholder="https://yourwebsite.com/our-work"
-                        style={{ flex: 1, minWidth: 0, background: urlSaved ? 'var(--surface-2)' : 'var(--surface)', border: urlSaved ? '1px solid rgba(14,165,233,.2)' : '1px solid var(--border-2)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: urlSaved ? 'var(--sky-text)' : 'var(--t1)', fontWeight: urlSaved ? 600 : 400, outline: 'none' }}
-                      />
-                      <button
-                        onClick={handleSavePortfolioUrl}
-                        disabled={portfolioUrlSaving || urlSaved}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 16px', height: 34, borderRadius: 8, fontSize: 11.5, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", border: 'none', cursor: portfolioUrlSaving || urlSaved ? 'default' : 'pointer', background: urlSaved ? 'var(--green)' : 'var(--sky-text)', color: '#fff', flexShrink: 0 }}
-                      >
-                        {urlSaved ? (
-                          <>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                            Saved
-                          </>
-                        ) : portfolioUrlSaving ? 'Saving…' : 'Save'}
-                      </button>
+                {(profile?.portfolioPageUrl && !portfolioUrlEditing) ? (
+                  /* Saved state — Edit / Remove */
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
+                        Saved
+                      </span>
+                      <span style={{ display: 'inline-flex', gap: 14, marginLeft: 'auto' }}>
+                        <button
+                          onClick={() => { setPortfolioUrlInput(profile?.portfolioPageUrl || ''); setPortfolioUrlEditing(true); setPortfolioUrlError(null) }}
+                          style={{ background: 'none', border: 'none', padding: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          Edit
+                        </button>
+                        <button
+                          onClick={handleRemovePortfolioUrl}
+                          disabled={portfolioUrlSaving}
+                          style={{ background: 'none', border: 'none', padding: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--red)', cursor: portfolioUrlSaving ? 'default' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                          Remove
+                        </button>
+                      </span>
                     </div>
-                  )
-                })()}
+                    <a href={profile.portfolioPageUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, color: 'var(--sky-text)', fontFamily: 'monospace', letterSpacing: '-0.2px', wordBreak: 'break-all', textDecoration: 'none' }}>{profile.portfolioPageUrl}</a>
+                  </>
+                ) : (
+                  /* Input state (empty or editing) */
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      type="url"
+                      value={portfolioUrlInput}
+                      onChange={(e) => { setPortfolioUrlInput(e.target.value); setPortfolioUrlError(null) }}
+                      placeholder="https://yourwebsite.com/our-work"
+                      style={{ flex: 1, minWidth: 0, background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', outline: 'none' }}
+                    />
+                    <button
+                      onClick={handleSavePortfolioUrl}
+                      disabled={portfolioUrlSaving || !portfolioUrlInput.trim()}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 16px', height: 34, borderRadius: 8, fontSize: 11.5, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", border: 'none', cursor: portfolioUrlSaving || !portfolioUrlInput.trim() ? 'default' : 'pointer', background: 'var(--sky-text)', color: '#fff', flexShrink: 0, opacity: !portfolioUrlInput.trim() ? 0.5 : 1 }}
+                    >
+                      {portfolioUrlSaving ? 'Saving…' : 'Save'}
+                    </button>
+                    {portfolioUrlEditing && (
+                      <button onClick={() => { setPortfolioUrlEditing(false); setPortfolioUrlError(null) }} style={{ background: 'none', border: 'none', padding: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--t3)', cursor: 'pointer', flexShrink: 0 }}>Cancel</button>
+                    )}
+                  </div>
+                )}
                 {portfolioUrlError && <div style={{ fontSize: 12, color: 'var(--red, #DC2626)', marginTop: 8 }}>{portfolioUrlError}</div>}
               </div>
 
@@ -1205,8 +1333,24 @@ export default function AccountPage() {
                     </button>
                   ))}
                 </div>
+                <div style={{ display: 'inline-flex', gap: 3, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 3, marginBottom: 10 }}>
+                  {(['install', 'update'] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setWidgetMode(m)}
+                      style={{ border: 'none', background: widgetMode === m ? 'var(--surface-3)' : 'none', color: widgetMode === m ? 'var(--t1)' : 'var(--t3)', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 11.5, fontWeight: 600, padding: '5px 11px', borderRadius: 6, cursor: 'pointer' }}
+                    >
+                      {m === 'install' ? 'First-time install' : 'Update an installed widget'}
+                    </button>
+                  ))}
+                </div>
+                {widgetMode === 'update' && (
+                  <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.6, marginBottom: 10 }}>
+                    <strong style={{ color: 'var(--t1)' }}>Already added the widget?</strong> Swap your old snippet for a fresh one — old block out, new block in.
+                  </div>
+                )}
                 <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: 'var(--t2)', lineHeight: 1.65, marginBottom: 10, whiteSpace: 'pre-line' }}>
-                  {WIDGET_PLATFORM_INSTRUCTIONS[widgetPlatform]}
+                  {(widgetMode === 'update' ? WIDGET_PLATFORM_UPDATE_INSTRUCTIONS : WIDGET_PLATFORM_INSTRUCTIONS)[widgetPlatform]}
                 </div>
                 <div style={{ background: 'var(--t1)', color: '#7DD3FC', borderRadius: 8, padding: '12px 14px', fontFamily: "'Courier New', monospace", fontSize: 11.5, lineHeight: 1.6, marginBottom: 10, overflowX: 'auto', whiteSpace: 'pre' }}>
                   <span style={{ color: '#4B6378' }}>&lt;!-- ProjectCheckin: Website Integration for Local SEO --&gt;</span>{'\n'}
@@ -1313,28 +1457,20 @@ export default function AccountPage() {
                   </div>
                 )}
               </div>
-            </div>
-          )}
+            </ConnCard>
 
-          {/* ── Host Your Work On Your Own Site (CNAME subdomain, Titan only) ── */}
-          {hasWebsiteIntegration && (
-            <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Host Your Work Directly On Your Own Site</div>
-                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>A real page on your domain — built for Google and AI search, not just a widget</div>
-                  </div>
-                </div>
-                <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, flexShrink: 0, background: '#FFF7ED', color: '#C2410C', border: '1px solid rgba(194,65,12,.2)' }}>
-                  Titan
-                </span>
-              </div>
+            {/* BETTER · Hosted subdomain via CNAME */}
+            <ConnCard
+              icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="6" rx="1"/><rect x="2" y="15" width="20" height="6" rx="1"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>}
+              title="Host a Branded Page on Your Domain (CNAME)"
+              titleExtra={<TierLabel label="Better" />}
+              sub="Add one CNAME record — we serve your jobs on your own domain. No code, no plugin."
+              status={sdStatus === 'verified' ? <ActiveTag /> : undefined}
+              accent={sdStatus === 'verified'}
+              open={!!openCards['cname']}
+              onToggle={() => toggleCard('cname')}
+              cardStyle={{ marginBottom: 12 }}
+            >
 
               {/* State: verified & live */}
               {sdStatus === 'verified' && !sdEditing ? (
@@ -1344,12 +1480,21 @@ export default function AccountPage() {
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
                       Live
                     </span>
-                    <button
-                      onClick={() => setSdEditing(true)}
-                      style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', padding: 0 }}
-                    >
-                      Edit
-                    </button>
+                    <span style={{ display: 'inline-flex', gap: 14, marginLeft: 'auto' }}>
+                      <button
+                        onClick={() => setSdEditing(true)}
+                        style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', padding: 0 }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={handleRemoveSubdomain}
+                        disabled={sdSaving}
+                        style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--red)', cursor: sdSaving ? 'default' : 'pointer', padding: 0 }}
+                      >
+                        Remove
+                      </button>
+                    </span>
                   </div>
                   <div style={{ fontSize: 11.5, color: 'var(--t3)', fontFamily: 'monospace', letterSpacing: '-0.2px', marginTop: 7 }}>
                     <a href={`https://${sdHost}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--sky-text)' }}>{sdHost}</a>
@@ -1523,29 +1668,20 @@ export default function AccountPage() {
                   )}
                 </div>
               )}
-            </div>
-          )}
+            </ConnCard>
 
-          {/* ── Publish Directly to Your WordPress Site (Phase 3, Titan only) ── */}
-          {hasWebsiteIntegration && (
-            <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                      <circle cx="12" cy="12" r="11" fill="#21759B"/>
-                      <path fill="#fff" d="M3.9 12a8.1 8.1 0 0 0 4.56 7.29L4.86 8.98A8.06 8.06 0 0 0 3.9 12zm14.03-.42c0-.95-.34-1.6-.63-2.11-.39-.63-.75-1.16-.75-1.79 0-.7.53-1.35 1.28-1.35.03 0 .07 0 .1.01A8.1 8.1 0 0 0 12 3.9a8.11 8.11 0 0 0-6.78 3.65c.18 0 .35.01.5.01.8 0 2.05-.1 2.05-.1.41-.02.46.58.05.63 0 0-.41.05-.87.07l2.78 8.26 1.67-5.01-1.19-3.25c-.41-.02-.8-.07-.8-.07-.41-.02-.36-.65.05-.63 0 0 1.27.1 2.03.1.8 0 2.05-.1 2.05-.1.41-.02.46.58.05.63 0 0-.42.05-.87.07l2.76 8.2.76-2.55c.35-1.05.53-1.86.53-2.52zm-5.51 1.16-2.29 6.65c.68.2 1.41.31 2.16.31.89 0 1.75-.15 2.55-.44a.71.71 0 0 1-.06-.11l-2.36-6.41zm7.22-4.77c.03.24.05.5.05.78 0 .77-.14 1.63-.58 2.71l-2.32 6.71A8.1 8.1 0 0 0 20.1 12a8.05 8.05 0 0 0-.46-4.03z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Publish Directly to Your WordPress Site</div>
-                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Real posts in your own theme — the deepest SEO and AI search integration we offer</div>
-                  </div>
-                </div>
-                <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, flexShrink: 0, background: '#FFF7ED', color: '#C2410C', border: '1px solid rgba(194,65,12,.2)' }}>
-                  Titan
-                </span>
-              </div>
+            {/* BEST · WordPress native publish */}
+            <ConnCard
+              icon={<svg width="19" height="19" viewBox="0 0 24 24" fill="var(--t2)" stroke="none"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 1.4a8.6 8.6 0 0 1 4.86 1.49h-.1a1.2 1.2 0 0 0-1.16 1.23c0 .57.33 1.05.68 1.62.27.45.58 1.03.58 1.87 0 .58-.22 1.26-.52 2.2l-.68 2.26-2.45-7.3c.41-.02.78-.06.78-.06.36-.05.32-.58-.05-.56 0 0-1.1.09-1.82.09-.67 0-1.8-.09-1.8-.09-.36-.02-.4.54-.05.56 0 0 .35.04.72.06l1.06 2.9-1.49 4.46-2.48-7.36c.41-.02.78-.06.78-.06.36-.05.32-.58-.05-.56 0 0-1.1.09-1.82.09-.13 0-.28 0-.44-.01A8.6 8.6 0 0 1 12 3.4zM4.3 8.9l3.77 10.32A8.6 8.6 0 0 1 4.3 8.9zm8.2 3.62l2.28 6.24a.7.7 0 0 0 .06.1 8.6 8.6 0 0 1-5.1.06l1.9-5.5.86-.9zm5.9-2.05a8.6 8.6 0 0 1-2.42 8.5l2.35-6.8c.3-.9.44-1.62.44-2.27 0-.24-.02-.46-.05-.68.28.52.44 1.13.44 1.79z"/></svg>}
+              title="Publish Into Your WordPress Site"
+              titleExtra={<TierLabel label="Best" />}
+              sub="Real posts in your own theme — the deepest local-SEO integration we offer."
+              status={wpStatus === 'connected' ? <ActiveTag /> : undefined}
+              accent={wpStatus === 'connected'}
+              open={!!openCards['wordpress']}
+              onToggle={() => toggleCard('wordpress')}
+              cardStyle={{ marginBottom: 0 }}
+            >
 
               {wpStatus === 'connected' ? (
                 /* State: connected */
@@ -1675,30 +1811,20 @@ export default function AccountPage() {
                   </button>
                 </div>
               )}
-            </div>
+            </ConnCard>
+          </div>
           )}
 
           {/* ── Share Your Project Check-In Portfolio ── */}
           {profile?.slug && (
-            <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Share Your Project Check-In Portfolio</div>
-                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Share your work and track visits from any source</div>
-                  </div>
-                </div>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, flexShrink: 0, background: 'var(--green-bg)', color: 'var(--green)' }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
-                  Available now
-                </span>
-              </div>
+          <ConnCard
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
+            title="Share Your Project Check-In Portfolio"
+            sub="Share your work and track visits from any source"
+            status={<StatusDot state="active" label="Active" />}
+            open={!!openCards['share']}
+            onToggle={() => toggleCard('share')}
+          >
               <div style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <button
@@ -1759,28 +1885,23 @@ export default function AccountPage() {
                   )}
                 </div>
               </div>
-            </div>
+            </ConnCard>
           )}
 
           {/* ── Integrate Google Search Console ── */}
-          <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden', opacity: 0.65 }}>
-            <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--surface-3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Integrate Google Search Console</div>
-                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>See your search impressions and clicks inside this dashboard</div>
-                </div>
-              </div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: 'var(--surface-3)', color: 'var(--t3)', flexShrink: 0 }}>
-                Coming soon
-              </span>
+          <ConnCard
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>}
+            title="Integrate Google Search Console"
+            sub="See your search impressions and clicks inside this dashboard"
+            status={<StatusDot state="coming" label="Coming soon" />}
+            open={!!openCards['gsc']}
+            onToggle={() => toggleCard('gsc')}
+            locked
+          >
+            <div style={{ padding: '16px 20px' }}>
+              <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, margin: 0 }}>This connection isn&apos;t available yet. When it&apos;s ready, you&apos;ll be able to see your Google Search impressions and clicks right inside your dashboard.</p>
             </div>
-          </div>
+          </ConnCard>
 
         </div>
       )}
@@ -1824,6 +1945,7 @@ export default function AccountPage() {
                 </li>
               )}
               <li>Your data is preserved — resubscribing restores everything instantly</li>
+              <li>If you have a discounted or promotional rate, re-enrolling later is priced at whatever&apos;s being offered at that time — your current rate isn&apos;t guaranteed to still be available</li>
             </ul>
             <div style={{ display: 'flex', gap: 8 }}>
               <button

@@ -108,6 +108,7 @@ export async function GET(
           photoUrls: true,
           beforePhotoUrl: true,
           afterPhotoUrl: true,
+          featuredPhotoUrl: true,
           timestamp: true,
         },
       }),
@@ -124,6 +125,16 @@ export async function GET(
       const doorTypeSlug = slugify(job.doorType || 'job')
       const jobSlug = org.slug ? `${doorTypeSlug}-${org.slug}-${job.id}` : `${doorTypeSlug}-${job.id}`
 
+      const allPhotoUrls = job.photoUrls
+        ? job.photoUrls.split(',').map((u) => u.trim()).filter(Boolean)
+        : []
+      // The owner's chosen cover photo leads, so widgets/embeds that just take
+      // photoUrls[0] as the thumbnail show the right image without extra logic.
+      const photoUrls =
+        job.featuredPhotoUrl && allPhotoUrls.includes(job.featuredPhotoUrl)
+          ? [job.featuredPhotoUrl, ...allPhotoUrls.filter((u) => u !== job.featuredPhotoUrl)]
+          : allPhotoUrls
+
       return {
         id: job.id,
         slug: jobSlug,
@@ -134,9 +145,7 @@ export async function GET(
         latitude: job.latitude,
         longitude: job.longitude,
         description: job.seoDescription || job.notes || null,
-        photoUrls: job.photoUrls
-          ? job.photoUrls.split(',').map((u) => u.trim()).filter(Boolean)
-          : [],
+        photoUrls,
         beforePhotoUrl: job.beforePhotoUrl,
         afterPhotoUrl: job.afterPhotoUrl,
         createdAt: job.timestamp ? job.timestamp.toISOString() : null,
