@@ -591,6 +591,9 @@ export default function Dashboard() {
   // Photo delete
   const [deletingPhotoKey, setDeletingPhotoKey] = useState<string | null>(null)
 
+  // Cover photo — brief confirmation so it's clear the click already saved (no separate save step)
+  const [coverJustSavedId, setCoverJustSavedId] = useState<string | null>(null)
+
   // Publish
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [publishModal, setPublishModal] = useState<{
@@ -1227,6 +1230,8 @@ export default function Dashboard() {
         body: JSON.stringify({ id: checkIn.id, url: next }),
       })
       if (!res.ok) throw new Error('Failed to set cover photo')
+      setCoverJustSavedId(checkIn.id)
+      setTimeout(() => setCoverJustSavedId((id) => (id === checkIn.id ? null : id)), 1800)
     } catch {
       setCheckIns((prev) =>
         prev.map((c) => (c.id === checkIn.id ? { ...c, featuredPhotoUrl: previous } : c))
@@ -2047,9 +2052,12 @@ export default function Dashboard() {
                             )}
                             {(checkIn.photoUrls?.length ?? 0) > 0 && (
                               <div className="db-photo-cover-note">
+                                {coverJustSavedId === checkIn.id && (
+                                  <strong style={{ color: 'var(--green)' }}>Saved! </strong>
+                                )}
                                 {checkIn.featuredPhotoUrl
-                                  ? 'Cover photo set — used as the main image when this job is shared or published to your website.'
-                                  : 'No cover photo chosen — the "after" photo is used automatically, or the first photo.'}
+                                  ? 'Cover photo set — used as the main image on your portfolio, this job’s page, and when it’s shared or published to your website. Works whether the job is published or not.'
+                                  : 'No cover photo chosen — the first photo is used automatically.'}
                               </div>
                             )}
 

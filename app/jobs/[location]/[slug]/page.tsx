@@ -119,6 +119,7 @@ export default async function JobPage(
     organization,
     beforePhotoUrl,
     afterPhotoUrl,
+    featuredPhotoUrl,
   } = checkIn
 
   const effectiveTitle =
@@ -134,12 +135,19 @@ export default async function JobPage(
       ? `View ${effectiveArticle} ${doorType} installation completed in ${city}, ${state}${organization?.name ? ` by ${organization.name}` : ''}. See photos, details, and get a free estimate.`
       : 'View completed job details, photos, and request a free estimate.')
 
-  const photos = photoUrls
+  const allPhotos = photoUrls
     ? photoUrls
         .split(',')
         .map((url) => url.trim())
         .filter(Boolean)
     : []
+
+  // The owner's chosen cover photo leads in the visible carousel, same as the
+  // link-preview metadata above — otherwise the cover selection never shows up.
+  const photos =
+    featuredPhotoUrl && allPhotos.includes(featuredPhotoUrl)
+      ? [featuredPhotoUrl, ...allPhotos.filter((u) => u !== featuredPhotoUrl)]
+      : allPhotos
 
   const businessName = organization?.name || 'Business name unavailable'
   const businessPhone = organization?.phone || ''
