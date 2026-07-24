@@ -102,52 +102,69 @@
 
   // ── styles ───────────────────────────────────────────────────────────
 
+  // Note: every rule that sets margin/padding is scoped under #pc-widget (rather than a
+  // bare .pcw-* class) so it reliably beats the #pc-widget *{margin:0;padding:0} reset
+  // below — a plain class selector has lower CSS specificity than an ID+universal
+  // selector and loses regardless of source order, which was silently zeroing out most
+  // of the intended spacing before this fix.
   var CSS = '' +
     '#pc-widget{color:#0F172A;line-height:1.5}' +
     '#pc-widget *{box-sizing:border-box;margin:0;padding:0}' +
-    '.pcw-h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin-bottom:10px}' +
-    '.pcw-intro{font-size:14.5px;color:#374151;line-height:1.7;margin-bottom:24px;max-width:820px}' +
-    '.pcw-empty{font-size:14px;color:#64748B;padding:20px 0}' +
-    '.pcw-tabs{display:flex;gap:6px;margin-bottom:32px;flex-wrap:wrap}' +
-    '.pcw-tab{padding:6px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;border:1.5px solid #E2E8F0;color:#475569;background:#fff;font-family:inherit}' +
+    '#pc-widget .pcw-h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin-bottom:14px}' +
+    '#pc-widget .pcw-intro{font-size:14.5px;color:#374151;line-height:1.75;margin-bottom:32px;max-width:820px}' +
+    '#pc-widget .pcw-empty{font-size:14px;color:#64748B;padding:20px 0}' +
+    '#pc-widget .pcw-tabs{display:flex;gap:8px;margin-bottom:44px;flex-wrap:wrap}' +
+    '.pcw-tab{padding:8px 18px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;border:1.5px solid #E2E8F0;color:#475569;background:#fff;font-family:inherit}' +
     '.pcw-tab.pcw-on{background:#0F172A;color:#fff;border-color:#0F172A}' +
-    '.pcw-group{margin-bottom:36px}' +
-    '.pcw-h2{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:12px}' +
+    '#pc-widget .pcw-group{margin-bottom:56px}' +
+    '#pc-widget .pcw-h2{font-size:16px;font-weight:700;margin-bottom:22px;display:flex;align-items:center;gap:14px}' +
     '.pcw-h2:after{content:"";flex:1;height:1px;background:#E2E8F0}' +
-    '.pcw-count{font-size:11.5px;font-weight:600;color:#94A3B8;background:#F1F5F9;padding:2px 8px;border-radius:20px;flex-shrink:0}' +
-    '.pcw-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}' +
-    '@media(max-width:768px){.pcw-grid{grid-template-columns:1fr}}' +
+    '#pc-widget .pcw-count{font-size:11.5px;font-weight:600;color:#94A3B8;background:#F1F5F9;padding:3px 10px;border-radius:20px;flex-shrink:0}' +
+    '#pc-widget .pcw-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}' +
+    '@media(max-width:768px){#pc-widget .pcw-grid{grid-template-columns:1fr}}' +
     '.pcw-card{border-radius:10px;overflow:hidden;border:1px solid #E2E8F0;cursor:pointer;background:#fff;transition:box-shadow .15s,transform .15s}' +
     '.pcw-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.1);transform:translateY(-1px)}' +
-    '.pcw-photo{height:160px;width:100%;object-fit:cover;display:block;background:#F1F5F9}' +
-    '.pcw-nophoto{height:160px;width:100%;background:#F1F5F9}' +
-    '.pcw-cbody{padding:12px 14px}' +
-    '.pcw-h3{font-size:13px;font-weight:700;margin-bottom:4px;line-height:1.3}' +
-    '.pcw-meta{font-size:11.5px;color:#94A3B8;margin-bottom:6px}' +
-    '.pcw-snip{font-size:11.5px;color:#64748B;line-height:1.5}' +
-    '.pcw-morewrap{text-align:center;margin:24px 0 28px}' +
+    '.pcw-photo{height:180px;width:100%;object-fit:cover;display:block;background:#F1F5F9}' +
+    '.pcw-nophoto{height:180px;width:100%;background:#F1F5F9}' +
+    '#pc-widget .pcw-cbody{padding:18px 20px 22px}' +
+    '#pc-widget .pcw-h3{font-size:14px;font-weight:700;margin-bottom:7px;line-height:1.35}' +
+    '#pc-widget .pcw-meta{font-size:12px;color:#94A3B8;margin-bottom:11px}' +
+    '.pcw-snip{font-size:12.5px;color:#64748B;line-height:1.65}' +
+    '#pc-widget .pcw-morewrap{text-align:center;margin:28px 0 32px}' +
     '.pcw-more{display:inline-flex;align-items:center;gap:6px;padding:9px 24px;border-radius:8px;font-size:13px;font-weight:600;border:1.5px solid #E2E8F0;color:#475569;background:#fff;cursor:pointer;font-family:inherit}' +
-    '.pcw-jsonld{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#64748B;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:5px 10px;margin-bottom:20px}' +
+    '#pc-widget .pcw-jsonld{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#64748B;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:5px 10px;margin-bottom:20px}' +
     '.pcw-dot{width:6px;height:6px;border-radius:50%;background:#16A34A;flex-shrink:0}' +
-    '.pcw-foot{text-align:center;padding-top:20px;border-top:1px solid #F1F5F9}' +
+    '#pc-widget .pcw-foot{text-align:center;padding-top:24px;border-top:1px solid #F1F5F9}' +
     '.pcw-foot a{font-size:11.5px;font-weight:600;color:#94A3B8;text-decoration:none}' +
     '.pcw-foot b{color:#F97316;font-weight:700}' +
     '.pcw-overlay{position:fixed;inset:0;background:rgba(15,23,42,.62);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px}' +
-    '.pcw-modal{background:#fff;border-radius:14px;width:100%;max-width:580px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative}' +
-    '.pcw-mphotowrap{height:240px;position:relative;background:#0F172A}' +
-    '.pcw-mphoto{width:100%;height:100%;object-fit:cover;display:block}' +
+    // Modal width/photo-height are orientation-aware: JS toggles .pcw-landscape /
+    // .pcw-portrait on the modal once the photo's natural dimensions are known, so a
+    // portrait job gets a narrower-but-taller modal and a landscape job gets a
+    // wider-but-shorter one. object-fit:contain means the whole photo always shows —
+    // nothing gets cropped the way a fixed-height + cover box used to.
+    '.pcw-modal{background:#fff;border-radius:14px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative;transition:max-width .15s ease}' +
+    '.pcw-modal.pcw-landscape{max-width:640px}' +
+    '.pcw-modal.pcw-portrait{max-width:420px}' +
+    '.pcw-mphotowrap{position:relative;background:#0F172A;display:flex;align-items:center;justify-content:center;overflow:hidden}' +
+    '.pcw-modal.pcw-landscape .pcw-mphotowrap{max-height:420px}' +
+    '.pcw-modal.pcw-portrait .pcw-mphotowrap{max-height:560px}' +
+    '.pcw-mphoto{width:100%;height:100%;object-fit:contain;display:block}' +
     '.pcw-close{position:absolute;top:12px;right:12px;width:32px;height:32px;background:rgba(0,0,0,.4);border-radius:50%;border:none;color:#fff;cursor:pointer;font-size:18px;line-height:1}' +
     '.pcw-arrow{position:absolute;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;border:none;background:rgba(0,0,0,.4);color:#fff;cursor:pointer;font-size:16px;line-height:1}' +
-    '.pcw-mbody{padding:20px 22px 0}' +
-    '.pcw-mlabel{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94A3B8;margin-bottom:3px}' +
-    '.pcw-mh2{font-size:20px;font-weight:800;margin-bottom:6px;line-height:1.2}' +
-    '.pcw-mloc{font-size:13px;color:#64748B;margin-bottom:14px}' +
-    '.pcw-mdesc{font-size:13px;color:#374151;line-height:1.7;margin-bottom:14px;max-height:160px;overflow-y:auto;white-space:pre-wrap}' +
-    '.pcw-mfoot{padding:13px 22px;border-top:1px solid #F1F5F9;display:flex;align-items:center;justify-content:space-between;gap:12px}' +
-    '.pcw-mlinks{display:flex;flex-direction:column;gap:4px;min-width:0}' +
+    // The modal is appended to document.body (not inside #pc-widget — see openModal()),
+    // so the #pc-widget * reset never reaches it; these are never in specificity
+    // conflict and stay as plain classes.
+    '.pcw-mbody{padding:22px 24px 0}' +
+    '.pcw-mlabel{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94A3B8;margin-bottom:5px}' +
+    '.pcw-mh2{font-size:21px;font-weight:800;margin-bottom:8px;line-height:1.25}' +
+    '.pcw-mloc{font-size:13px;color:#64748B;margin-bottom:18px}' +
+    '.pcw-mdesc{font-size:13.5px;color:#374151;line-height:1.75;margin-bottom:20px;max-height:220px;overflow-y:auto;white-space:pre-wrap;padding-left:14px;border-left:3px solid #e8a83a}' +
+    '.pcw-mfoot{padding:16px 24px;border-top:1px solid #F1F5F9;display:flex;align-items:center;justify-content:space-between;gap:12px}' +
+    '.pcw-mlinks{display:flex;flex-direction:column;gap:5px;min-width:0}' +
     '.pcw-share{font-size:12px;color:#0284C7;text-decoration:none;font-weight:600}' +
     '.pcw-pck{font-size:11px;color:#94A3B8;text-decoration:none}' +
-    '.pcw-est{background:#0F172A;color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;text-decoration:none;flex-shrink:0;font-family:inherit}';
+    '.pcw-est{background:#0F172A;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;text-decoration:none;flex-shrink:0;font-family:inherit}';
 
   // ── JSON-LD ──────────────────────────────────────────────────────────
 
@@ -393,11 +410,22 @@
     document.addEventListener('keydown', onKey);
     overlay.onclick = function (e) { if (e.target === overlay) close(); };
 
-    // Photo area
+    // Photo area — modal size adapts to each photo's orientation (checked on every
+    // load, since photos on the same job can mix portrait and landscape) so nothing
+    // gets cropped: a portrait photo gets a narrower/taller modal, landscape gets
+    // wider/shorter. Defaults to landscape sizing until the first photo's real
+    // dimensions are known.
     if (photos.length) {
+      modal.classList.add('pcw-landscape');
       var wrap = el('div', 'pcw-mphotowrap');
       var img = el('img', 'pcw-mphoto');
       img.alt = job.jobType + ' in ' + cityLabel(job) + ' — ' + job.jobType + ' service';
+      img.onload = function () {
+        if (!img.naturalWidth || !img.naturalHeight) return;
+        var isPortrait = img.naturalHeight > img.naturalWidth;
+        modal.classList.toggle('pcw-portrait', isPortrait);
+        modal.classList.toggle('pcw-landscape', !isPortrait);
+      };
       img.src = photos[0];
       wrap.appendChild(img);
       if (photos.length > 1) {
