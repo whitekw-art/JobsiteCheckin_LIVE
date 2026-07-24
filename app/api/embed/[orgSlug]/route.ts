@@ -144,7 +144,13 @@ export async function GET(
         zipCode: job.zip,
         latitude: job.latitude,
         longitude: job.longitude,
-        description: job.seoDescription || job.notes || null,
+        // notes is the real, human-written (or AI-generated) job narrative — the same
+        // content shown as "About This Project" on the real job page. seoDescription is
+        // just an auto-templated fallback ("Installed a Wood Door at 123 Main St...")
+        // meant only for the invisible <meta name="description"> tag, never for visible
+        // body content. Preferring it here was backwards and produced thin, duplicate
+        // text across every job on a customer's site.
+        description: job.notes || job.seoDescription || null,
         photoUrls,
         beforePhotoUrl: job.beforePhotoUrl,
         afterPhotoUrl: job.afterPhotoUrl,
