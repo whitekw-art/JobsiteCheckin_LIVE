@@ -18,9 +18,12 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/:path*',
+        // Every path EXCEPT the single named exception below (Next.js merges
+        // headers from multiple matching rules rather than overriding them,
+        // so the exception must be excluded here, not just added separately).
+        source: '/:path((?!portfolio/wave-advisory-3e10).*)',
         headers: [
-          // Clickjacking: the dashboard must never be framed by another site.
+          // Clickjacking: no page should be framed by another site by default.
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           // Stops browsers guessing a content type and treating an upload as script.
           { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -45,6 +48,25 @@ const nextConfig = {
               "base-uri 'self'",
               "form-action 'self'",
             ].join('; '),
+          },
+        ],
+      },
+      {
+        // Single named exception: this exact URL is the one dedicated demo
+        // portfolio ProjectCheckin's own landing page embeds in an iframe.
+        // No X-Frame-Options here at all (there's no valid "allow" value —
+        // omitting it is the correct way to permit framing). Every other
+        // portfolio/job page (real customers) keeps full protection via the
+        // blanket rule above, since this exact path is excluded from it.
+        source: '/portfolio/wave-advisory-3e10',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(self), payment=()' },
+          {
+            key: 'Content-Security-Policy-Report-Only',
+            value: "frame-ancestors 'self' https://projectcheckin.com https://*.vercel.app",
           },
         ],
       },

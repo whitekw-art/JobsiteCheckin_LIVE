@@ -100,6 +100,12 @@ export default function LandingPage({ registrationOpen = false }: { registration
   // FAQ accordion
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
+  // Bento card collapse toggles (all default collapsed)
+  const [portfolioOpen, setPortfolioOpen] = useState(false)
+  const [gbpOpen, setGbpOpen] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [bacTextOpen, setBacTextOpen] = useState(false)
+
   // Before/after slider refs
   const sliderRef = useRef<HTMLDivElement>(null)
   const afterRef = useRef<HTMLDivElement>(null)
@@ -156,7 +162,7 @@ export default function LandingPage({ registrationOpen = false }: { registration
     const hint   = hintRef.current
     if (!slider || !after || !line || !btn) return
 
-    let pct = 0.90
+    let pct = 0.50
     let dragging = false
     let hintDismissed = false
 
@@ -479,6 +485,7 @@ export default function LandingPage({ registrationOpen = false }: { registration
         <div className="bento-head">
           <span className="section-label r">What ProjectCheckin creates</span>
           <h2 className="section-h2 r d1">Your jobs, working for you.</h2>
+          <p className="bento-sub r d2">ProjectCheckin eliminates hours of marketing work, offshore agency headaches, and hundreds to thousands of dollars in monthly subscriptions and fees — while quietly building the reputation that&apos;s meant to attract more customers.</p>
         </div>
         <div className="bento-grid">
 
@@ -487,19 +494,34 @@ export default function LandingPage({ registrationOpen = false }: { registration
 
             {/* Portfolio page card */}
             <div className="bc bc-main r d1">
-              <span className="bc-label">Shareable Project Page</span>
-              <div className="bc-title">A live portfolio page for your business</div>
-              <div className="bc-desc">Your own portfolio of your best work, branded for your business. We build the page, you control the content. Send it in quotes. Share it with prospects. Post it to Google Business. Indexed, linkable, and a permanent record of your crew&apos;s work.</div>
-              <div className="bc-bullets">
-                <ul className="bc-blist">
-                  <li>Live, branded URL with your business name</li>
-                  <li>Direct links to your website &amp; contact info for leads &amp; SEO</li>
-                  <li>Zero effort to set up or create</li>
-                </ul>
-                <ul className="bc-blist">
-                  <li>Fully editable. Update with a click.</li>
-                  <li>Optimized for Google Search, ChatGPT, and Gemini so customers find you</li>
-                </ul>
+              <span className="bc-label">Shareable Portfolio</span>
+              <div className="bc-title-row">
+                <div className="bc-title">Custom, professionally designed portfolio of work</div>
+                <button
+                  type="button"
+                  className={`bc-toggle${portfolioOpen ? ' open' : ''}`}
+                  aria-expanded={portfolioOpen}
+                  aria-label={portfolioOpen ? 'Collapse details' : 'Expand details'}
+                  onClick={() => setPortfolioOpen((v) => !v)}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+              <div className={`bc-collapse${portfolioOpen ? ' open' : ''}`}>
+                <div className="bc-desc">Your own portfolio of your best work, branded for your business. We build the page, you control the content. Send it in quotes. Share it with prospects. Post it to Google Business. Indexed, linkable, and a permanent record of your crew&apos;s work.</div>
+                <div className="bc-bullets">
+                  <ul className="bc-blist">
+                    <li>Live, branded URL with your business name</li>
+                    <li>Direct links to your website &amp; contact info for leads &amp; SEO</li>
+                    <li>Zero effort to set up or create</li>
+                  </ul>
+                  <ul className="bc-blist">
+                    <li>Fully editable. Update with a click.</li>
+                    <li>Optimized for Google Search, ChatGPT, and Gemini so customers find you</li>
+                  </ul>
+                </div>
               </div>
               <div className="bc-browser" ref={browserRef}>
                 <div className="bcb-chrome">
@@ -521,14 +543,29 @@ export default function LandingPage({ registrationOpen = false }: { registration
 
             {/* Before/After text card */}
             <div className="bc bc-bac-text r d4">
-              <span className="bc-label">Before / After</span>
-              <div className="bc-title">Drag-to-reveal proof of the transformation</div>
-              <div className="bc-desc">Every job page includes an interactive before/after comparison your prospects can drag and explore. Proof they can feel, not just read.</div>
-              <ul className="bc-blist" style={{ marginBottom: '16px' }}>
-                <li>Built into every published job page automatically</li>
-                <li>Shareable — send it in quotes, texts, or emails</li>
-                <li>Visible on your portfolio and in Google search results</li>
-              </ul>
+              <span className="bc-label">User Experience & Features</span>
+              <div className="bc-title-row">
+                <div className="bc-title">Drag-to-reveal proof of the transformation</div>
+                <button
+                  type="button"
+                  className={`bc-toggle${bacTextOpen ? ' open' : ''}`}
+                  aria-expanded={bacTextOpen}
+                  aria-label={bacTextOpen ? 'Collapse details' : 'Expand details'}
+                  onClick={() => setBacTextOpen((v) => !v)}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+              <div className={`bc-collapse${bacTextOpen ? ' open' : ''}`}>
+                <div className="bc-desc">Every job page includes an interactive before/after comparison your prospects can drag and explore. Proof they can feel, not just read.</div>
+                <ul className="bc-blist" style={{ marginBottom: '16px' }}>
+                  <li>Built into every published job page automatically</li>
+                  <li>Shareable — send it in quotes, texts, or emails</li>
+                  <li>Visible on your portfolio and in Google search results</li>
+                </ul>
+              </div>
               <div className="bac-ghost">
                 <div className="bac-ghost-bar">
                   <span className="bac-ghost-label">Ghost Camera — in the field</span>
@@ -594,9 +631,24 @@ export default function LandingPage({ registrationOpen = false }: { registration
 
             {/* GBP card */}
             <div className="bc bc-gbp r d2">
-              <span className="bc-label">Google Business Profile Post</span>
-              <div className="bc-title">Connect to GBP — Approve and Post in a click</div>
-              <div className="bc-desc">Formatted with your photos, job description, and location. You can edit &amp; revise, copy and paste, or with a click auto-post to GBP*.</div>
+              <span className="bc-label">Google Business Ranking</span>
+              <div className="bc-title-row">
+                <div className="bc-title">Optimize GBP with automatic content capture</div>
+                <button
+                  type="button"
+                  className={`bc-toggle${gbpOpen ? ' open' : ''}`}
+                  aria-expanded={gbpOpen}
+                  aria-label={gbpOpen ? 'Collapse details' : 'Expand details'}
+                  onClick={() => setGbpOpen((v) => !v)}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+              <div className={`bc-collapse${gbpOpen ? ' open' : ''}`}>
+                <div className="bc-desc">Formatted with your photos, job description, and location. You can edit &amp; revise, copy and paste, or with a click auto-post to GBP*.</div>
+              </div>
               <div className="gbp-preview">
                 <div className="gbp-source">
                   <div className="gbp-g"></div>
@@ -610,9 +662,24 @@ export default function LandingPage({ registrationOpen = false }: { registration
 
             {/* Review card */}
             <div className="bc bc-review r d3">
-              <span className="bc-label">Review Request</span>
-              <div className="bc-title">Pre-written and ready to send</div>
-              <div className="bc-desc">A personalized text and/or email to your customer. Edit if you&apos;d like, one tap to send from your phone or email. Logs &ldquo;Sent on&rdquo; dates so you&apos;ll never forget.</div>
+              <span className="bc-label">Customer Review Growth</span>
+              <div className="bc-title-row">
+                <div className="bc-title">Capture more reviews with intelligent automations</div>
+                <button
+                  type="button"
+                  className={`bc-toggle${reviewOpen ? ' open' : ''}`}
+                  aria-expanded={reviewOpen}
+                  aria-label={reviewOpen ? 'Collapse details' : 'Expand details'}
+                  onClick={() => setReviewOpen((v) => !v)}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+              <div className={`bc-collapse${reviewOpen ? ' open' : ''}`}>
+                <div className="bc-desc">Send personalized texts and/or emails to your customer. Deploy a trained agent to manage comms for you - or - edit manually and tap to send from your phone or email, if you&apos;d prefer. Logs &ldquo;Sent on&rdquo; dates so you&apos;ll never forget.</div>
+              </div>
               <div className="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
               <div className="rev-preview">
                 <div className="rev-msg">&ldquo;Sarah &mdash; we really appreciated your business. Hope you love the new door. If you have a minute, a Google review helps us more than you know: [review link]&rdquo;</div>
@@ -917,107 +984,6 @@ export default function LandingPage({ registrationOpen = false }: { registration
         </div>
       </section>
 
-      {/* ── PRICING ── */}
-      <section className="pricing" id="pricing">
-        <div className="pricing-inner">
-          <div className="pricing-head">
-            <h2 className="r">Founder pricing, locked in for life</h2>
-            <p className="r d1">First 20 businesses get 50% off &mdash; for life. Prices go up when spots fill.</p>
-          </div>
-          <div className="pricing-grid">
-
-            {/* FREE */}
-            <div className="pc-card r">
-              <div className="pc-tier">Free</div>
-              <div className="pc-price">$0</div>
-              <div className="pc-note">No credit card</div>
-              <div className="pc-div"></div>
-              <div className="pc-feats">
-                <div className="pf"><span className="pf-ck">&#10003;</span>Try it free on your next 5 jobs</div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>5 photos per job</div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Owner publish controls</div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Each job page built for Google search</div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Public portfolio page</div>
-              </div>
-              {registrationOpen ? (
-                <a href="/auth/register" className="btn-pc-ghost">Start Free</a>
-              ) : (
-                <button className="btn-pc-ghost" onClick={() => openWaitlistModal()}>Start Free</button>
-              )}
-            </div>
-
-            {/* PRO */}
-            <div className="pc-card r d1">
-              <div className="pc-tier">Pro</div>
-              <div className="pc-price">$49.50</div>
-              <div className="pc-note">/ month &mdash; founding rate</div>
-              <div className="pc-div"></div>
-              <div className="pc-feats">
-                <div className="pf-inherit">Everything in Free, plus:</div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Unlimited published job pages</div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Unlimited photos per job</div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>One-tap GBP post from your job notes</div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Traffic dashboard (views, calls, clicks)</div>
-              </div>
-              {registrationOpen ? (
-                <a href="/auth/register" className="btn-pc-ghost">Get Started</a>
-              ) : (
-                <button className="btn-pc-ghost" onClick={() => openWaitlistModal()}>Get Early Access</button>
-              )}
-            </div>
-
-            {/* ELITE — featured */}
-            <div className="pc-card feat r d2">
-              <div className="feat-tag">Recommended</div>
-              <div className="pc-tier">Elite</div>
-              <div className="pc-price">$74.50</div>
-              <div className="pc-note">/ month &mdash; founding rate</div>
-              <div className="pc-div"></div>
-              <div className="pc-feats">
-                <div className="pf-inherit">Everything in Pro, plus:</div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Google Business Profile auto-posts <span className="soon-badge">Soon</span></div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Before/after photo tagging</div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Before/after comparison on published pages</div>
-              </div>
-              {registrationOpen ? (
-                <a href="/auth/register" className="btn-pc-main">Get Started</a>
-              ) : (
-                <button className="btn-pc-main" onClick={() => openWaitlistModal()}>Get Early Access</button>
-              )}
-            </div>
-
-            {/* TITAN */}
-            <div className="pc-card r d3">
-              <div className="pc-tier">Titan</div>
-              <div className="pc-price">$149.50</div>
-              <div className="pc-note">/ month &mdash; founding rate</div>
-              <div className="pc-div"></div>
-              <div className="pc-feats">
-                <div className="pf-inherit">Everything in Elite, plus:</div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>AI copywriting agent <span className="new-badge">New</span></div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>AI review request agent <span className="soon-badge">Soon</span></div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Automated Google review requests</div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Geo-grid rank tracking heatmap <span className="soon-badge">Soon</span></div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>CRM &amp; QuickBooks integration <span className="soon-badge">Soon</span></div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Website Integration for Local SEO</div>
-                <div className="pf"><span className="pf-ck">&#10003;</span>Priority support + strategy calls</div>
-              </div>
-              {registrationOpen ? (
-                <a href="/auth/register" className="btn-pc-ghost">Get Started</a>
-              ) : (
-                <button className="btn-pc-ghost" onClick={() => openWaitlistModal()}>Get Early Access</button>
-              )}
-            </div>
-
-          </div>
-          <p className="pricing-footnote r">
-            Cancel anytime. No contracts.&nbsp;&nbsp;&middot;&nbsp;&nbsp;
-            <a href="/pricing" style={{ color: 'var(--orange)', fontWeight: 700, textDecoration: 'none' }}>
-              See full feature comparison &rarr;
-            </a>
-          </p>
-        </div>
-      </section>
 
       {/* ── FAQ ── */}
       <section className="faq" id="faq">
