@@ -582,6 +582,32 @@ export default function AccountPage() {
   const [wpDisconnecting, setWpDisconnecting] = useState(false)
   const [showWpSteps,    setShowWpSteps]    = useState(false)
 
+  // WordPress existing-page injection (Phase 3b)
+  type PageMapping = {
+    id: string
+    matchCity: string | null
+    matchState: string | null
+    matchService: string | null
+    wpPageUrl: string
+    wpPageType: string
+    builderBlocked: boolean
+    markerMode: string
+  }
+  type LocationOpt = { city: string; state: string | null }
+  const [wpMappings,       setWpMappings]       = useState<PageMapping[]>([])
+  const [wpCreateNewPosts, setWpCreateNewPosts] = useState(true)
+  const [wpLocations,      setWpLocations]      = useState<LocationOpt[]>([])
+  const [wpServices,       setWpServices]       = useState<string[]>([])
+  const [wpAddOpen,        setWpAddOpen]        = useState(false)
+  const [wpAddLocation,    setWpAddLocation]    = useState('') // "city|state", '' = any
+  const [wpAddService,     setWpAddService]     = useState('') // service, '' = any
+  const [wpAddUrl,         setWpAddUrl]         = useState('')
+  const [wpAddSaving,      setWpAddSaving]      = useState(false)
+  const [wpAddError,       setWpAddError]       = useState<string | null>(null)
+  const [wpNotice,         setWpNotice]         = useState<string | null>(null)
+  const [wpMarkerCopied,   setWpMarkerCopied]   = useState(false)
+  const WP_MARKER = '<!-- projectcheckin:start --><!-- projectcheckin:end -->'
+
   useEffect(() => {
     if (!hasWebsiteIntegration) return
     fetch('/api/organization/wordpress')
@@ -639,6 +665,87 @@ export default function AccountPage() {
     } finally {
       setWpDisconnecting(false)
     }
+  }
+
+  // Existing-page mappings load once the WordPress connection is live.
+  async function reloadWpMappings() {
+    try {
+      const r = await fetch('/api/organization/wordpress/pages')
+      if (!r.ok) return
+      const d = await r.json()
+      setWpMappings(d.mappings ?? [])
+      setWpCreateNewPosts(d.wpCreateNewPosts ?? true)
+      setWpLocations(d.locations ?? [])
+      setWpServices(d.services ?? [])
+    } catch {}
+  }
+
+  useEffect(() => {
+    if (!hasWebsiteIntegration || wpStatus !== 'connected') return
+    reloadWpMappings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasWebsiteIntegration, wpStatus])
+
+  async function toggleWpCreateNewPosts() {
+    const next = !wpCreateNewPosts
+    setWpCreateNewPosts(next) // optimistic
+    try {
+      const r = await fetch('/api/organization/wordpress/pages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wpCreateNewPosts: next }),
+      })
+      if (!r.ok) setWpCreateNewPosts(!next) // revert on failure
+    } catch {
+      setWpCreateNewPosts(!next)
+    }
+  }
+
+  async function handleAddMapping() {
+    setWpAddError(null)
+    setWpNotice(null)
+    if (!wpAddUrl.trim()) {
+      setWpAddError('Paste the URL of your existing page.')
+      return
+    }
+    setWpAddSaving(true)
+    try {
+      const [city, state] = wpAddLocation ? wpAddLocation.split('|') : ['', '']
+      const r = await fetch('/api/organization/wordpress/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pageUrl: wpAddUrl.trim(),
+          matchCity: city || null,
+          matchState: state || null,
+          matchService: wpAddService || null,
+        }),
+      })
+      const d = await r.json().catch(() => null)
+      if (!r.ok) throw new Error(d?.error || 'Could not save that page.')
+      await reloadWpMappings()
+      setWpAddOpen(false)
+      setWpAddUrl('')
+      setWpAddLocation('')
+      setWpAddService('')
+      if (d?.builderNotice) {
+        setWpNotice("That page was built with a page builder, so we'll create new posts for those jobs instead. No action needed.")
+      } else if (d?.overlapWarning) {
+        setWpNotice('Heads up: another page already targets the same location and service. The most specific match wins.')
+      }
+    } catch (err: any) {
+      setWpAddError(err.message)
+    } finally {
+      setWpAddSaving(false)
+    }
+  }
+
+  async function handleRemoveMapping(id: string) {
+    if (!confirm('Remove this page? Your recent work will no longer be added to it. Your page itself is never changed or deleted.')) return
+    try {
+      const r = await fetch(`/api/organization/wordpress/pages?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+      if (r.ok) await reloadWpMappings()
+    } catch {}
   }
 
   // Connections tab state (localStorage-backed, Phase 1)
@@ -1720,6 +1827,143 @@ export default function AccountPage() {
                   <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: 'var(--sky-dim)', border: '1px solid rgba(14,165,233,.25)', borderRadius: 8, padding: '12px 14px', marginTop: 14, fontSize: 12, color: 'var(--t2)', lineHeight: 1.6 }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                     <span>Reminder: if you ever need to downgrade or cancel, nothing will be deleted from ProjectCheckin, but job content will no longer be displayed on your site. Everything is restored to your site automatically the moment you resubscribe to Titan.</span>
+                  </div>
+
+                  {/* ── Existing-page injection (Phase 3b) ── */}
+                  <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 18 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--t1)', letterSpacing: '-0.1px' }}>Feed jobs into pages you already have</div>
+                    <p style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.6, marginTop: 6, marginBottom: 16 }}>
+                      Already have pages that rank — like an &ldquo;areas we serve&rdquo; or a service page? Point ProjectCheckin at them and matching jobs get added right onto those pages, keeping them fresh with your recent work. Jobs that don&apos;t match a page here still become their own new post.
+                    </p>
+
+                    {wpNotice && (
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', marginBottom: 14, fontSize: 12, color: '#92400E', lineHeight: 1.55 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <span>{wpNotice}</span>
+                        <button onClick={() => setWpNotice(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }} aria-label="Dismiss">×</button>
+                      </div>
+                    )}
+
+                    {/* Master switch: create new posts for unmatched jobs */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 9, padding: '12px 14px', marginBottom: 18 }}>
+                      <div>
+                        <div style={{ fontSize: 12.5, color: 'var(--t1)', fontWeight: 600 }}>Create a new post for jobs that don&apos;t match a page below</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5, marginTop: 3, maxWidth: 340 }}>On: unmatched jobs become their own new post (standard). Off: only jobs that match a page below get published.</div>
+                      </div>
+                      <button
+                        onClick={toggleWpCreateNewPosts}
+                        aria-label="Toggle new posts for unmatched jobs"
+                        style={{ position: 'relative', width: 40, height: 23, flexShrink: 0, border: 'none', borderRadius: 20, background: wpCreateNewPosts ? 'var(--sky-text)' : 'var(--border-2)', cursor: 'pointer', padding: 0, transition: 'background .18s' }}
+                      >
+                        <span style={{ position: 'absolute', top: 2.5, left: 2.5, width: 18, height: 18, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,.25)', transition: 'transform .18s', transform: wpCreateNewPosts ? 'translateX(17px)' : 'translateX(0)' }} />
+                      </button>
+                    </div>
+
+                    {/* Saved mappings */}
+                    {wpMappings.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                        {wpMappings.map((m) => (
+                          <div key={m.id} style={{ border: '1px solid var(--border)', borderRadius: 9, padding: '12px 14px', background: 'var(--surface)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 6, fontSize: 11.5, fontWeight: m.matchCity ? 700 : 600, background: m.matchCity ? 'var(--sky-dim)' : 'var(--surface-3)', color: m.matchCity ? 'var(--sky-text)' : 'var(--t3)' }}>
+                                  {m.matchCity ? `${m.matchCity}${m.matchState ? ', ' + m.matchState : ''}` : 'Any location'}
+                                </span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 6, fontSize: 11.5, fontWeight: m.matchService ? 700 : 600, background: m.matchService ? 'var(--sky-dim)' : 'var(--surface-3)', color: m.matchService ? 'var(--sky-text)' : 'var(--t3)' }}>
+                                  {m.matchService || 'Any service'}
+                                </span>
+                              </div>
+                              <button onClick={() => handleRemoveMapping(m.id)} title="Remove" style={{ background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', padding: 4, borderRadius: 6, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                              </button>
+                            </div>
+                            <div style={{ fontSize: 11.5, color: 'var(--t2)', fontFamily: 'monospace', letterSpacing: '-0.2px', marginTop: 9, wordBreak: 'break-all' }}>{m.wpPageUrl}</div>
+                            {m.builderBlocked ? (
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 12px', marginTop: 10, fontSize: 11.5, color: '#92400E', lineHeight: 1.55 }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                <span>This page was built with a page builder, which we can&apos;t reliably add content to yet. We&apos;ll follow best practice to create a new page. No action required.</span>
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 6 }}>
+                                {m.markerMode === 'marker' ? 'Placed where you put the marker' : 'Added to the end of the page'}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add-a-page form */}
+                    {wpAddOpen ? (
+                      <div style={{ border: '1px dashed var(--border-2)', borderRadius: 9, padding: 16, background: 'var(--surface-2)', marginBottom: 14 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                          <div>
+                            <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Location</label>
+                            <select value={wpAddLocation} onChange={(e) => setWpAddLocation(e.target.value)} style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', outline: 'none', cursor: 'pointer' }}>
+                              <option value="">Any location</option>
+                              {wpLocations.map((l) => {
+                                const val = `${l.city}|${l.state ?? ''}`
+                                return <option key={val} value={val}>{l.city}{l.state ? `, ${l.state}` : ''}</option>
+                              })}
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Service</label>
+                            <select value={wpAddService} onChange={(e) => setWpAddService(e.target.value)} style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', outline: 'none', cursor: 'pointer' }}>
+                              <option value="">Any service</option>
+                              {wpServices.map((s) => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Paste the URL of your existing page</label>
+                        <input type="text" value={wpAddUrl} onChange={(e) => setWpAddUrl(e.target.value)} placeholder="https://yourbusiness.com/areas-served/city/" style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--t1)', outline: 'none', marginBottom: 14 }} />
+
+                        {wpAddError && (
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'var(--red, #DC2626)', lineHeight: 1.5, marginBottom: 12 }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            <span>{wpAddError}</span>
+                          </div>
+                        )}
+
+                        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px' }}>
+                          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t1)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                            Optional: choose exactly where it lands
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 7, padding: '9px 12px' }}>
+                            <code style={{ fontFamily: 'monospace', fontSize: 11.5, color: 'var(--t1)', letterSpacing: '-0.2px', wordBreak: 'break-all' }}>{WP_MARKER}</code>
+                            <button
+                              onClick={() => { navigator.clipboard?.writeText(WP_MARKER); setWpMarkerCopied(true); setTimeout(() => setWpMarkerCopied(false), 1600) }}
+                              style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 14px', borderRadius: 7, fontSize: 12, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: wpMarkerCopied ? 'var(--green)' : 'var(--sky-text)', color: '#fff', border: 'none', flexShrink: 0, whiteSpace: 'nowrap' }}
+                            >
+                              {wpMarkerCopied ? 'Copied' : 'Copy'}
+                            </button>
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.55, marginTop: 9 }}>
+                            In your WordPress editor, add a <strong>Custom HTML block</strong> where you want the jobs to appear, and paste this in. We only ever write between these two tags — the rest of your page is never touched. Skip this and your jobs are added to the bottom of the page.
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                          <button onClick={handleAddMapping} disabled={wpAddSaving} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: wpAddSaving ? 'default' : 'pointer', background: 'var(--sky-text)', color: '#fff', border: 'none' }}>
+                            {wpAddSaving ? 'Saving…' : 'Save page'}
+                          </button>
+                          <button onClick={() => { setWpAddOpen(false); setWpAddError(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: 'none', color: 'var(--t2)', border: '1px solid var(--border-2)' }}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => { setWpAddOpen(true); setWpNotice(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, justifyContent: 'center', width: '100%', fontSize: 12.5, fontWeight: 700, color: 'var(--sky-text)', background: 'none', border: '1px dashed var(--border-2)', borderRadius: 9, padding: '11px 14px', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Add a page
+                      </button>
+                    )}
+
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: 'var(--sky-dim)', border: '1px solid rgba(14,165,233,.25)', borderRadius: 8, padding: '12px 14px', marginTop: 16, fontSize: 12, color: 'var(--t2)', lineHeight: 1.6 }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                      <span>Pages you connect here follow the same Titan rule: if you downgrade or cancel, the ProjectCheckin content is removed from these pages — but your pages themselves are never changed or deleted, and everything restores automatically when you return to Titan.</span>
+                    </div>
                   </div>
                 </div>
               ) : (

@@ -327,3 +327,122 @@ export async function deletePost(creds: WpCredentials, postId: number): Promise<
   if (!res.ok) return { ok: false, error: res.error, transient: res.transient }
   return { ok: true }
 }
+
+// ── Phase 3b: existing-page injection ────────────────────────────────────────
+// Reading and marker-safe writing of a customer's own already-existing pages.
+// Unlike posts (which we create and may delete), these pages belong to the
+// customer — we only ever rewrite the slice between our own markers, and never
+// delete the page. The splice itself lives in lib/wordpressSync.ts; this module
+// only does the raw read/write and a best-effort page-builder probe.
+
+export interface WpPageRef {
+  id: number
+  type: 'page' | 'post'
+  /** True when a page builder is detected — injection is unreliable, so the
+   *  caller falls back to creating a normal post instead (design §9.1). */
+  builder: boolean
+}
+
+interface WpObjectProbe {
+  id: number
+  meta?: Record<string, unknown> | unknown[]
+  content?: { raw?: string; rendered?: string }
+}
+
+// Rendered/stored markup fragments that reliably indicate a page builder.
+// Best-effort by nature — builders change over time, so this is a heuristic
+// that fails safe (a miss just means we attempt injection, which either works
+// or visibly does nothing; a hit routes the customer to the post fallback).
+const BUILDER_SIGNALS = [
+  'data-elementor-type', 'elementor-widget', 'elementor-element', // Elementor
+  'et_pb_', // Divi
+  'vc_row', '[vc_row', 'wpb_wrapper', // WPBakery
+]
+
+function detectBuilder(obj: WpObjectProbe): boolean {
+  const meta = obj.meta && !Array.isArray(obj.meta) ? (obj.meta as Record<string, unknown>) : {}
+  if (meta._elementor_edit_mode) return true
+  const haystack = `${obj.content?.raw ?? ''}${obj.content?.rendered ?? ''}`
+  return BUILDER_SIGNALS.some((sig) => haystack.includes(sig))
+}
+
+/**
+ * Resolve a customer-pasted page URL to a WordPress object id + type, and probe
+ * whether it was built with a page builder. Rejects URLs that aren't on the
+ * connected site. Tries Pages first (the common case), then Posts used as
+ * landing pages.
+ */
+export async function resolvePageByUrl(
+  creds: WpCredentials,
+  pageUrl: string
+): Promise<WpResult<WpPageRef>> {
+  let slug: string
+  try {
+    const target = new URL((pageUrl || '').trim())
+    const site = new URL(creds.siteUrl)
+    if (target.host.replace(/^www\./, '') !== site.host.replace(/^www\./, '')) {
+      return { ok: false, error: 'That URL is not on your connected site.' }
+    }
+    const segments = target.pathname.split('/').filter(Boolean)
+    slug = decodeURIComponent(segments[segments.length - 1] || '')
+  } catch {
+    return { ok: false, error: 'That does not look like a valid page address.' }
+  }
+  if (!slug) return { ok: false, error: 'Add the full page URL, including the page name.' }
+
+  for (const rest of ['pages', 'posts'] as const) {
+    const found = await wpJson<Array<{ id: number }>>(
+      creds,
+      `/wp/v2/${rest}?slug=${encodeURIComponent(slug)}&_fields=id&context=edit`
+    )
+    if (found.ok && found.data && found.data.length > 0) {
+      const id = found.data[0].id
+      const type = rest === 'pages' ? 'page' : 'post'
+      const probe = await wpJson<WpObjectProbe>(
+        creds,
+        `/wp/v2/${rest}/${id}?context=edit&_fields=id,meta,content`
+      )
+      const builder = probe.ok && probe.data ? detectBuilder(probe.data) : false
+      return { ok: true, data: { id, type, builder } }
+    }
+    // A transient failure shouldn't be reported as "page not found".
+    if (!found.ok && found.transient) return { ok: false, error: found.error, transient: true }
+  }
+  return { ok: false, error: "We couldn't find that page on your site. Paste the exact page URL." }
+}
+
+/** Read a page/post's raw (unrendered) content — the source we splice into. */
+export async function getPageContent(
+  creds: WpCredentials,
+  pageId: number,
+  type: 'page' | 'post'
+): Promise<WpResult<{ raw: string }>> {
+  const rest = type === 'page' ? 'pages' : 'posts'
+  const res = await wpJson<{ content?: { raw?: string } }>(
+    creds,
+    `/wp/v2/${rest}/${pageId}?context=edit&_fields=content`
+  )
+  if (!res.ok || !res.data) return { ok: false, error: res.error, transient: res.transient }
+  return { ok: true, data: { raw: res.data.content?.raw ?? '' } }
+}
+
+/**
+ * Write a page/post's full content back. The caller has already spliced the new
+ * block into the existing content between our markers, so this only ever sends
+ * the `content` field — nothing else about the customer's page is touched.
+ */
+export async function updatePageContent(
+  creds: WpCredentials,
+  pageId: number,
+  type: 'page' | 'post',
+  fullContent: string
+): Promise<WpResult<null>> {
+  const rest = type === 'page' ? 'pages' : 'posts'
+  const res = await wpJson<{ id: number }>(
+    creds,
+    `/wp/v2/${rest}/${pageId}`,
+    jsonInit('POST', { content: fullContent })
+  )
+  if (!res.ok || !res.data) return { ok: false, error: res.error, transient: res.transient }
+  return { ok: true }
+}

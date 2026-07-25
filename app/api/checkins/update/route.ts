@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { syncCheckIn } from '@/lib/wordpressSync'
+import { syncCheckIn, rerenderMappingForLocation } from '@/lib/wordpressSync'
 
 function cleanPhone(v: string | null | undefined): string | null {
   if (typeof v !== 'string') return null
@@ -101,7 +101,7 @@ export async function PATCH(request: NextRequest) {
 
     const checkIn = await prisma.checkIn.findFirst({
       where,
-      select: { id: true, photoUrls: true },
+      select: { id: true, photoUrls: true, city: true, state: true, doorType: true },
     })
     if (!checkIn) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -151,9 +151,24 @@ export async function PATCH(request: NextRequest) {
     // Keep the customer's WordPress post in step with the edit. Only published
     // jobs sync — syncCheckIn itself re-checks that and the Titan gate.
     if (updated.isPublic) {
+      // Did this edit move the job to a different location/service? If so, its
+      // OLD existing-page block must be rebuilt so it no longer shows the job
+      // (design §9.5). syncCheckIn handles the new placement.
+      const moved =
+        updated.city !== checkIn.city ||
+        updated.state !== checkIn.state ||
+        updated.doorType !== checkIn.doorType
+      const orgId = currentUser.organizationId
       after(async () => {
         try {
           await syncCheckIn(checkIn.id)
+          if (moved) {
+            await rerenderMappingForLocation(orgId, {
+              city: checkIn.city,
+              state: checkIn.state,
+              doorType: checkIn.doorType,
+            })
+          }
         } catch (err) {
           console.error('WordPress resync failed after job edit:', err)
         }
