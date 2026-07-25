@@ -318,6 +318,7 @@ nav {
 /* ─── SHARED SECTION LABELS ─── */
 .section-label { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue); display: block; margin-bottom: 14px; }
 .section-h2 { font-family: var(--serif); font-size: clamp(26px, 3.2vw, 42px); font-weight: 400; color: var(--ink); line-height: 1.25; letter-spacing: 0; }
+.bento-sub { font-size: 16px; color: var(--muted); line-height: 1.7; margin-top: 16px; }
 
 /* ─── BENTO ─── */
 .bento-section { padding: 0 0 112px; background: var(--bg); position: relative; z-index: 1; }
@@ -330,6 +331,19 @@ nav {
 .bc-main { background: #F0EEE9; border: 1px solid rgba(0,0,0,0.07); padding: 36px 32px 0; display: flex; flex-direction: column; z-index: 2; }
 .bc-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--blue); margin-bottom: 10px; display: block; }
 .bc-title { font-size: 20px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; margin-bottom: 8px; line-height: 1.2; }
+.bc-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.bc-title-row .bc-title { margin-bottom: 0; }
+.bc-toggle { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(249,115,22,0.4); background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--orange); animation: bc-toggle-pulse 2.6s ease-in-out infinite; transition: color 150ms, border-color 150ms, background-color 150ms, box-shadow 150ms; }
+.bc-toggle:hover { color: #fff; background: var(--orange); border-color: var(--orange); box-shadow: 0 0 0 5px rgba(249,115,22,0.2), 0 0 20px rgba(249,115,22,0.55); animation-play-state: paused; }
+@keyframes bc-toggle-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(249,115,22,0.10), 0 0 10px rgba(249,115,22,0.3); }
+  50%      { box-shadow: 0 0 0 6px rgba(249,115,22,0.18), 0 0 18px rgba(249,115,22,0.5); }
+}
+.bc-toggle svg { transition: transform 280ms; }
+.bc-toggle.open svg { transform: rotate(180deg); }
+.bc-collapse { max-height: 0; overflow: hidden; transition: max-height 360ms ease; }
+.bc-collapse.open { max-height: 600px; }
+.bc-collapse .bc-desc { margin-top: 12px; }
 .bc-desc { font-size: 14px; color: var(--muted); line-height: 1.65; margin-bottom: 16px; }
 .bc-bullets { display: grid; grid-template-columns: 1.08fr 0.92fr; gap: 0 12px; margin-bottom: 24px; }
 .bc-blist { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
