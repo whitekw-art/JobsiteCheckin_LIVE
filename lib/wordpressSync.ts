@@ -219,7 +219,7 @@ function jobTitle(job: JobRecord): string {
 }
 
 function jobDescription(job: JobRecord): string {
-  return (job.seoDescription || job.notes || '').trim()
+  return (job.notes || job.seoDescription || '').trim()
 }
 
 /**
@@ -703,25 +703,46 @@ function renderJobCard(
   job: JobRecord,
   media: SyncedMedia[],
   baseUrl: string,
-  orgSlug: string | null
+  org: OrgContext['org'],
+  siteUrl: string
 ): string {
   const alt = jobTitle(job)
-  const lead = media.find((m) => m.role === 'after') ?? media[0] ?? null
+  const before = media.find((m) => m.role === 'before') ?? null
+  const after = media.find((m) => m.role === 'after') ?? null
+  const gallery = media.filter((m) => m.role === 'gallery')
   const place = [job.city?.trim(), job.state?.trim()].filter(Boolean).join(', ')
   const desc = jobDescription(job)
 
   const citySlug = slugify(job.city || '')
   const stateSlug = slugify(job.state || '')
   const doorTypeSlug = slugify(job.doorType || 'job')
-  const jobSlug = orgSlug ? `${doorTypeSlug}-${orgSlug}-${job.id}` : `${doorTypeSlug}-${job.id}`
+  const jobSlug = org.slug ? `${doorTypeSlug}-${org.slug}-${job.id}` : `${doorTypeSlug}-${job.id}`
   const pckUrl = `${baseUrl}/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${jobSlug}`
 
   const parts: string[] = ['<div class="projectcheckin-job">']
-  if (lead) parts.push(photoHtml(lead, alt))
   parts.push(`<h3>${escapeHtml(alt)}</h3>`)
+
+  // Same full photo treatment as a standalone post — every photo carries its
+  // own SEO value (alt text, filename), so none of it should be left behind
+  // on ProjectCheckin's own domain when it could be on the customer's.
+  if (before && after) {
+    parts.push(
+      `<figure class="wp-block-columns" style="display:flex;gap:16px;flex-wrap:wrap">` +
+        `<div style="flex:1 1 240px"><p><strong>Before</strong></p>${photoHtml(before, `${alt} — before`)}</div>` +
+        `<div style="flex:1 1 240px"><p><strong>After</strong></p>${photoHtml(after, `${alt} — after`)}</div>` +
+        `</figure>`
+    )
+  } else if (after) {
+    parts.push(photoHtml(after, alt))
+  } else if (before) {
+    parts.push(photoHtml(before, alt))
+  }
+  for (const p of gallery) parts.push(`<figure>${photoHtml(p, alt)}</figure>`)
+
   if (place) parts.push(`<p><strong>Location:</strong> ${escapeHtml(place)}</p>`)
   if (desc) parts.push(`<p>${escapeHtml(desc)}</p>`)
   parts.push(`<p><a href="${escapeHtml(pckUrl)}">See the full project</a></p>`)
+  parts.push(`<script type="application/ld+json">${buildJsonLd(job, org, siteUrl)}</script>`)
   parts.push('</div>')
   return parts.join('\n')
 }
@@ -764,7 +785,7 @@ export async function renderPageMapping(mappingId: string): Promise<{ rendered: 
   const cards: string[] = []
   for (const job of jobs) {
     const media = await reconcileJobMedia(creds, job)
-    cards.push(renderJobCard(job, media, baseUrl, org.slug))
+    cards.push(renderJobCard(job, media, baseUrl, org, creds.siteUrl))
     await prisma.checkIn.update({
       where: { id: job.id },
       data: {
