@@ -219,7 +219,7 @@ function jobTitle(job: JobRecord): string {
 }
 
 function jobDescription(job: JobRecord): string {
-  return (job.seoDescription || job.notes || '').trim()
+  return (job.notes || job.seoDescription || '').trim()
 }
 
 /**
