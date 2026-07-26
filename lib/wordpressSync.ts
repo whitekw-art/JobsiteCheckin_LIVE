@@ -61,24 +61,38 @@ const MARKER_END = '<!-- projectcheckin:end -->'
  *
  * Returns the full new page content plus which mode was used (for status/UI).
  */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Matches one full marker-delimited block, non-greedy so back-to-back pairs
+// are matched individually rather than as one span from the first start to
+// the last end.
+const MARKER_BLOCK_RE = new RegExp(`${escapeRegex(MARKER_START)}[\\s\\S]*?${escapeRegex(MARKER_END)}`, 'g')
+
 export function spliceBlock(
   existing: string,
   blockHtml: string
 ): { content: string; markerMode: 'marker' | 'append' } {
-  const start = existing.indexOf(MARKER_START)
-  const end = existing.indexOf(MARKER_END)
-  if (start !== -1 && end !== -1 && end > start) {
-    const before = existing.slice(0, start)
-    const after = existing.slice(end + MARKER_END.length)
+  const matches = [...existing.matchAll(MARKER_BLOCK_RE)]
+  if (matches.length === 0) {
     return {
-      content: `${before}${MARKER_START}${blockHtml}${MARKER_END}${after}`,
-      markerMode: 'marker',
+      content: `${existing}\n${MARKER_START}${blockHtml}${MARKER_END}`,
+      markerMode: 'append',
     }
   }
-  return {
-    content: `${existing}\n${MARKER_START}${blockHtml}${MARKER_END}`,
-    markerMode: 'append',
-  }
+  // Only the first marker pair (in document order) is "the" placement. Any
+  // further pairs are stale leftovers from an earlier append or a moved
+  // marker — strip them entirely instead of leaving duplicate content behind.
+  let first = true
+  const content = existing.replace(MARKER_BLOCK_RE, () => {
+    if (first) {
+      first = false
+      return `${MARKER_START}${blockHtml}${MARKER_END}`
+    }
+    return ''
+  })
+  return { content, markerMode: 'marker' }
 }
 
 function escapeHtml(s: string): string {
