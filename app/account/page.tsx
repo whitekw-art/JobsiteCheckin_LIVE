@@ -1940,7 +1940,16 @@ export default function AccountPage() {
                             </button>
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.55, marginTop: 9 }}>
-                            In your WordPress editor, add a <strong>Custom HTML block</strong> where you want the jobs to appear, and paste this in. We only ever write between these two tags — the rest of your page is never touched. Skip this and your jobs are added to the bottom of the page.
+                            Pasting this directly into the normal page editor often fails silently — WordPress strips bare HTML comments when it parses pasted content. Use the <strong>Code editor</strong> instead:
+                            <ol style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                              <li>Open the page in your WordPress editor.</li>
+                              <li>Click the three-dot menu (top-right of the toolbar) and choose <strong>&quot;Code editor&quot;</strong>.</li>
+                              <li>The whole page becomes plain text. Click at the exact spot where you want the jobs to appear.</li>
+                              <li>Paste the marker pair above.</li>
+                              <li>Click the three-dot menu again and choose <strong>&quot;Exit code editor&quot;</strong> to go back to the normal view.</li>
+                              <li>Click <strong>Update</strong>.</li>
+                            </ol>
+                            <div style={{ marginTop: 6 }}>We only ever write between these two tags — the rest of your page is never touched. Skip this and your jobs are added to the bottom of the page.</div>
                           </div>
                         </div>
 
