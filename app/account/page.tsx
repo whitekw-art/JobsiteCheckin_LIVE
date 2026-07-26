@@ -606,6 +606,7 @@ export default function AccountPage() {
   const [wpAddError,       setWpAddError]       = useState<string | null>(null)
   const [wpNotice,         setWpNotice]         = useState<string | null>(null)
   const [wpMarkerCopied,   setWpMarkerCopied]   = useState(false)
+  const [wpMarkerHowToOpen, setWpMarkerHowToOpen] = useState(false)
   const WP_MARKER = '<!-- projectcheckin:start --><!-- projectcheckin:end -->'
 
   useEffect(() => {
@@ -1912,7 +1913,10 @@ export default function AccountPage() {
                           </div>
                         </div>
                         <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Paste the URL of your existing page</label>
-                        <input type="text" value={wpAddUrl} onChange={(e) => setWpAddUrl(e.target.value)} placeholder="https://yourbusiness.com/areas-served/city/" style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--t1)', outline: 'none', marginBottom: 14 }} />
+                        <input type="text" value={wpAddUrl} onChange={(e) => setWpAddUrl(e.target.value)} placeholder="https://yourbusiness.com/areas-served/city/" style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--t1)', outline: 'none' }} />
+                        <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.55, margin: '8px 0 14px' }}>
+                          <strong>Pick a page you already have, even if it only matches the location OR the service, not both.</strong> An existing page with real history almost always outranks a brand-new page, even one built for the exact combination. Building a brand-new city+service page starts at zero authority and can take months to catch up — only worth doing for a keyword valuable enough to wait for.
+                        </div>
 
                         {wpAddError && (
                           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'var(--red, #DC2626)', lineHeight: 1.5, marginBottom: 12 }}>
@@ -1922,31 +1926,41 @@ export default function AccountPage() {
                         )}
 
                         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px' }}>
-                          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t1)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                            Optional: choose exactly where it lands
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 7, padding: '9px 12px' }}>
-                            <code style={{ fontFamily: 'monospace', fontSize: 11.5, color: 'var(--t1)', letterSpacing: '-0.2px', wordBreak: 'break-all' }}>{WP_MARKER}</code>
-                            <button
-                              onClick={() => { navigator.clipboard?.writeText(WP_MARKER); setWpMarkerCopied(true); setTimeout(() => setWpMarkerCopied(false), 1600) }}
-                              style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 14px', borderRadius: 7, fontSize: 12, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: wpMarkerCopied ? 'var(--green)' : 'var(--sky-text)', color: '#fff', border: 'none', flexShrink: 0, whiteSpace: 'nowrap' }}
-                            >
-                              {wpMarkerCopied ? 'Copied' : 'Copy'}
-                            </button>
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.55, marginTop: 9 }}>
-                            Pasting this directly into the normal page editor often fails silently — WordPress strips bare HTML comments when it parses pasted content. Use the <strong>Code editor</strong> instead:
-                            <ol style={{ margin: '6px 0 0', paddingLeft: 18 }}>
-                              <li>Open the page in your WordPress editor.</li>
-                              <li>Click the three-dot menu (top-right of the toolbar) and choose <strong>&quot;Code editor&quot;</strong>.</li>
-                              <li>The whole page becomes plain text. Click at the exact spot where you want the jobs to appear.</li>
-                              <li>Paste the marker pair above.</li>
-                              <li>Click the three-dot menu again and choose <strong>&quot;Exit code editor&quot;</strong> to go back to the normal view.</li>
-                              <li>Click <strong>Update</strong>.</li>
-                            </ol>
-                            <div style={{ marginTop: 6 }}>We only ever write between these two tags — the rest of your page is never touched. Skip this and your jobs are added to the bottom of the page.</div>
-                          </div>
+                          <button
+                            onClick={() => setWpMarkerHowToOpen((v) => !v)}
+                            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, color: 'var(--t1)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                          >
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                              Optional: choose exactly where it lands
+                            </span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: wpMarkerHowToOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}><polyline points="6 9 12 15 18 9"/></svg>
+                          </button>
+                          {wpMarkerHowToOpen && (
+                            <>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 7, padding: '9px 12px', marginTop: 10 }}>
+                                <code style={{ fontFamily: 'monospace', fontSize: 11.5, color: 'var(--t1)', letterSpacing: '-0.2px', wordBreak: 'break-all' }}>{WP_MARKER}</code>
+                                <button
+                                  onClick={() => { navigator.clipboard?.writeText(WP_MARKER); setWpMarkerCopied(true); setTimeout(() => setWpMarkerCopied(false), 1600) }}
+                                  style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 14px', borderRadius: 7, fontSize: 12, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: wpMarkerCopied ? 'var(--green)' : 'var(--sky-text)', color: '#fff', border: 'none', flexShrink: 0, whiteSpace: 'nowrap' }}
+                                >
+                                  {wpMarkerCopied ? 'Copied' : 'Copy'}
+                                </button>
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.55, marginTop: 9 }}>
+                                <strong>Pasting this directly into the normal page editor often fails silently</strong> — WordPress strips bare HTML comments when it parses pasted content. Use the <strong>Code editor</strong> instead:
+                                <ol style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                                  <li>Open the page in your WordPress editor.</li>
+                                  <li>Click the three-dot menu (top-right of the toolbar) and choose <strong>&quot;Code editor&quot;</strong>.</li>
+                                  <li>The whole page becomes plain text. Click at the exact spot where you want the jobs to appear.</li>
+                                  <li>Paste the marker pair above.</li>
+                                  <li>Click the three-dot menu again and choose <strong>&quot;Exit code editor&quot;</strong> to go back to the normal view.</li>
+                                  <li>Click <strong>Update</strong>.</li>
+                                </ol>
+                                <div style={{ marginTop: 6 }}>We only ever write between these two tags — the rest of your page is never touched. Skip this and your jobs are added to the bottom of the page.</div>
+                              </div>
+                            </>
+                          )}
                         </div>
 
                         <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
