@@ -87,6 +87,12 @@ export default function HelpPage() {
         </p>
 
         <HelpSection title="Guides" sub="Step-by-step setup instructions" defaultOpen>
+          <Link href="/help/guides/wordpress-publish" style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none', marginBottom: 2 }}>
+            WordPress Publishing Guide
+          </Link>
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '0 0 16px', lineHeight: 1.6 }}>
+            Publish jobs straight into your WordPress site — as new posts, or fed into pages you already have. Includes how to get the most SEO value.
+          </p>
           <Link href="/help/guides/widget-install" style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none', marginBottom: 2 }}>
             Widget Installation Guide
           </Link>
