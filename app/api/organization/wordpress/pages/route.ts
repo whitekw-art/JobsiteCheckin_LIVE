@@ -6,7 +6,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { tierHasFeature } from '@/lib/planVersions'
 import { decryptCredential } from '@/lib/wpCredentials'
 import { resolvePageByUrl, type WpCredentials } from '@/lib/wordpressApi'
-import { renderPageMapping, clearPageMapping } from '@/lib/wordpressSync'
+import { renderPageMapping, clearPageMapping, syncCheckIn } from '@/lib/wordpressSync'
 
 // Existing-page injection mapping management (Phase 3b). Mirrors the owner +
 // Titan guard shape of the sibling app/api/organization/wordpress/route.ts.
@@ -215,8 +215,25 @@ export async function DELETE(request: NextRequest) {
     })
     if (!mapping) return NextResponse.json({ error: 'Mapping not found.' }, { status: 404 })
 
-    await clearPageMapping(mapping.id, 'unpublished')
+    const cleared = await clearPageMapping(mapping.id, 'unpublished')
     await prisma.wordPressPageMapping.delete({ where: { id: mapping.id } })
+
+    // The jobs that were on this page are now unrouted. Re-sync each so it
+    // falls through to another matching mapping, or to a standalone post when
+    // the org keeps new-post creation on — instead of silently disappearing.
+    // Runs after the response and after the row is deleted, so pickMapping no
+    // longer sees this mapping.
+    if (cleared.jobIds.length) {
+      after(async () => {
+        for (const jobId of cleared.jobIds) {
+          try {
+            await syncCheckIn(jobId)
+          } catch (err) {
+            console.error('Re-sync after mapping delete failed:', err)
+          }
+        }
+      })
+    }
 
     return NextResponse.json({ ok: true })
   } catch (error) {

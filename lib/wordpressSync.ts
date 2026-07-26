@@ -685,6 +685,56 @@ export async function restoreOrgWordPress(orgId: string): Promise<{ restored: nu
   return { restored }
 }
 
+/**
+ * Push every already-published job that isn't on WordPress yet. syncCheckIn and
+ * renderPageMapping only fire on live publish/edit/mapping-create events, so a
+ * job published BEFORE the site was connected would otherwise never appear.
+ * Called after a successful connect so a customer's existing catalogue lands on
+ * their site instead of only future jobs. Safe/idempotent — already-synced jobs
+ * are skipped (posts) or harmlessly re-rendered in place (injected blocks).
+ */
+export async function backfillOrgWordPress(orgId: string): Promise<{ synced: number }> {
+  const ctx = await getOrgContext(orgId)
+  if (!ctx) return { synced: 0 }
+
+  const mappings = await prisma.wordPressPageMapping.findMany({
+    where: { organizationId: orgId },
+  })
+
+  // 1) Standalone posts for published jobs not yet on the site and not covered
+  //    by an injectable mapping. Skip anything already a post (wpPostId set) or
+  //    already injected (wpSyncStatus 'synced').
+  const jobs = await prisma.checkIn.findMany({
+    where: {
+      organizationId: orgId,
+      isPublic: true,
+      wpPostId: null,
+      wpSyncStatus: { not: 'synced' },
+    },
+    select: { id: true, city: true, state: true, doorType: true },
+    orderBy: { timestamp: 'asc' },
+  })
+
+  let synced = 0
+  for (const job of jobs) {
+    const m = pickMapping(mappings, job)
+    if (m && !m.builderBlocked) continue // injected — handled by block render below
+    const res = await syncCheckIn(job.id)
+    if (res.ok) synced++
+    await sleep(BULK_DELAY_MS)
+  }
+
+  // 2) Render each mapping's block once, pulling in all of its matching jobs
+  //    (including any published before the connection existed).
+  for (const m of mappings) {
+    if (m.builderBlocked) continue
+    const r = await renderPageMapping(m.id)
+    synced += r.rendered
+    await sleep(BULK_DELAY_MS)
+  }
+  return { synced }
+}
+
 /** True when this org currently has a live WordPress connection. */
 export async function hasActiveWordPressConnection(orgId: string): Promise<boolean> {
   const org = await prisma.organization.findUnique({
@@ -823,9 +873,9 @@ export async function renderPageMapping(mappingId: string): Promise<{ rendered: 
 export async function clearPageMapping(
   mappingId: string,
   reason: 'unpublished' | 'revoked' = 'unpublished'
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; jobIds: string[] }> {
   const mapping = await prisma.wordPressPageMapping.findUnique({ where: { id: mappingId } })
-  if (!mapping) return { ok: true }
+  if (!mapping) return { ok: true, jobIds: [] }
   const pageType = mapping.wpPageType === 'post' ? 'post' : 'page'
 
   // The jobs currently represented in this page's block: matched, injected
@@ -867,5 +917,8 @@ export async function clearPageMapping(
       },
     })
   }
-  return { ok: true }
+  // The caller may need to re-route these jobs (e.g. a deleted mapping — they
+  // should fall through to a standalone post or another mapping). On revoke we
+  // deliberately leave them 'revoked' and the caller ignores this list.
+  return { ok: true, jobIds: jobs.map((j) => j.id) }
 }
