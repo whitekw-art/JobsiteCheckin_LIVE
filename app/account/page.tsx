@@ -607,6 +607,7 @@ export default function AccountPage() {
   const [wpNotice,         setWpNotice]         = useState<string | null>(null)
   const [wpMarkerCopied,   setWpMarkerCopied]   = useState(false)
   const [wpMarkerHowToOpen, setWpMarkerHowToOpen] = useState(false)
+  const [wpDisableModalOpen, setWpDisableModalOpen] = useState(false)
   const WP_MARKER = '<!-- projectcheckin:start --><!-- projectcheckin:end -->'
 
   useEffect(() => {
@@ -687,8 +688,7 @@ export default function AccountPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasWebsiteIntegration, wpStatus])
 
-  async function toggleWpCreateNewPosts() {
-    const next = !wpCreateNewPosts
+  async function applyWpCreateNewPosts(next: boolean) {
     setWpCreateNewPosts(next) // optimistic
     try {
       const r = await fetch('/api/organization/wordpress/pages', {
@@ -699,6 +699,15 @@ export default function AccountPage() {
       if (!r.ok) setWpCreateNewPosts(!next) // revert on failure
     } catch {
       setWpCreateNewPosts(!next)
+    }
+  }
+
+  function toggleWpCreateNewPosts() {
+    // Turning OFF is discouraged — warn first. Turning back ON is immediate.
+    if (wpCreateNewPosts) {
+      setWpDisableModalOpen(true)
+    } else {
+      applyWpCreateNewPosts(true)
     }
   }
 
@@ -1834,7 +1843,7 @@ export default function AccountPage() {
                   <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 18 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--t1)', letterSpacing: '-0.1px' }}>Feed jobs into pages you already have</div>
                     <p style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.6, marginTop: 6, marginBottom: 16 }}>
-                      Already have pages that rank — like an &ldquo;areas we serve&rdquo; or a service page? Point ProjectCheckin at them and matching jobs get added right onto those pages, keeping them fresh with your recent work. Jobs that don&apos;t match a page here still become their own new post.
+                      Every job you publish becomes its own permanent post on your site. On top of that, if you have pages that rank — like an &ldquo;areas we serve&rdquo; or a service page — point ProjectCheckin at them and your recent matching jobs appear there as a linked highlight, sending visitors and search authority to each job&apos;s post.
                     </p>
 
                     {wpNotice && (
@@ -1848,8 +1857,8 @@ export default function AccountPage() {
                     {/* Master switch: create new posts for unmatched jobs */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 9, padding: '12px 14px', marginBottom: 18 }}>
                       <div>
-                        <div style={{ fontSize: 12.5, color: 'var(--t1)', fontWeight: 600 }}>Create a new post for jobs that don&apos;t match a page below</div>
-                        <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5, marginTop: 3, maxWidth: 340 }}>On: unmatched jobs become their own new post (standard). Off: only jobs that match a page below get published.</div>
+                        <div style={{ fontSize: 12.5, color: 'var(--t1)', fontWeight: 600 }}>Auto-post every job to your site</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5, marginTop: 3, maxWidth: 340 }}>On (recommended): every job becomes its own permanent post — the engine behind your SEO growth. Off: jobs that don&apos;t match a page below won&apos;t get their own post.</div>
                       </div>
                       <button
                         onClick={toggleWpCreateNewPosts}
@@ -2228,6 +2237,60 @@ export default function AccountPage() {
                 }}
               >
                 Keep my plan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Disable auto-posting warning — discourages turning the switch off */}
+      {wpDisableModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)',
+          backdropFilter: 'blur(3px)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+        }}>
+          <div style={{
+            background: 'var(--surface)', borderRadius: 14, maxWidth: 460, width: '100%',
+            padding: '28px 24px', boxShadow: '0 20px 60px rgba(0,0,0,.2)',
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            border: '1px solid var(--border)',
+          }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 10,
+              background: 'var(--amber-bg)', border: '1px solid rgba(217,119,6,.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--t1)', marginBottom: 10 }}>
+              Are you sure?
+            </h3>
+            <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, marginBottom: 16 }}>
+              Disabling auto-posting could slow your SEO and page growth. Remember, you can always
+              unpublish individual jobs from your ProjectCheckin dashboard if you&apos;d like them
+              removed from public view.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setWpDisableModalOpen(false)}
+                className="db-shell-btn"
+                style={{ flex: 1, height: 40 }}
+              >
+                Keep auto-posting on
+              </button>
+              <button
+                onClick={() => { setWpDisableModalOpen(false); applyWpCreateNewPosts(false) }}
+                style={{
+                  flex: 1, height: 40, background: 'var(--surface-3)', color: 'var(--t1)',
+                  border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
+              >
+                Disable anyway
               </button>
             </div>
           </div>
