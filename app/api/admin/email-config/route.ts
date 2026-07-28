@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const CONFIG_KEYS = ['followUpEmailDays', 'followUpEmailSubject', 'followUpEmailBody']
+const CONFIG_KEYS = ['followUpEmailEnabled', 'followUpEmailDays', 'followUpEmailSubject', 'followUpEmailBody']
 
 export async function GET() {
   const user = await getCurrentUser()
@@ -12,6 +12,9 @@ export async function GET() {
   const config = Object.fromEntries(rows.map((r) => [r.key, r.value]))
 
   return NextResponse.json({
+    // Defaults OFF when no key has ever been set — this must never silently
+    // turn itself on for an org that's never touched this setting.
+    followUpEmailEnabled: config.followUpEmailEnabled === 'true',
     followUpEmailDays: config.followUpEmailDays ?? '7',
     followUpEmailSubject: config.followUpEmailSubject ?? 'How did {{businessName}} do? Quick favor if you have a minute',
     followUpEmailBody: config.followUpEmailBody ?? DEFAULT_BODY,
