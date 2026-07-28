@@ -196,7 +196,9 @@ export default function PricingPage() {
               <div className="pf"><span className="pf-ck">&#10003;</span>AI copywriting agent <span className="new-badge">New</span></div>
               <div className="pf"><span className="pf-ck">&#10003;</span>AI review request agent <span className="soon-badge">Soon</span></div>
               <div className="pf"><span className="pf-ck">&#10003;</span>CRM &amp; QuickBooks integration <span className="soon-badge">Soon</span></div>
-              <div className="pf"><span className="pf-ck">&#10003;</span>Website Integration for Local SEO</div>
+              <div className="pf"><span className="pf-ck">&#10003;</span>Job widget for any website</div>
+              <div className="pf"><span className="pf-ck">&#10003;</span>Branded project page on your own domain, stronger SEO</div>
+              <div className="pf"><span className="pf-ck">&#10003;</span>Full WordPress integration, maximum SEO <span className="new-badge">New</span></div>
             </div>
           </div>
 
@@ -291,7 +293,28 @@ export default function PricingPage() {
                   <td><span className="ck">✓</span></td>
                 </tr>
                 <tr>
-                  <td>Custom subdomain &amp; white-label branding</td>
+                  <td>Job widget for any website</td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="ck">✓</span></td>
+                </tr>
+                <tr>
+                  <td>Branded project page on your own domain, stronger SEO</td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="ck">✓</span></td>
+                </tr>
+                <tr>
+                  <td>Full WordPress integration, maximum SEO</td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="ck">✓</span></td>
+                </tr>
+                <tr>
+                  <td>Wix, Squarespace, and other platforms</td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
