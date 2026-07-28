@@ -70,10 +70,25 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
       aria-checked={checked}
       onClick={onChange}
       style={{
+        // appearance: 'none' is the fix -- without it, the browser keeps
+        // native OS button chrome, which can override or fight explicit
+        // width/height in ways the box model alone doesn't predict. That
+        // native chrome, not the dimensions, was the actual cause of the
+        // circle-in-a-circle rendering.
+        appearance: 'none',
+        WebkitAppearance: 'none',
+        MozAppearance: 'none',
+        display: 'inline-block',
         width: D * 2,
         height: D,
+        minWidth: D * 2,
+        minHeight: D,
+        maxWidth: D * 2,
+        maxHeight: D,
         borderRadius: 9999,
         border: 'none',
+        outline: 'none',
+        margin: 0,
         padding: 0,
         cursor: 'pointer',
         position: 'relative',
@@ -95,6 +110,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
           boxShadow: '0 1px 3px rgba(0,0,0,.2)',
           boxSizing: 'border-box',
           transition: 'left 0.15s',
+          pointerEvents: 'none',
         }}
       />
     </button>
