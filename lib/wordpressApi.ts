@@ -176,6 +176,29 @@ export async function ensureTag(creds: WpCredentials, name: string) {
 }
 
 /**
+ * The public archive URL for a category/tag term, read from WordPress's own
+ * `link` field so it respects whatever permalink structure the site uses
+ * (never hand-built). Used for the "View Archive" link on a mapped showcase.
+ */
+export async function getArchiveLink(
+  creds: WpCredentials,
+  taxonomy: 'categories' | 'tags',
+  name: string
+): Promise<string | null> {
+  const clean = name.trim()
+  if (!clean) return null
+  const found = await wpJson<Array<{ name: string; link: string }>>(
+    creds,
+    `/wp/v2/${taxonomy}?search=${encodeURIComponent(clean)}&per_page=100&_fields=name,link`
+  )
+  if (found.ok && found.data) {
+    const match = found.data.find((t) => t.name.toLowerCase() === clean.toLowerCase())
+    if (match?.link) return match.link
+  }
+  return null
+}
+
+/**
  * Upload one image into the customer's Media Library so the file is genuinely
  * hosted on their domain (image-search credit follows the host).
  * `filename` should be SEO-descriptive, not a raw UUID.

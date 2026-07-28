@@ -218,9 +218,9 @@ export async function DELETE(request: NextRequest) {
     const cleared = await clearPageMapping(mapping.id, 'unpublished')
     await prisma.wordPressPageMapping.delete({ where: { id: mapping.id } })
 
-    // The jobs that were on this page are now unrouted. Re-sync each so it
-    // falls through to another matching mapping, or to a standalone post when
-    // the org keeps new-post creation on — instead of silently disappearing.
+    // The jobs that were on this page keep their own posts, but their showcase
+    // card needs re-homing: re-sync each so it re-appears on its next-best
+    // mapped page (e.g. a catch-all), or simply stays a post if none matches.
     // Runs after the response and after the row is deleted, so pickMapping no
     // longer sees this mapping.
     if (cleared.jobIds.length) {

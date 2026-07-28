@@ -11,6 +11,7 @@ import {
   deleteMedia,
   ensureCategory,
   ensureTag,
+  getArchiveLink,
   uploadMedia,
   getPageContent,
   updatePageContent,
@@ -41,6 +42,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 // Recent-jobs cap per injected page block (design §4). Bounds page weight; older
 // jobs roll off the block but still exist as data / new posts.
 export const PAGE_JOB_CAP = 12
+// How many recent matching jobs to scan before applying the most-specific
+// filter and slicing to PAGE_JOB_CAP. Bounds memory/CPU for a broad or
+// catch-all mapping (which would otherwise match the whole table) while giving
+// the filter enough headroom that the page is never short in practice.
+const RENDER_SCAN_CAP = 120
 
 // The delimiter pair the customer pastes (or we auto-append). We ONLY ever
 // rewrite what sits between these two markers — never anything outside them.
@@ -169,6 +175,7 @@ type JobRecord = {
   featuredPhotoUrl: string | null
   timestamp: Date | null
   wpPostId: number | null
+  wpPostUrl: string | null
   wpMedia: string | null
 }
 
@@ -209,6 +216,7 @@ const JOB_SELECT = {
   featuredPhotoUrl: true,
   timestamp: true,
   wpPostId: true,
+  wpPostUrl: true,
   wpMedia: true,
 } as const
 
@@ -420,7 +428,8 @@ export function pickMapping<T extends MappingLike>(
  * Safe to call repeatedly — updates in place when a post already exists.
  */
 export async function syncCheckIn(
-  checkInId: string
+  checkInId: string,
+  opts: { skipMappingRender?: boolean } = {}
 ): Promise<{ ok: boolean; error?: string; transient?: boolean }> {
   const job = await prisma.checkIn.findUnique({
     where: { id: checkInId },
@@ -434,32 +443,22 @@ export async function syncCheckIn(
 
   const { creds, org } = ctx
 
-  // ── Routing (Phase 3b): existing-page injection vs. new post ──
-  // Look up whether this job matches one of the org's existing-page mappings.
+  // ── Routing (Phase 3b, post + linked-showcase model) ──
+  // EVERY job becomes its own post (permanent, indexable). A mapped page is a
+  // curated showcase that LINKS to those posts — never the only home for a job,
+  // so nothing vanishes when a page hits its display cap.
   const mappings = await prisma.wordPressPageMapping.findMany({
     where: { organizationId: job.organizationId },
   })
   const mapping = pickMapping(mappings, job)
 
-  // Case A: matched an injectable page AND not already a standalone post →
-  // this job belongs to that page's block, not a post. renderPageMapping
-  // re-renders the whole block (which now includes this job) and sets the
-  // job's own media/sync fields. (wpPostId stays null; invariant 3.)
-  if (mapping && !mapping.builderBlocked && job.wpPostId == null) {
-    await renderPageMapping(mapping.id)
-    return { ok: true }
-  }
-
-  // Case B: decide whether a standalone post is warranted at all.
-  //  - builder-blocked mapping → publish anyway (customer explicitly mapped
-  //    this location; injection just isn't possible — design §9.1)
-  //  - already a post → keep it synced (design §9.8 leaves pre-existing posts)
-  //  - unmatched → only when the org keeps new-post creation on
-  const wantPost =
-    (mapping != null && mapping.builderBlocked) ||
-    job.wpPostId != null ||
-    (mapping == null && org.wpCreateNewPosts)
-  if (!wantPost) return { ok: true } // injection-only mode, unmatched job → nothing to do
+  // A post is warranted for: any matched job (matched jobs always post, so
+  // their showcase card has something to link to), any job that already has a
+  // post, and — only when the "create new posts" switch is on — residual jobs
+  // that match no mapping at all. Residual + switch off + no existing post is
+  // the one case that publishes nothing.
+  const shouldPost = mapping != null || job.wpPostId != null || org.wpCreateNewPosts
+  if (!shouldPost) return { ok: true }
 
   // Reconcile photos against what we've already uploaded (reuse existing,
   // upload new, drop removed) — shared with page injection.
@@ -519,6 +518,14 @@ export async function syncCheckIn(
       wpSyncStatus: 'synced',
     },
   })
+
+  // The post now exists; refresh the showcase on the job's most-specific mapped
+  // page so its card (linking to this post) appears/updates. Builder pages
+  // can't be injected, so their jobs live only as posts (design §9.1). Bulk
+  // callers skip this and render each page once at the end (avoids O(N^2)).
+  if (mapping && !mapping.builderBlocked && !opts.skipMappingRender) {
+    await renderPageMapping(mapping.id)
+  }
   return { ok: true }
 }
 
@@ -547,17 +554,13 @@ export async function unsyncCheckIn(
     },
   })
   if (!job?.organizationId) return { ok: true }
-  // Nothing was ever synced for this job (neither a post nor an injected entry).
-  const wasInjected = !job.wpPostId && (job.wpSyncStatus === 'synced' || !!job.wpMedia)
-  if (!job.wpPostId && !wasInjected) return { ok: true }
+  // Nothing was ever synced for this job.
+  if (!job.wpPostId && job.wpSyncStatus !== 'synced' && !job.wpMedia) return { ok: true }
 
   // Deliberately bypasses getOrgContext's Titan gate (see getDirectCreds):
   // revocation has to work at the exact moment a subscription ends.
   const creds = await getDirectCreds(job.organizationId)
   if (creds) {
-    // A standalone post gets deleted; an injected job has no post of its own —
-    // only its Media Library uploads are removed, and the page block is
-    // re-rendered below so the job drops off.
     if (job.wpPostId) await deletePost(creds, job.wpPostId)
     // Media has no trash state — must be deleted explicitly or the image files
     // stay publicly reachable at their upload URLs (spec §8).
@@ -577,12 +580,13 @@ export async function unsyncCheckIn(
     },
   })
 
-  // Injected job unpublished by the customer: rebuild its page block so it no
-  // longer appears. The job's isPublic is already false by now (the publish
-  // route updates it before calling this), so renderPageMapping excludes it.
-  // On 'revoked', the org isn't entitled so renderPageMapping no-ops — the
-  // whole block is emptied by clearPageMapping in revokeOrgWordPress instead.
-  if (wasInjected && reason === 'unpublished') {
+  // The job had a post, and that post may also have appeared as a card on a
+  // mapped showcase. Rebuild its page's block so the card drops off. The job's
+  // isPublic is already false by now (the publish route updates it before
+  // calling this), so renderPageMapping excludes it. On 'revoked' the org isn't
+  // entitled, so renderPageMapping no-ops — revokeOrgWordPress empties the whole
+  // block via clearPageMapping instead.
+  if (reason === 'unpublished') {
     const mappings = await prisma.wordPressPageMapping.findMany({
       where: { organizationId: job.organizationId },
     })
@@ -656,30 +660,27 @@ export async function restoreOrgWordPress(orgId: string): Promise<{ restored: nu
     where: { organizationId: orgId },
   })
 
-  // 1) Recreate standalone posts for revoked jobs that do NOT belong to an
-  //    injectable mapping. After a revoke, both post-jobs and injected-jobs
-  //    have wpPostId null, so we distinguish by whether they match a mapping.
+  // 1) Recreate the post for every revoked job. syncCheckIn also refreshes the
+  //    job's showcase card on any mapped page it belongs to, so posts and
+  //    showcases both come back.
   const jobs = await prisma.checkIn.findMany({
     where: { organizationId: orgId, wpSyncStatus: 'revoked', isPublic: true },
-    select: { id: true, city: true, state: true, doorType: true },
+    select: { id: true },
     orderBy: { timestamp: 'asc' },
   })
 
   let restored = 0
   for (const job of jobs) {
-    const m = pickMapping(mappings, job)
-    if (m && !m.builderBlocked) continue // injected — restored via block render below
-    const res = await syncCheckIn(job.id)
+    const res = await syncCheckIn(job.id, { skipMappingRender: true })
     if (res.ok) restored++
     await sleep(BULK_DELAY_MS)
   }
 
-  // 2) Rebuild each injected page block from current jobs (one render per
-  //    mapping restores all of its jobs at once, flipping them back to synced).
+  // 2) Render each mapped page once, after every post exists — one render per
+  //    page instead of one per job (avoids O(N^2) on large catalogues).
   for (const m of mappings) {
     if (m.builderBlocked) continue
-    const r = await renderPageMapping(m.id)
-    restored += r.rendered
+    await renderPageMapping(m.id)
     await sleep(BULK_DELAY_MS)
   }
   return { restored }
@@ -690,20 +691,16 @@ export async function restoreOrgWordPress(orgId: string): Promise<{ restored: nu
  * renderPageMapping only fire on live publish/edit/mapping-create events, so a
  * job published BEFORE the site was connected would otherwise never appear.
  * Called after a successful connect so a customer's existing catalogue lands on
- * their site instead of only future jobs. Safe/idempotent — already-synced jobs
- * are skipped (posts) or harmlessly re-rendered in place (injected blocks).
+ * their site instead of only future jobs. Safe/idempotent — a job already
+ * posted is skipped; syncCheckIn creates each job's post and refreshes its
+ * showcase.
  */
 export async function backfillOrgWordPress(orgId: string): Promise<{ synced: number }> {
   const ctx = await getOrgContext(orgId)
   if (!ctx) return { synced: 0 }
 
-  const mappings = await prisma.wordPressPageMapping.findMany({
-    where: { organizationId: orgId },
-  })
-
-  // 1) Standalone posts for published jobs not yet on the site and not covered
-  //    by an injectable mapping. Skip anything already a post (wpPostId set) or
-  //    already injected (wpSyncStatus 'synced').
+  // Every published job that isn't on the site yet (no post, not synced). Each
+  // becomes a post; syncCheckIn also refreshes any mapped page it belongs to.
   const jobs = await prisma.checkIn.findMany({
     where: {
       organizationId: orgId,
@@ -711,25 +708,23 @@ export async function backfillOrgWordPress(orgId: string): Promise<{ synced: num
       wpPostId: null,
       wpSyncStatus: { not: 'synced' },
     },
-    select: { id: true, city: true, state: true, doorType: true },
+    select: { id: true },
     orderBy: { timestamp: 'asc' },
   })
 
   let synced = 0
   for (const job of jobs) {
-    const m = pickMapping(mappings, job)
-    if (m && !m.builderBlocked) continue // injected — handled by block render below
-    const res = await syncCheckIn(job.id)
+    const res = await syncCheckIn(job.id, { skipMappingRender: true })
     if (res.ok) synced++
     await sleep(BULK_DELAY_MS)
   }
 
-  // 2) Render each mapping's block once, pulling in all of its matching jobs
-  //    (including any published before the connection existed).
+  // Render each mapped page once, after every post exists — one render per page
+  // instead of one per job (avoids O(N^2) on large catalogues).
+  const mappings = await prisma.wordPressPageMapping.findMany({ where: { organizationId: orgId } })
   for (const m of mappings) {
     if (m.builderBlocked) continue
-    const r = await renderPageMapping(m.id)
-    synced += r.rendered
+    await renderPageMapping(m.id)
     await sleep(BULK_DELAY_MS)
   }
   return { synced }
@@ -746,53 +741,34 @@ export async function hasActiveWordPressConnection(orgId: string): Promise<boole
 
 // ── Phase 3b: existing-page injection ────────────────────────────────────────
 
-/** One compact job card for an injected page block (design §4): lead photo,
- *  heading, location, description, and a link to the full PCK job page. No
- *  injected JS/CSS — renders in any theme and stays crawlable/indexable. */
-function renderJobCard(
-  job: JobRecord,
-  media: SyncedMedia[],
-  baseUrl: string,
-  org: OrgContext['org'],
-  siteUrl: string
-): string {
+/** One compact showcase card for a mapped page: lead photo, heading, location,
+ *  a short summary, and a link to the job's own WordPress post — where the full
+ *  gallery + schema live (that post is the canonical page for the job). The
+ *  card is an internal link that passes authority to the post; it deliberately
+ *  does NOT repeat the full gallery/schema, to avoid duplicating the post. No
+ *  injected JS/CSS — renders in any theme and stays crawlable. */
+function renderJobCard(job: JobRecord, media: SyncedMedia[]): string {
   const alt = jobTitle(job)
-  const before = media.find((m) => m.role === 'before') ?? null
-  const after = media.find((m) => m.role === 'after') ?? null
-  const gallery = media.filter((m) => m.role === 'gallery')
+  const lead = media.find((m) => m.role === 'after') ?? media[0] ?? null
   const place = [job.city?.trim(), job.state?.trim()].filter(Boolean).join(', ')
   const desc = jobDescription(job)
-
-  const citySlug = slugify(job.city || '')
-  const stateSlug = slugify(job.state || '')
-  const doorTypeSlug = slugify(job.doorType || 'job')
-  const jobSlug = org.slug ? `${doorTypeSlug}-${org.slug}-${job.id}` : `${doorTypeSlug}-${job.id}`
-  const pckUrl = `${baseUrl}/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${jobSlug}`
+  const summary = desc.length > 180 ? `${desc.slice(0, 177).trimEnd()}…` : desc
+  const postUrl = job.wpPostUrl || ''
 
   const parts: string[] = ['<div class="projectcheckin-job">']
-  parts.push(`<h3>${escapeHtml(alt)}</h3>`)
-
-  // Same full photo treatment as a standalone post — every photo carries its
-  // own SEO value (alt text, filename), so none of it should be left behind
-  // on ProjectCheckin's own domain when it could be on the customer's.
-  if (before && after) {
+  if (lead) {
     parts.push(
-      `<figure class="wp-block-columns" style="display:flex;gap:16px;flex-wrap:wrap">` +
-        `<div style="flex:1 1 240px"><p><strong>Before</strong></p>${photoHtml(before, `${alt} — before`)}</div>` +
-        `<div style="flex:1 1 240px"><p><strong>After</strong></p>${photoHtml(after, `${alt} — after`)}</div>` +
-        `</figure>`
+      postUrl
+        ? `<a href="${escapeHtml(postUrl)}">${photoHtml(lead, alt)}</a>`
+        : photoHtml(lead, alt)
     )
-  } else if (after) {
-    parts.push(photoHtml(after, alt))
-  } else if (before) {
-    parts.push(photoHtml(before, alt))
   }
-  for (const p of gallery) parts.push(`<figure>${photoHtml(p, alt)}</figure>`)
-
+  parts.push(
+    postUrl ? `<h3><a href="${escapeHtml(postUrl)}">${escapeHtml(alt)}</a></h3>` : `<h3>${escapeHtml(alt)}</h3>`
+  )
   if (place) parts.push(`<p><strong>Location:</strong> ${escapeHtml(place)}</p>`)
-  if (desc) parts.push(`<p>${escapeHtml(desc)}</p>`)
-  parts.push(`<p><a href="${escapeHtml(pckUrl)}">See the full project</a></p>`)
-  parts.push(`<script type="application/ld+json">${buildJsonLd(job, org, siteUrl)}</script>`)
+  if (summary) parts.push(`<p>${escapeHtml(summary)}</p>`)
+  if (postUrl) parts.push(`<p><a href="${escapeHtml(postUrl)}">See this project →</a></p>`)
   parts.push('</div>')
   return parts.join('\n')
 }
@@ -812,41 +788,52 @@ export async function renderPageMapping(mappingId: string): Promise<{ rendered: 
 
   const ctx = await getOrgContext(mapping.organizationId)
   if (!ctx) return { rendered: 0 }
-  const { creds, org } = ctx
+  const { creds } = ctx
   const pageType = mapping.wpPageType === 'post' ? 'post' : 'page'
 
-  const jobs = await prisma.checkIn.findMany({
+  // Every job now has its own post, so the showcase links to those posts. Pull
+  // the most-recent matching jobs that already have a post. We scan more than
+  // the display cap so the most-specific filter below (a job shows only on its
+  // most-specific page) can't leave the page short — bounded so a broad/
+  // catch-all mapping never loads the whole table into a background task.
+  const allMappings = await prisma.wordPressPageMapping.findMany({
+    where: { organizationId: mapping.organizationId },
+  })
+  const candidates = await prisma.checkIn.findMany({
     where: {
       organizationId: mapping.organizationId,
       isPublic: true,
-      // Never double-publish a job that already has its own standalone post
-      // (invariant 3; also enforces design §9.8 — pre-existing posts stay posts).
-      wpPostId: null,
+      wpPostId: { not: null },
       ...(mapping.matchCity ? { city: mapping.matchCity, state: mapping.matchState } : {}),
       ...(mapping.matchService ? { doorType: mapping.matchService } : {}),
     },
     orderBy: { timestamp: 'desc' },
-    take: PAGE_JOB_CAP,
+    take: RENDER_SCAN_CAP,
     select: JOB_SELECT,
   })
 
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://projectcheckin.com').replace(/\/$/, '')
+  // A job belongs to whichever mapping is its MOST specific match, so a
+  // catch-all ("Any/Any") page shows only true residuals — never jobs that
+  // already have their own specific page.
+  const jobs = candidates
+    .filter((job) => pickMapping(allMappings, job)?.id === mapping.id)
+    .slice(0, PAGE_JOB_CAP)
 
-  const cards: string[] = []
-  for (const job of jobs) {
-    const media = await reconcileJobMedia(creds, job)
-    cards.push(renderJobCard(job, media, baseUrl, org, creds.siteUrl))
-    await prisma.checkIn.update({
-      where: { id: job.id },
-      data: {
-        wpMedia: media.length ? JSON.stringify(media) : null,
-        wpSyncedAt: new Date(),
-        wpSyncStatus: 'synced',
-      },
-    })
+  const cards = jobs.map((job) => renderJobCard(job, parseMedia(job.wpMedia)))
+
+  let block = ''
+  if (cards.length) {
+    // "View Archive" points at the real WordPress category (service) or tag
+    // (city) archive — read from WP so it respects the site's permalinks. A
+    // catch-all page has no single archive, so it links to the site itself.
+    let archiveUrl: string | null = null
+    if (mapping.matchService) archiveUrl = await getArchiveLink(creds, 'categories', mapping.matchService.trim())
+    else if (mapping.matchCity)
+      archiveUrl = await getArchiveLink(creds, 'tags', [mapping.matchCity, mapping.matchState].filter(Boolean).join(' '))
+    if (!archiveUrl && !mapping.matchService && !mapping.matchCity) archiveUrl = creds.siteUrl
+
+    block = `<h2>Recent Projects</h2>\n${cards.join('\n')}${archiveUrl ? `\n<p><a href="${escapeHtml(archiveUrl)}">View Archive →</a></p>` : ''}`
   }
-
-  const block = cards.length ? `<h2>Recent Projects</h2>\n${cards.join('\n')}` : ''
 
   const page = await getPageContent(creds, mapping.wpPageId, pageType)
   if (!page.ok || !page.data) return { rendered: 0 }
@@ -862,63 +849,47 @@ export async function renderPageMapping(mappingId: string): Promise<{ rendered: 
 }
 
 /**
- * Empty one page mapping's injected block and delete the media its jobs put
- * into the customer's Media Library. NEVER deletes the page itself.
- * `reason` decides whether the jobs can auto-restore later:
- *   'unpublished' — mapping removed by the customer; status cleared
- *   'revoked'     — subscription lapsed; jobs stay eligible for restore
- * Bypasses the Titan gate (like unsyncCheckIn) so it works the instant a
- * subscription ends.
+ * Empty one page mapping's showcase block. NEVER deletes the page itself, and
+ * NEVER touches the jobs' posts — under the post + linked-showcase model, the
+ * showcase is only a curated view; each job keeps its own standalone post and
+ * media. Returns the ids of the jobs that were on this page so a caller that
+ * deleted the mapping can re-home them onto their next-best page.
+ * `reason` is retained for call-site clarity (revoke vs mapping delete); both
+ * simply empty the block. Bypasses the Titan gate (like unsyncCheckIn) so it
+ * works the instant a subscription ends.
  */
 export async function clearPageMapping(
   mappingId: string,
   reason: 'unpublished' | 'revoked' = 'unpublished'
 ): Promise<{ ok: boolean; jobIds: string[] }> {
+  void reason
   const mapping = await prisma.wordPressPageMapping.findUnique({ where: { id: mappingId } })
   if (!mapping) return { ok: true, jobIds: [] }
   const pageType = mapping.wpPageType === 'post' ? 'post' : 'page'
 
-  // The jobs currently represented in this page's block: matched, injected
-  // (no standalone post), with media uploaded.
+  // Published jobs that were shown on this page (they have posts of their own).
   const jobs = await prisma.checkIn.findMany({
     where: {
       organizationId: mapping.organizationId,
-      wpPostId: null,
-      wpMedia: { not: null },
+      isPublic: true,
+      wpPostId: { not: null },
       ...(mapping.matchCity ? { city: mapping.matchCity, state: mapping.matchState } : {}),
       ...(mapping.matchService ? { doorType: mapping.matchService } : {}),
     },
-    select: { id: true, wpMedia: true },
+    select: { id: true },
   })
 
   const creds = await getDirectCreds(mapping.organizationId)
-  if (creds) {
-    // Empty our block from the page (builder pages never had one). The splice
-    // rewrites only between our markers — the customer's own content is intact.
-    if (!mapping.builderBlocked) {
-      const page = await getPageContent(creds, mapping.wpPageId, pageType)
-      if (page.ok && page.data) {
-        const spliced = spliceBlock(page.data.raw, '')
-        await updatePageContent(creds, mapping.wpPageId, pageType, spliced.content)
-      }
-    }
-    for (const job of jobs) {
-      for (const m of parseMedia(job.wpMedia)) await deleteMedia(creds, m.id)
+  if (creds && !mapping.builderBlocked) {
+    // Empty our block from the page. The splice rewrites only between our
+    // markers — the customer's own content is untouched, and the jobs' posts
+    // (and their media) are left intact.
+    const page = await getPageContent(creds, mapping.wpPageId, pageType)
+    if (page.ok && page.data) {
+      const spliced = spliceBlock(page.data.raw, '')
+      await updatePageContent(creds, mapping.wpPageId, pageType, spliced.content)
     }
   }
 
-  for (const job of jobs) {
-    await prisma.checkIn.update({
-      where: { id: job.id },
-      data: {
-        wpMedia: null,
-        wpSyncedAt: null,
-        wpSyncStatus: reason === 'revoked' ? 'revoked' : null,
-      },
-    })
-  }
-  // The caller may need to re-route these jobs (e.g. a deleted mapping — they
-  // should fall through to a standalone post or another mapping). On revoke we
-  // deliberately leave them 'revoked' and the caller ignores this list.
   return { ok: true, jobIds: jobs.map((j) => j.id) }
 }
