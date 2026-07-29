@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://projectcheckin.com/privacy' },
 }
 
-const EFFECTIVE_DATE = 'March 11, 2026'
+const EFFECTIVE_DATE = 'July 29, 2026'
 const CONTACT_EMAIL = 'support@projectcheckin.com'
 
 export default function PrivacyPage() {
@@ -43,6 +43,7 @@ export default function PrivacyPage() {
               <li><strong>Account registration:</strong> name, email address, business name, and password (stored as a secure hash — we never store your plain-text password).</li>
               <li><strong>Job check-ins:</strong> job description, service type, location (city/state), job photos, and crew information you choose to enter.</li>
               <li><strong>Payment information:</strong> billing details collected and processed by Stripe. We do not store your credit card number — Stripe handles all payment data.</li>
+              <li><strong>Connected website credentials:</strong> if you connect your own WordPress site (Titan plan), the site URL, username, and an application password you provide, stored in encrypted form.</li>
             </ul>
           </Subsection>
           <Subsection title="Information collected automatically">
@@ -70,6 +71,7 @@ export default function PrivacyPage() {
           <ul>
             <li><strong>Service providers:</strong> we use third-party vendors who process data on our behalf, including Stripe (payments), Resend (email delivery), Supabase (database hosting), and Vercel (application hosting). These providers are contractually bound to protect your data.</li>
             <li><strong>Public job pages:</strong> job information you submit for publication (job description, photos, location, service type) is made publicly visible on projectcheckin.com as part of the core service. You control what is submitted and can request removal.</li>
+            <li><strong>Your own connected website (Titan plan):</strong> if you choose to connect your own website, job content and photos you&apos;ve published are sent to and stored on that site, which you own and control. See Section 6 of our Terms of Service for how this works and what happens if you disconnect or downgrade.</li>
             <li><strong>Legal requirements:</strong> we may disclose your information if required by law or in response to a valid legal process.</li>
             <li><strong>Business transfers:</strong> if ProjectCheckin is acquired or merged with another company, your information may be transferred as part of that transaction.</li>
           </ul>
