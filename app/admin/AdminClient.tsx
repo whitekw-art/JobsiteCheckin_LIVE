@@ -20,6 +20,8 @@ interface Org {
   planTier: string | null
   subscriptionStatus: string | null
   createdAt: string
+  showEngagementMetrics: boolean
+  showPortfolioViewsMetric: boolean
   _count: { checkIns: number }
 }
 
@@ -126,7 +128,7 @@ function statusBadge(status: string | null) {
 /* ── Main Component ───────────────────────────────────────────── */
 
 export default function AdminClient() {
-  const [tab, setTab] = useState<'overview' | 'orgs' | 'waitlist' | 'emails' | 'ai-settings'>('overview')
+  const [tab, setTab] = useState<'overview' | 'orgs' | 'waitlist' | 'emails' | 'ai-settings' | 'reporting-visibility'>('overview')
 
   const TAB_LABELS: Record<string, string> = {
     overview: 'Overview',
@@ -134,6 +136,7 @@ export default function AdminClient() {
     waitlist: 'Waitlist',
     emails: 'Follow-up Emails',
     'ai-settings': 'AI Settings',
+    'reporting-visibility': 'Reporting Visibility',
   }
 
   return (
@@ -150,7 +153,7 @@ export default function AdminClient() {
       {/* Tabs */}
       <div className="border-b border-gray-200 bg-white px-6">
         <nav className="flex gap-1">
-          {(['overview', 'orgs', 'waitlist', 'emails', 'ai-settings'] as const).map((t) => (
+          {(['overview', 'orgs', 'waitlist', 'emails', 'ai-settings', 'reporting-visibility'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -171,6 +174,7 @@ export default function AdminClient() {
         {tab === 'waitlist' && <WaitlistTab />}
         {tab === 'emails' && <EmailsTab />}
         {tab === 'ai-settings' && <AiSettingsTab />}
+        {tab === 'reporting-visibility' && <ReportingVisibilityTab />}
       </div>
     </div>
   )
@@ -277,6 +281,83 @@ function OrgsTab() {
                     <option value="elite">Elite</option>
                     <option value="titan">Titan</option>
                   </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+/* ── Reporting Visibility Tab ─────────────────────────────────── */
+
+function ReportingVisibilityTab() {
+  const [orgs, setOrgs] = useState<Org[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/admin/orgs').then(r => r.json()).then(setOrgs).finally(() => setLoading(false))
+  }, [])
+
+  const toggleFlag = useCallback(async (id: string, field: 'showEngagementMetrics' | 'showPortfolioViewsMetric', next: boolean) => {
+    setSaving(id + field)
+    await fetch('/api/admin/orgs', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, [field]: next }),
+    })
+    setOrgs(prev => prev.map(o => o.id === id ? { ...o, [field]: next } : o))
+    setSaving(null)
+  }, [])
+
+  if (loading) return <p className="text-gray-500 text-sm">Loading...</p>
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-gray-900 mb-1">Reporting Visibility</h2>
+      <p className="text-sm text-gray-500 mb-4 max-w-2xl">
+        Controls whether each customer sees projectcheckin.com-tied engagement metrics (Total Engagement, Page/Website/Phone Clicks, Photo Views, per-job performance, top photos) on their own Reporting tab. Both off by default for every org. This never affects data collection — only what that customer can see. You can always view the real numbers for any org via &quot;View Reporting&quot;, regardless of their toggle state.
+      </p>
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Org</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Plan</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Show Engagement Metrics</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Show Portfolio Views</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Superadmin View</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orgs.map((org, i) => (
+              <tr key={org.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                <td className="px-4 py-3 font-medium text-gray-900">{org.name}</td>
+                <td className="px-4 py-3">{tierBadge(org.planTier)}</td>
+                <td className="px-4 py-3">
+                  <Toggle
+                    checked={org.showEngagementMetrics}
+                    onChange={() => toggleFlag(org.id, 'showEngagementMetrics', !org.showEngagementMetrics)}
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <Toggle
+                    checked={org.showPortfolioViewsMetric}
+                    onChange={() => toggleFlag(org.id, 'showPortfolioViewsMetric', !org.showPortfolioViewsMetric)}
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <a
+                    href={`/reporting?orgId=${org.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline font-medium"
+                  >
+                    View Reporting →
+                  </a>
                 </td>
               </tr>
             ))}

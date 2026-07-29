@@ -41,6 +41,8 @@ model Organization {
   wpConnectionStatus       String?
   wpConnectedAt            DateTime?
   wpCreateNewPosts         Boolean                @default(true)
+  showEngagementMetrics    Boolean                @default(false)
+  showPortfolioViewsMetric Boolean                @default(false)
   Invitations              Invitations[]
   users                    User[]
   checkIns                 CheckIn[]
