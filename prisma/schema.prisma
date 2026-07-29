@@ -3,36 +3,36 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 model Organization {
-  id                   String        @id @default(uuid())
-  name                 String
-  slug                 String?       @unique
-  createdAt            DateTime      @default(now())
-  phone                String?
-  website              String?
-  trade                String?
-  howHeardAbout        String?
-  onboardingComplete   Boolean       @default(false)
-  stripeCustomerId     String?  @unique
-  stripeSubscriptionId String?  @unique
-  stripePriceId        String?
-  subscriptionStatus   String?
-  planTier             String?
-  planVersion          Int     @default(1)
+  id                       String                 @id @default(uuid())
+  name                     String
+  slug                     String?                @unique
+  createdAt                DateTime               @default(now())
+  phone                    String?
+  website                  String?
+  trade                    String?
+  howHeardAbout            String?
+  onboardingComplete       Boolean                @default(false)
+  stripeCustomerId         String?                @unique
+  stripeSubscriptionId     String?                @unique
+  stripePriceId            String?
+  subscriptionStatus       String?
+  planTier                 String?
+  planVersion              Int                    @default(1)
   gbpReviewLink            String?
   portfolioPageUrl         String?
   portfolioIntro           String?
   email                    String?
   businessContext          String?
   businessContextUpdatedAt DateTime?
-  websiteScanHistory       Json      @default("[]")
-  aiDescriptionHistory     Json      @default("[]")
-  customSubdomain          String?   @unique
+  websiteScanHistory       Json                   @default("[]")
+  aiDescriptionHistory     Json                   @default("[]")
+  customSubdomain          String?                @unique
   subdomainStatus          String?
   subdomainVerifiedAt      DateTime?
   wpSiteUrl                String?
@@ -40,57 +40,81 @@ model Organization {
   wpApplicationPassword    String?
   wpConnectionStatus       String?
   wpConnectedAt            DateTime?
-  Invitations Invitations[]
-  users       User[]
-  checkIns    CheckIn[]
-  photos      Photo[]
+  wpCreateNewPosts         Boolean                @default(true)
+  Invitations              Invitations[]
+  users                    User[]
+  checkIns                 CheckIn[]
+  photos                   Photo[]
+  wordPressPageMappings    WordPressPageMapping[]
+}
+
+// Phase 3b — existing-page injection. Each row maps jobs matching a location
+// (and optionally a service) to one of the customer's own already-existing
+// WordPress pages, where their recent work is injected between our markers.
+// Design: docs/plans/2026-07-25-wordpress-existing-page-injection-design.md
+model WordPressPageMapping {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  matchCity      String? // null = any city
+  matchState     String? // paired with matchCity
+  matchService   String? // doorType value; null = any service
+  wpPageId       Int
+  wpPageUrl      String
+  wpPageType     String // 'page' | 'post'
+  builderBlocked Boolean      @default(false) // detected page builder → inject disabled, job falls back to a new post
+  markerMode     String       @default("append") // 'marker' (customer placed one) | 'append'
+  lastRenderedAt DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 model User {
-  id             String        @id @default(cuid())
+  id                  String               @id @default(cuid())
   passwordResetTokens PasswordResetToken[]
-  email          String        @unique
-  name           String?
-  password       String?
-  role           Role          @default(USER)
-  organizationId String?
-  createdAt      DateTime      @default(now())
-  accounts       Account[]
-  sessions       Session[]
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  email               String               @unique
+  name                String?
+  password            String?
+  role                Role                 @default(USER)
+  organizationId      String?
+  createdAt           DateTime             @default(now())
+  accounts            Account[]
+  sessions            Session[]
+  organization        Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
 }
 
 model CheckIn {
-  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  installer      String
-  street         String?
-  notes          String?
-  latitude       Float?
-  longitude      Float?
-  timestamp      DateTime?      @db.Timestamptz(6)
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  userId         String?
-  city           String?
-  state          String?
-  seoTitle       String?
-  seoDescription String?
-  doorType       String?
-  zip            String?
-  photoUrls          String?
-  isPublic           Boolean        @default(false)
-  locationSource     String?
-  homeCustomerName      String?
-  homeCustomerPhone     String?
-  homeCustomerEmail     String?
-  publishedAt           DateTime?      @db.Timestamptz(6)
-  followUpEmailSentAt   DateTime?      @db.Timestamptz(6)
+  id                       String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  installer                String
+  street                   String?
+  notes                    String?
+  latitude                 Float?
+  longitude                Float?
+  timestamp                DateTime?      @db.Timestamptz(6)
+  organizationId           String?
+  organization             Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId                   String?
+  city                     String?
+  state                    String?
+  seoTitle                 String?
+  seoDescription           String?
+  doorType                 String?
+  zip                      String?
+  photoUrls                String?
+  isPublic                 Boolean        @default(false)
+  locationSource           String?
+  homeCustomerName         String?
+  homeCustomerPhone        String?
+  homeCustomerEmail        String?
+  publishedAt              DateTime?      @db.Timestamptz(6)
+  followUpEmailSentAt      DateTime?      @db.Timestamptz(6)
   beforePhotoUrl           String?
   afterPhotoUrl            String?
   aiDescriptionGeneratedAt DateTime?
-  aiDescriptionCount       Int       @default(0)
+  aiDescriptionCount       Int            @default(0)
   featuredPhotoUrl         String?
   wpPostId                 Int?
   wpPostUrl                String?
@@ -232,12 +256,12 @@ model Invitations {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
   tokenHash String
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

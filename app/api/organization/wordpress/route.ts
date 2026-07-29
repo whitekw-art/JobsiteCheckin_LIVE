@@ -1,12 +1,12 @@
 export const runtime = 'nodejs'
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { tierHasFeature } from '@/lib/planVersions'
 import { encryptCredential, encryptionConfigured } from '@/lib/wpCredentials'
 import { normalizeSiteUrl, testConnection } from '@/lib/wordpressApi'
-import { revokeOrgWordPress } from '@/lib/wordpressSync'
+import { revokeOrgWordPress, backfillOrgWordPress } from '@/lib/wordpressSync'
 
 // WordPress connection management (Phase 3, Website Integration for Local SEO).
 // Mirrors the CNAME phase's shape in app/api/organization/subdomain/route.ts:
@@ -131,6 +131,17 @@ export async function POST(request: NextRequest) {
         wpConnectionStatus: 'connected',
         wpConnectedAt: new Date(),
       },
+    })
+
+    // Publish the customer's existing catalogue to their newly-connected site.
+    // Runs after the response so the Connect click returns immediately; the
+    // sync happens quietly in the background (throttled inside the helper).
+    after(async () => {
+      try {
+        await backfillOrgWordPress(org.id)
+      } catch (err) {
+        console.error('WordPress backfill after connect failed:', err)
+      }
     })
 
     return NextResponse.json({

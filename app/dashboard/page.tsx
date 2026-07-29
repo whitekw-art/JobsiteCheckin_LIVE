@@ -215,6 +215,15 @@ function IcoAdmin() {
     </svg>
   )
 }
+function IcoHelp() {
+  return (
+    <svg className="db-nav-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="8" cy="8" r="6.5"/>
+      <path d="M6 6.2a2 2 0 1 1 3.2 1.6c-.7.55-1.2 1-1.2 1.9" strokeLinecap="round"/>
+      <circle cx="8" cy="11.4" r="0.6" fill="currentColor" stroke="none"/>
+    </svg>
+  )
+}
 function IcoPlus() {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -1368,6 +1377,11 @@ export default function Dashboard() {
                 Admin
               </Link>
             )}
+
+            <Link className="db-nav-item" href="/help" onClick={() => setSidebarOpen(false)}>
+              <IcoHelp />
+              Help
+            </Link>
 
             <button className="db-nav-item" onClick={() => { setSidebarOpen(false); localStorage.removeItem('gbp_connected'); localStorage.removeItem('gbp_post_mode'); signOut() }}>
               <IcoSignOut />

@@ -34,6 +34,7 @@ interface WaitlistEntry {
 }
 
 interface EmailConfig {
+  followUpEmailEnabled: boolean
   followUpEmailDays: string
   followUpEmailSubject: string
   followUpEmailBody: string
@@ -54,6 +55,66 @@ function tierBadge(tier: string | null) {
   }
   const cls = map[tier ?? 'free'] ?? 'bg-gray-100 text-gray-600'
   return <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase ${cls}`}>{tier ?? 'free'}</span>
+}
+
+// Shared on/off switch. Shape is intentional: track is exactly 2x the
+// circle's diameter wide and 1x tall, circle sits flush inside with no
+// gap, sliding fully between left:0 (off) and left:D (on). Do not give
+// the track and circle independent width/height numbers again -- that's
+// what produced the previous broken circle-in-a-circle rendering.
+function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  const D = 20 // circle diameter in px; track is 2D x D
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+      style={{
+        // appearance: 'none' is the fix -- without it, the browser keeps
+        // native OS button chrome, which can override or fight explicit
+        // width/height in ways the box model alone doesn't predict. That
+        // native chrome, not the dimensions, was the actual cause of the
+        // circle-in-a-circle rendering.
+        appearance: 'none',
+        WebkitAppearance: 'none',
+        MozAppearance: 'none',
+        display: 'inline-block',
+        width: D * 2,
+        height: D,
+        minWidth: D * 2,
+        minHeight: D,
+        maxWidth: D * 2,
+        maxHeight: D,
+        borderRadius: 9999,
+        border: 'none',
+        outline: 'none',
+        margin: 0,
+        padding: 0,
+        cursor: 'pointer',
+        position: 'relative',
+        flexShrink: 0,
+        boxSizing: 'border-box',
+        backgroundColor: checked ? '#10b981' : '#d1d5db',
+        transition: 'background-color 0.2s',
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: checked ? D : 0,
+          width: D,
+          height: D,
+          borderRadius: '50%',
+          backgroundColor: '#fff',
+          boxShadow: '0 1px 3px rgba(0,0,0,.2)',
+          boxSizing: 'border-box',
+          transition: 'left 0.15s',
+          pointerEvents: 'none',
+        }}
+      />
+    </button>
+  )
 }
 
 function statusBadge(status: string | null) {
@@ -323,7 +384,18 @@ function EmailsTab() {
           Sent automatically to homeowners via Resend. Use <code className="bg-gray-100 px-1 rounded text-xs">{`{{firstName}}`}</code>, <code className="bg-gray-100 px-1 rounded text-xs">{`{{businessName}}`}</code>, <code className="bg-gray-100 px-1 rounded text-xs">{`{{jobLocation}}`}</code>, <code className="bg-gray-100 px-1 rounded text-xs">{`{{reviewLink}}`}</code> as placeholders.
         </p>
 
-        <div className="space-y-4">
+        <div className="flex items-center justify-between mb-5 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+          <div>
+            <span className="text-sm font-medium text-gray-700">Enabled</span>
+            <p className="text-xs text-gray-500 mt-0.5">Off by default. While off, the daily cron sends nothing.</p>
+          </div>
+          <Toggle
+            checked={config.followUpEmailEnabled}
+            onChange={() => setConfig({ ...config, followUpEmailEnabled: !config.followUpEmailEnabled })}
+          />
+        </div>
+
+        <div className={`space-y-4 ${!config.followUpEmailEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Send delay (days after publish)</label>
             <input
@@ -536,14 +608,10 @@ function AiSettingsTab() {
             </p>
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm font-medium text-gray-700">Enabled</span>
-              <button
-                role="switch"
-                aria-checked={rates.jobDescriptionEnabled}
-                onClick={() => setRates(r => ({ ...r, jobDescriptionEnabled: !r.jobDescriptionEnabled }))}
-                style={{ width: 40, height: 24, borderRadius: 9999, border: 'none', padding: 0, cursor: 'pointer', position: 'relative', flexShrink: 0, backgroundColor: rates.jobDescriptionEnabled ? '#10b981' : '#d1d5db', transition: 'background-color 0.2s' }}
-              >
-                <span style={{ position: 'absolute', width: 16, height: 16, borderRadius: '50%', backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.2)', top: 4, left: rates.jobDescriptionEnabled ? 20 : 4, transition: 'left 0.15s' }} />
-              </button>
+              <Toggle
+                checked={rates.jobDescriptionEnabled}
+                onChange={() => setRates(r => ({ ...r, jobDescriptionEnabled: !r.jobDescriptionEnabled }))}
+              />
             </div>
             <div className={`space-y-3 ${!rates.jobDescriptionEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
               <div className="flex items-center justify-between">
@@ -578,14 +646,10 @@ function AiSettingsTab() {
             </p>
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm font-medium text-gray-700">Enabled</span>
-              <button
-                role="switch"
-                aria-checked={rates.websiteScanEnabled}
-                onClick={() => setRates(r => ({ ...r, websiteScanEnabled: !r.websiteScanEnabled }))}
-                style={{ width: 40, height: 24, borderRadius: 9999, border: 'none', padding: 0, cursor: 'pointer', position: 'relative', flexShrink: 0, backgroundColor: rates.websiteScanEnabled ? '#10b981' : '#d1d5db', transition: 'background-color 0.2s' }}
-              >
-                <span style={{ position: 'absolute', width: 16, height: 16, borderRadius: '50%', backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.2)', top: 4, left: rates.websiteScanEnabled ? 20 : 4, transition: 'left 0.15s' }} />
-              </button>
+              <Toggle
+                checked={rates.websiteScanEnabled}
+                onChange={() => setRates(r => ({ ...r, websiteScanEnabled: !r.websiteScanEnabled }))}
+              />
             </div>
             <div className={`space-y-3 ${!rates.websiteScanEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
               <div className="flex items-center justify-between">

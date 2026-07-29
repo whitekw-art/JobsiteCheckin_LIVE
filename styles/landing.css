@@ -69,6 +69,7 @@ body {
 .r.d3 { transition-delay: 0.24s; }
 .r.d4 { transition-delay: 0.32s; }
 .r.d5 { transition-delay: 0.40s; }
+.r.d6 { transition-delay: 0.48s; }
 
 /* ─── NAV ─── */
 nav {
@@ -403,6 +404,18 @@ nav {
 .bc-bac-text .bc-label { color: var(--orange); margin-bottom: 10px; }
 .bc-bac-text .bc-title { margin-bottom: 10px; }
 .bc-bac-text .bc-desc { margin-bottom: 20px; }
+
+/* Your own website card */
+.bc-site { background: #E9EEF2; border: 1px solid rgba(12,61,92,0.13); padding: 32px; display: flex; flex-direction: column; }
+.bc-site .bc-label { color: var(--navy); margin-bottom: 10px; }
+.bc-site .bc-title { margin-bottom: 10px; }
+.site-opts { display: flex; flex-direction: column; gap: 10px; margin: 18px 0 14px; }
+.site-opt { background: #fff; border: 1px solid rgba(12,61,92,0.10); border-radius: 11px; padding: 13px 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+.so-head { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }
+.so-num { flex-shrink: 0; width: 19px; height: 19px; border-radius: 50%; background: var(--navy); color: #fff; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.so-name { font-size: 13px; font-weight: 800; color: var(--ink); line-height: 1.25; }
+.so-desc { font-size: 11.5px; color: var(--muted); line-height: 1.55; padding-left: 28px; }
+.site-soon { font-size: 11.5px; color: var(--muted-lt); font-style: italic; }
 
 /* Ghost camera */
 .bac-ghost { margin-top: 20px; background: #1C2B3A; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }

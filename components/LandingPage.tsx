@@ -105,6 +105,7 @@ export default function LandingPage({ registrationOpen = false }: { registration
   const [gbpOpen, setGbpOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [bacTextOpen, setBacTextOpen] = useState(false)
+  const [siteOpen, setSiteOpen] = useState(false)
 
   // Before/after slider refs
   const sliderRef = useRef<HTMLDivElement>(null)
@@ -622,6 +623,57 @@ export default function LandingPage({ registrationOpen = false }: { registration
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Your own website card */}
+            <div className="bc bc-site r d6">
+              <span className="bc-label">Your Own Website</span>
+              <div className="bc-title-row">
+                <div className="bc-title">Your finished work shows up on your own site</div>
+                <button
+                  type="button"
+                  className={`bc-toggle${siteOpen ? ' open' : ''}`}
+                  aria-expanded={siteOpen}
+                  aria-label={siteOpen ? 'Collapse details' : 'Expand details'}
+                  onClick={() => setSiteOpen((v) => !v)}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+              <div className={`bc-collapse${siteOpen ? ' open' : ''}`}>
+                <div className="bc-desc">The work your crew documents is worth more on your own website than on ours. We&rsquo;ll help you pick the setup that matches how your site is built. This is a <strong>one time setup</strong>, and after that every job your crew checks in shows up there on its own.</div>
+                <ul className="bc-blist" style={{ marginBottom: '16px' }}>
+                  <li>Works with any website builder</li>
+                  <li>WordPress gets you the strongest SEO of the three</li>
+                  <li>Helps Google connect your work to the areas you serve</li>
+                </ul>
+              </div>
+              <div className="site-opts">
+                <div className="site-opt">
+                  <div className="so-head">
+                    <span className="so-num">1</span>
+                    <div className="so-name">Our widget on your current site</div>
+                  </div>
+                  <div className="so-desc">Your jobs appear on any page of your current site that you want with our widget, whatever your site was built with.</div>
+                </div>
+                <div className="site-opt">
+                  <div className="so-head">
+                    <span className="so-num">2</span>
+                    <div className="so-name">Your own branded project page</div>
+                  </div>
+                  <div className="so-desc">Stronger and better SEO than #1. It runs under your business address, not ours.</div>
+                </div>
+                <div className="site-opt">
+                  <div className="so-head">
+                    <span className="so-num">3</span>
+                    <div className="so-name">Full integration with your WordPress site</div>
+                  </div>
+                  <div className="so-desc">Maximum SEO. Each job becomes a real page on your site, continuously growing and attracting visitors. Featured and Recent jobs are showcased on your own location and service pages, so you touch every searchable market.</div>
+                </div>
+              </div>
+              <p className="site-soon">Wix, Squarespace, and more site types are coming.</p>
             </div>
 
           </div>

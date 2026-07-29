@@ -17,9 +17,15 @@ export async function GET(request: NextRequest) {
   try {
     // Load config from AdminConfig table
     const configs = await prisma.adminConfig.findMany({
-      where: { key: { in: ['followUpEmailDays', 'followUpEmailSubject', 'followUpEmailBody'] } },
+      where: { key: { in: ['followUpEmailEnabled', 'followUpEmailDays', 'followUpEmailSubject', 'followUpEmailBody'] } },
     })
     const cfg = Object.fromEntries(configs.map((c) => [c.key, c.value]))
+
+    // Off by default. No key set at all (fresh install) must behave the same
+    // as explicitly disabled -- never send unless someone has turned this on.
+    if (cfg.followUpEmailEnabled !== 'true') {
+      return NextResponse.json({ sent: 0, failed: 0, eligible: 0, skipped: 'disabled' })
+    }
 
     const delayDays = parseInt(cfg.followUpEmailDays ?? '7', 10)
     const subject = cfg.followUpEmailSubject ?? 'How did {{businessName}} do? Quick favor if you have a minute'
