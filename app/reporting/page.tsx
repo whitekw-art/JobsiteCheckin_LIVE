@@ -135,6 +135,7 @@ export default async function ReportingPage({
     dir?: string
     photoSort?: string
     photoDir?: string
+    orgId?: string
   }>
 }) {
   const resolvedSearchParams = await Promise.resolve(searchParams)
@@ -150,10 +151,35 @@ export default async function ReportingPage({
     )
   }
 
+  // Superadmin can view any org's real numbers via ?orgId=, regardless of
+  // that org's own visibility toggle. Never trust this param from anyone else.
+  const isSuperAdmin = currentUser.role === 'SUPER_ADMIN'
+  const requestedOrgId = isSuperAdmin ? resolvedSearchParams?.orgId : undefined
+  const effectiveOrgId = requestedOrgId || currentUser.organizationId
+  const isSuperAdminView = isSuperAdmin && !!requestedOrgId
+
+  const viewedOrg = await prisma.organization.findUnique({
+    where: { id: effectiveOrgId },
+    select: { name: true, showEngagementMetrics: true, showPortfolioViewsMetric: true },
+  })
+
+  if (!viewedOrg) {
+    return (
+      <DashboardShell title="Reporting">
+        <div className="db-shell-card">
+          <p style={{ fontSize: 13, color: 'var(--t2)' }}>Organization not found.</p>
+        </div>
+      </DashboardShell>
+    )
+  }
+
+  const showEngagement = isSuperAdminView || viewedOrg.showEngagementMetrics
+  const showPortfolioViews = isSuperAdminView || viewedOrg.showPortfolioViewsMetric
+
   // ── All-time totals ──
   const grouped = await prisma.checkInEvent.groupBy({
     by: ['eventType'],
-    where: { checkIn: { organizationId: currentUser.organizationId } },
+    where: { checkIn: { organizationId: effectiveOrgId } },
     _count: { _all: true },
   })
 
@@ -169,7 +195,7 @@ export default async function ReportingPage({
 
   const dailyRaw = await prisma.checkInEvent.findMany({
     where: {
-      checkIn: { organizationId: currentUser.organizationId },
+      checkIn: { organizationId: effectiveOrgId },
       createdAt: { gte: thirtyDaysAgo },
     },
     select: { eventType: true, createdAt: true },
@@ -225,7 +251,7 @@ export default async function ReportingPage({
   // ── Portfolio view counts (last 30 days) ──
   const portfolioRaw = await prisma.portfolioView.findMany({
     where: {
-      organizationId: currentUser.organizationId,
+      organizationId: effectiveOrgId,
       createdAt: { gte: thirtyDaysAgo },
     },
     select: { createdAt: true },
@@ -245,7 +271,7 @@ export default async function ReportingPage({
 
   // ── Per-job metrics ──
   const checkIns = await prisma.checkIn.findMany({
-    where: { organizationId: currentUser.organizationId },
+    where: { organizationId: effectiveOrgId },
     select: { id: true, doorType: true, city: true, state: true, timestamp: true },
     orderBy: { timestamp: 'desc' },
   })
@@ -253,7 +279,7 @@ export default async function ReportingPage({
   const eventRows = await prisma.checkInEvent.groupBy({
     by: ['checkInId', 'eventType'],
     where: {
-      checkIn: { organizationId: currentUser.organizationId },
+      checkIn: { organizationId: effectiveOrgId },
       eventType: { in: ['PAGE_VIEW', 'page_view', 'PHOTO_CLICK', 'photo_click', 'WEBSITE_CLICK', 'website_click', 'PHONE_CLICK', 'phone_click'] },
     },
     _count: { _all: true },
@@ -316,7 +342,7 @@ export default async function ReportingPage({
     where: {
       eventType: { in: ['PHOTO_CLICK', 'photo_click'] },
       metadata: { not: null },
-      checkIn: { organizationId: currentUser.organizationId },
+      checkIn: { organizationId: effectiveOrgId },
     },
     select: {
       checkInId: true,
@@ -397,6 +423,14 @@ export default async function ReportingPage({
   return (
     <DashboardShell title="Reporting">
 
+      {isSuperAdminView && (
+        <div style={{ background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E', fontSize: 12, fontWeight: 600, padding: '8px 14px', borderRadius: 8, marginBottom: 16 }}>
+          Viewing {viewedOrg.name}&apos;s reporting as SUPER_ADMIN — this customer&apos;s own toggles: Engagement Metrics {viewedOrg.showEngagementMetrics ? 'ON' : 'OFF'}, Portfolio Views {viewedOrg.showPortfolioViewsMetric ? 'ON' : 'OFF'}.
+        </div>
+      )}
+
+      {showEngagement && (
+      <>
       {/* ── Hero trend card ── */}
       <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
         <div style={{ padding: '18px 22px 12px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
@@ -476,8 +510,10 @@ export default async function ReportingPage({
           )
         })}
       </div>
+      </>
+      )}
 
-      {/* ── Google Business Profile section ── */}
+      {/* ── Google Business Profile section (always visible — not projectcheckin-URL tied) ── */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
@@ -513,8 +549,9 @@ export default async function ReportingPage({
       </div>
 
       {/* ── Engagement breakdown ── */}
-      <div className="rpt-engagement-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        {/* Donut card — flex-column so content fills full tile height */}
+      <div className="rpt-engagement-grid" style={{ display: 'grid', gridTemplateColumns: showEngagement ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 16 }}>
+        {/* Donut card — projectcheckin-URL engagement, gated. flex-column so content fills full tile height */}
+        {showEngagement && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 20px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)' }}>Engagement Breakdown</div>
           {engagementTotal > 0 ? (
@@ -563,9 +600,10 @@ export default async function ReportingPage({
             </div>
           )}
         </div>
+        )}
 
-        {/* Right column: Recent GBP Posts + Portfolio Views side by side */}
-        <div className="rpt-sidebar-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {/* Right column: Recent GBP Posts (always visible) + Portfolio Views (gated independently) */}
+        <div className="rpt-sidebar-grid" style={{ display: 'grid', gridTemplateColumns: showPortfolioViews ? '1fr 1fr' : '1fr', gap: 12 }}>
           {/* Recent GBP Posts */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 16px', boxShadow: 'var(--shadow-card)' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)', marginBottom: 14 }}>Recent GBP Posts</div>
@@ -582,7 +620,8 @@ export default async function ReportingPage({
             </div>
           </div>
 
-          {/* Portfolio Views */}
+          {/* Portfolio Views — gated independently via showPortfolioViewsMetric */}
+          {showPortfolioViews && (
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 16px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)', marginBottom: 6 }}>Portfolio Views</div>
             {portfolioTotal > 0 ? (
@@ -610,9 +649,12 @@ export default async function ReportingPage({
               </div>
             )}
           </div>
+          )}
         </div>
       </div>
 
+      {showEngagement && (
+      <>
       {/* ── Per-job table ── */}
       <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
@@ -686,6 +728,8 @@ export default async function ReportingPage({
           </div>
         )}
       </div>
+      </>
+      )}
 
     </DashboardShell>
   )
