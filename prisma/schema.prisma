@@ -41,6 +41,11 @@ model Organization {
   wpConnectionStatus       String?
   wpConnectedAt            DateTime?
   wpCreateNewPosts         Boolean                @default(true)
+  gscAccessToken           String?
+  gscRefreshToken          String?
+  gscPropertyUrl           String?
+  gscConnectionStatus      String?
+  gscConnectedAt           DateTime?
   showEngagementMetrics    Boolean                @default(false)
   showPortfolioViewsMetric Boolean                @default(false)
   Invitations              Invitations[]

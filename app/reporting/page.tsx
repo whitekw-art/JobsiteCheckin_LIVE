@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { tierHasFeature } from '@/lib/planVersions'
+import { fetchPerformance } from '@/lib/gscApi'
 import { ReportingJobTableBody } from '@/components/ReportingJobTableBody'
 import { ReportingPhotoTableBody } from '@/components/ReportingPhotoTableBody'
 import DashboardShell from '@/components/DashboardShell'
@@ -160,7 +162,16 @@ export default async function ReportingPage({
 
   const viewedOrg = await prisma.organization.findUnique({
     where: { id: effectiveOrgId },
-    select: { name: true, showEngagementMetrics: true, showPortfolioViewsMetric: true },
+    select: {
+      name: true,
+      showEngagementMetrics: true,
+      showPortfolioViewsMetric: true,
+      planTier: true,
+      gscAccessToken: true,
+      gscRefreshToken: true,
+      gscPropertyUrl: true,
+      gscConnectionStatus: true,
+    },
   })
 
   if (!viewedOrg) {
@@ -175,6 +186,22 @@ export default async function ReportingPage({
 
   const showEngagement = isSuperAdminView || viewedOrg.showEngagementMetrics
   const showPortfolioViews = isSuperAdminView || viewedOrg.showPortfolioViewsMetric
+
+  // ── Google Search Console (Elite + Titan) ──
+  // Fetched live on page load rather than synced by a cron: Search Console's
+  // own data only refreshes every few days, so a cached copy would be no
+  // fresher (design doc §2). Losing the plan hides the section but never
+  // deletes the connection, so re-upgrading needs no re-setup.
+  const showGsc = tierHasFeature(viewedOrg.planTier, 'gsc_integration')
+  const gscConnected =
+    showGsc && viewedOrg.gscConnectionStatus === 'connected' && !!viewedOrg.gscRefreshToken && !!viewedOrg.gscPropertyUrl
+
+  const gsc = gscConnected
+    ? await fetchPerformance(viewedOrg.gscRefreshToken!, viewedOrg.gscAccessToken, viewedOrg.gscPropertyUrl!)
+    : null
+  // A failed fetch degrades to the not-connected layout rather than taking the
+  // whole Reporting page down — every other section here is unrelated to GSC.
+  const gscData = gsc?.ok ? gsc.data : undefined
 
   // ── All-time totals ──
   const grouped = await prisma.checkInEvent.groupBy({
@@ -547,6 +574,95 @@ export default async function ReportingPage({
           to see GBP metrics here.
         </div>
       </div>
+
+      {/* ── Google Search Console section (Elite + Titan only) ── */}
+      {showGsc && (
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Google Search Console Performance</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>
+              {gscData
+                ? `Last 28 days · ${viewedOrg.gscPropertyUrl}`
+                : "Clicks, impressions, and ranking position from your website's real Google Search data"}
+            </div>
+          </div>
+          <Link
+            href="/account"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'var(--surface)', border: '1px solid var(--border-2)', color: 'var(--t2)', textDecoration: 'none', flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            {gscData ? 'Manage connection' : 'Connect GSC'}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+            </svg>
+          </Link>
+        </div>
+
+        <div className="rpt-gbp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          {[
+            { label: 'Clicks', value: gscData?.totals.clicks },
+            { label: 'Impressions', value: gscData?.totals.impressions },
+            { label: 'Avg. Position', value: gscData?.totals.position },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px', boxShadow: 'var(--shadow-card)' }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--t3)', marginBottom: 8 }}>{label}</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: gscData ? 'var(--t1)' : 'var(--t3)', lineHeight: 1, letterSpacing: '-0.3px' }}>
+                {value === undefined ? '—' : value.toLocaleString()}
+              </div>
+              {!gscData && <div style={{ marginTop: 10, height: 4, borderRadius: 4, background: 'var(--surface-3)' }} />}
+            </div>
+          ))}
+        </div>
+
+        {!gscData ? (
+          <div style={{ marginTop: 10, background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--t3)', lineHeight: 1.5 }}>
+            Connect Google Search Console in{' '}
+            <Link href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
+              Account &rsaquo; Connections
+            </Link>{' '}
+            to see this data here.
+          </div>
+        ) : (
+          <>
+            {([
+              { title: 'Top Search Queries', header: 'Query', rows: gscData.topQueries },
+              { title: 'Top Pages', header: 'Page', rows: gscData.topPages },
+            ] as const).map(({ title, header, rows }) => (
+              <div key={title} className="db-shell-card" style={{ padding: 0, overflow: 'hidden', marginTop: 12 }}>
+                <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
+                  <div className="db-shell-card-title" style={{ marginBottom: 0 }}>{title}</div>
+                </div>
+                {rows.length === 0 ? (
+                  <div style={{ padding: 24, fontSize: 13, color: 'var(--t3)' }}>
+                    No Search Console data yet. Google needs a few days of search activity before this fills in.
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="db-shell-table">
+                      <thead>
+                        <tr><th>{header}</th><th>Clicks</th><th>Impressions</th></tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((row, i) => (
+                          <tr key={row.key || i}>
+                            <td>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: 'var(--surface-3)', color: 'var(--t3)', fontSize: 10, fontWeight: 700, marginRight: 8 }}>{i + 1}</span>
+                              {row.key}
+                            </td>
+                            <td>{row.clicks.toLocaleString()}</td>
+                            <td>{row.impressions.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+      )}
 
       {/* ── Engagement breakdown ── */}
       <div className="rpt-engagement-grid" style={{ display: 'grid', gridTemplateColumns: showEngagement ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 16 }}>
