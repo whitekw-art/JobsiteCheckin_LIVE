@@ -4,6 +4,12 @@
 //
 // Version history:
 // v1 — 2026-03-12: Initial feature set
+// v1 — 2026-07-31: `gsc_integration` added to elite + titan. Deliberate exception
+//   to the never-edit-old-rows rule above: there are no paying customers yet, so
+//   no one is being grandfathered out of anything, and a v2 bump would have split
+//   tierHasFeature (always reads CURRENT_PLAN_VERSION) from hasFeature (reads the
+//   org's stored planVersion) for every org still stored as v1. Once real
+//   customers exist, follow the rule as written — add a v2, don't edit v1.
 
 export const CURRENT_PLAN_VERSION = 1
 
@@ -15,10 +21,10 @@ export const PLAN_FEATURES: Record<string, Record<number, string[]>> = {
     1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'gbp_post'],
   },
   elite: {
-    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'gbp_post', 'before_after_tagging'],
+    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'gbp_post', 'before_after_tagging', 'gsc_integration'],
   },
   titan: {
-    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'api_access', 'white_label', 'gbp_post', 'before_after_tagging', 'review_request', 'ai_job_description', 'website_integration'],
+    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'api_access', 'white_label', 'gbp_post', 'before_after_tagging', 'review_request', 'ai_job_description', 'website_integration', 'gsc_integration'],
   },
 }
 

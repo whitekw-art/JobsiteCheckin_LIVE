@@ -764,6 +764,120 @@ export default function AccountPage() {
   const [servicesSync, setServicesSync] = useState(false)
   const [showServicesTip, setShowServicesTip] = useState(false)
 
+  // ── Google Search Console (Elite + Titan) ──
+  // Status mirrors Organization.gscConnectionStatus:
+  //   'connected' | 'select_property' | 'no_properties' | null (never connected)
+  const hasGsc = tierHasFeature(planTier, 'gsc_integration')
+  const [gscStatus, setGscStatus] = useState<string | null>(null)
+  const [gscPropertyUrl, setGscPropertyUrl] = useState<string | null>(null)
+  const [gscProperties, setGscProperties] = useState<string[]>([])
+  const [gscChoice, setGscChoice] = useState('')
+  const [gscBusy, setGscBusy] = useState(false)
+  const [gscError, setGscError] = useState<string | null>(null)
+
+  async function reloadGscStatus() {
+    try {
+      const res = await fetch('/api/organization/gsc')
+      if (!res.ok) return
+      const data = await res.json()
+      setGscStatus(data.status ?? null)
+      setGscPropertyUrl(data.propertyUrl ?? null)
+      // The picker is only meaningful mid-handshake, so the property list is
+      // fetched on demand rather than on every Account page load.
+      if (data.status === 'select_property') {
+        const listRes = await fetch('/api/organization/gsc/properties')
+        if (listRes.ok) {
+          const list = await listRes.json()
+          setGscProperties(list.properties ?? [])
+          setGscChoice(list.properties?.[0] ?? '')
+        }
+      }
+    } catch { /* leave prior status visible rather than flashing an error */ }
+  }
+
+  async function handleGscConnect() {
+    setGscBusy(true)
+    setGscError(null)
+    try {
+      const res = await fetch('/api/organization/gsc', { method: 'POST' })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.consentUrl) {
+        setGscError(data?.error || 'Could not start the connection. Please try again.')
+        setGscBusy(false)
+        return
+      }
+      // Full navigation, not a router push — this leaves the app for Google.
+      window.location.assign(data.consentUrl)
+    } catch {
+      setGscError('Could not start the connection. Please try again.')
+      setGscBusy(false)
+    }
+  }
+
+  async function handleGscSelectProperty() {
+    if (!gscChoice) return
+    setGscBusy(true)
+    setGscError(null)
+    try {
+      const res = await fetch('/api/organization/gsc', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ propertyUrl: gscChoice }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setGscError(data?.error || 'Could not save your selection.')
+      } else {
+        setGscStatus('connected')
+        setGscPropertyUrl(data.propertyUrl)
+      }
+    } catch {
+      setGscError('Could not save your selection.')
+    } finally {
+      setGscBusy(false)
+    }
+  }
+
+  async function handleGscDisconnect() {
+    if (!confirm('Disconnect Google Search Console? Your search data will stop showing in Reporting.')) return
+    setGscBusy(true)
+    setGscError(null)
+    try {
+      const res = await fetch('/api/organization/gsc', { method: 'DELETE' })
+      if (res.ok) {
+        setGscStatus(null)
+        setGscPropertyUrl(null)
+        setGscProperties([])
+      } else {
+        setGscError('Could not disconnect. Please try again.')
+      }
+    } catch {
+      setGscError('Could not disconnect. Please try again.')
+    } finally {
+      setGscBusy(false)
+    }
+  }
+
+  // Re-check after returning from Google's consent screen. The callback route
+  // redirects to /account?gsc=<outcome>; the param is stripped afterwards so a
+  // refresh doesn't replay a stale outcome message.
+  useEffect(() => {
+    if (!hasGsc) return
+    const outcome = new URLSearchParams(window.location.search).get('gsc')
+    if (outcome === 'denied') {
+      setGscError('You cancelled the Google connection. Nothing was changed.')
+    } else if (outcome === 'failed') {
+      setGscError('We could not finish connecting to Google. Please try again.')
+    }
+    if (outcome) {
+      setActiveTab('connections')
+      setOpenCards((prev) => ({ ...prev, gsc: true }))
+      window.history.replaceState({}, '', '/account')
+    }
+    reloadGscStatus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasGsc])
+
   useEffect(() => {
     const loadProfile = async () => {
       setLoading(true)
@@ -2160,18 +2274,124 @@ export default function AccountPage() {
             </ConnCard>
           )}
 
-          {/* ── Integrate Google Search Console ── */}
+          {/* ── Connect Google Search Console (Elite + Titan) ── */}
           <ConnCard
-            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>}
-            title="Integrate Google Search Console"
-            sub="See your search impressions and clicks inside this dashboard"
-            status={<StatusDot state="coming" label="Coming soon" />}
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={hasGsc ? 'var(--t2)' : 'var(--t3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>}
+            title="Connect Google Search Console"
+            titleExtra={!hasGsc ? (
+              <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: 'var(--surface-3)', color: 'var(--t2)' }}>Elite &amp; Titan</span>
+            ) : undefined}
+            sub="See your search impressions and clicks inside your Reporting tab"
+            status={
+              !hasGsc ? <StatusDot state="coming" label="Elite & Titan only" />
+              : gscStatus === 'connected' ? <StatusDot state="active" label="Active" />
+              : gscStatus === 'select_property' ? <StatusDot state="disabled" label="Almost done" />
+              : gscStatus === 'no_properties' ? <StatusDot state="disabled" label="Action needed" />
+              : <StatusDot state="disabled" label="Not connected" />
+            }
             open={!!openCards['gsc']}
             onToggle={() => toggleCard('gsc')}
-            locked
+            locked={!hasGsc}
           >
             <div style={{ padding: '16px 20px' }}>
-              <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, margin: 0 }}>This connection isn&apos;t available yet. When it&apos;s ready, you&apos;ll be able to see your Google Search impressions and clicks right inside your dashboard.</p>
+              {gscError && (
+                <div style={{ background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,.25)', borderRadius: 8, padding: '10px 13px', fontSize: 12, color: 'var(--red)', lineHeight: 1.55, marginBottom: 14 }}>
+                  {gscError}
+                </div>
+              )}
+
+              {!hasGsc ? (
+                <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, margin: 0 }}>
+                  Upgrade to Elite or Titan to connect Google Search Console and see real search performance data for your business right inside ProjectCheckin.
+                </p>
+              ) : gscStatus === 'connected' ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 7 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
+                      Connected
+                    </span>
+                    <button
+                      onClick={handleGscDisconnect}
+                      disabled={gscBusy}
+                      style={{ marginLeft: 'auto', background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: 'var(--red)', cursor: gscBusy ? 'not-allowed' : 'pointer', padding: 0 }}
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--t3)', fontFamily: "'Courier New', monospace", letterSpacing: '-.2px', wordBreak: 'break-all' }}>
+                    {gscPropertyUrl}
+                  </div>
+                  <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, margin: '12px 0 0' }}>
+                    Your search data now shows up in your <a href="/reporting" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>Reporting tab</a>.
+                  </p>
+                </>
+              ) : gscStatus === 'select_property' ? (
+                <>
+                  <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, margin: '0 0 14px' }}>
+                    We found more than one website connected to your Google account. Pick the one you want ProjectCheckin to show data for.
+                  </p>
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Your website</label>
+                  <select
+                    value={gscChoice}
+                    onChange={(e) => setGscChoice(e.target.value)}
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontFamily: 'inherit', fontSize: 13, color: 'var(--t1)', outline: 'none', marginBottom: 14 }}
+                  >
+                    {gscProperties.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <button
+                    onClick={handleGscSelectProperty}
+                    disabled={gscBusy || !gscChoice}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 13px', borderRadius: 8, fontFamily: 'inherit', fontSize: 12, fontWeight: 700, background: 'var(--sky-text)', color: '#fff', border: 'none', cursor: gscBusy || !gscChoice ? 'not-allowed' : 'pointer', opacity: gscBusy || !gscChoice ? 0.5 : 1 }}
+                  >
+                    {gscBusy ? 'Saving…' : 'Save selection'}
+                  </button>
+                </>
+              ) : gscStatus === 'no_properties' ? (
+                <>
+                  <div style={{ background: 'var(--amber-bg)', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', fontSize: 12, color: 'var(--amber)', lineHeight: 1.55 }}>
+                    Your Google account isn&apos;t verified for any website in Search Console yet, so there&apos;s no data for us to show. This is a one-time setup on Google&apos;s side, not something wrong with ProjectCheckin.
+                  </div>
+                  <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, margin: '12px 0 10px' }}>You have two options:</p>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <a href="/help/guides/gsc-setup" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 13px', borderRadius: 8, fontSize: 12, fontWeight: 700, background: 'var(--surface-3)', color: 'var(--t2)', border: '1px solid var(--border)', textDecoration: 'none' }}>
+                      Read the setup guide
+                    </a>
+                    <a href="/help" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 13px', borderRadius: 8, fontSize: 12, fontWeight: 700, background: 'var(--surface-3)', color: 'var(--t2)', border: '1px solid var(--border)', textDecoration: 'none' }}>
+                      Contact support for help
+                    </a>
+                  </div>
+                  <button
+                    onClick={reloadGscStatus}
+                    style={{ marginTop: 12, background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', padding: 0 }}
+                  >
+                    Check again
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: 'var(--t2)', lineHeight: 1.5, marginBottom: 9 }}>
+                    <span style={{ width: 20, height: 20, background: 'var(--sky-dim)', color: 'var(--sky-text)', borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </span>
+                    See real clicks, impressions, and average ranking position from Google
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: 'var(--t2)', lineHeight: 1.5, marginBottom: 14 }}>
+                    <span style={{ width: 20, height: 20, background: 'var(--sky-dim)', color: 'var(--sky-text)', borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </span>
+                    See which searches and pages are bringing customers to your site
+                  </div>
+                  <button
+                    onClick={handleGscConnect}
+                    disabled={gscBusy}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, fontWeight: 700, background: 'var(--sky-text)', color: '#fff', border: 'none', cursor: gscBusy ? 'not-allowed' : 'pointer', opacity: gscBusy ? 0.6 : 1 }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.2 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/></svg>
+                    {gscBusy ? 'Opening Google…' : 'Connect Google Search Console'}
+                  </button>
+                </>
+              )}
             </div>
           </ConnCard>
 
