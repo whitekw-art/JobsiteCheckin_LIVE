@@ -1,80 +1,184 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import DashboardShell from '@/components/DashboardShell'
-import { GuideBreadcrumb, GuideSection, Step, guideP, guidePLast, guideStrong, guideLink } from '@/components/HelpGuideSections'
+import { GuideBreadcrumb, GuideSection, GuideSubsection, Step, guideP, guidePLast, guideStrong, guideLink, guideHint } from '@/components/HelpGuideSections'
 
-export const metadata: Metadata = { title: 'Google Search Console Setup Guide — Help & Support' }
+export const metadata: Metadata = { title: 'Set Up Google Search Console — Help & Support' }
 
 export default function GscSetupGuidePage() {
   return (
-    <DashboardShell title="Google Search Console Setup Guide">
+    <DashboardShell title="Set Up Google Search Console">
       <div style={{ maxWidth: 700 }}>
         <GuideBreadcrumb />
         <p style={{ fontSize: 13.5, color: 'var(--t2)', lineHeight: 1.7, margin: '0 0 6px' }}>
-          Google Search Console is a free tool from Google that shows you what people actually searched for before they landed on your website — and how often you showed up. Once you connect it, those numbers appear right on your Reporting page in ProjectCheckin.
+          Google Search Console is a free tool from Google. It tells you what people typed into Google right before they found your business, how often you showed up, and how many people clicked. This guide walks you through setting it up from scratch.
         </p>
         <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '0 0 8px', lineHeight: 1.6 }}>
-          You only need this guide if ProjectCheckin told you it couldn&apos;t find a verified website on your Google account. If your connection already worked, there&apos;s nothing to do here.
+          Already have Search Console set up? Skip this and go straight to the <Link href="/help/guides/gsc-connect" style={guideLink}>Connect Google Search Console</Link> guide.
         </p>
 
-        <GuideSection title="What &ldquo;Verified&rdquo; Means — Read This First" defaultOpen>
+        <GuideSection title="Before You Start" defaultOpen>
           <p style={guideP}>
-            Google won&apos;t show anyone a website&apos;s search data until that person has proven they actually own the website. Google calls this <strong style={guideStrong}>verifying</strong> it. It&apos;s a one-time thing you do on Google&apos;s site, and it&apos;s free.
+            Three things to have ready:
           </p>
-          <p style={guideP}>
-            This is why connecting to ProjectCheckin isn&apos;t enough on its own. Signing in with Google lets us <em>ask</em> for your data — but if you&apos;ve never verified your website with Google, there&apos;s simply no data there yet for us to show you.
-          </p>
+          <Step n={1}>
+            <strong style={guideStrong}>A Google account.</strong> Any Gmail address works. Use the one you want tied to your business long-term — you&apos;ll sign in with this same account when you connect to ProjectCheckin, so pick one you won&apos;t lose access to.
+          </Step>
+          <Step n={2}>
+            <strong style={guideStrong}>Your website address.</strong> The one people type to find you, like <code>www.yourbusiness.com</code>.
+          </Step>
+          <Step n={3}>
+            <strong style={guideStrong}>A way to edit your website</strong> — or the phone number of whoever built it. You&apos;ll need to add one small piece of code, once. If someone else manages your site, they can do this part in about two minutes.
+          </Step>
           <p style={guidePLast}>
-            The whole process below usually takes about 10-15 minutes, plus a wait of a few days before real numbers start appearing.
+            Total time: about 15 minutes. You only ever do this once.
           </p>
         </GuideSection>
 
-        <GuideSection title="Step 1 — Add Your Website to Google Search Console">
-          <Step n={1}>Go to <strong style={guideStrong}>search.google.com/search-console</strong> and sign in with the same Google account you use for your business.</Step>
-          <Step n={2}>If this is your first time, Google shows you a &ldquo;Welcome&rdquo; screen asking for a website. If you&apos;ve been here before, click the dropdown in the top-left and choose <strong style={guideStrong}>Add property</strong>.</Step>
-          <Step n={3}>You&apos;ll see two boxes side by side: <strong style={guideStrong}>Domain</strong> and <strong style={guideStrong}>URL prefix</strong>. Use the <strong style={guideStrong}>URL prefix</strong> box on the right — it&apos;s the easier of the two to verify.</Step>
-          <Step n={4}>Type your full website address exactly as it appears in your browser, including the <code>https://</code> part (for example <code>https://www.yourbusiness.com</code>), then click <strong style={guideStrong}>Continue</strong>.</Step>
+        <GuideSection title="Step 1 — Add Your Website to Search Console">
+          <Step n={1}>Go to <strong style={guideStrong}>search.google.com/search-console</strong> in your web browser.</Step>
+          <Step n={2}>Click <strong style={guideStrong}>Start now</strong> and sign in with your Google account.</Step>
+          <Step n={3}>
+            You&apos;ll see two boxes side by side: <strong style={guideStrong}>Domain</strong> on the left and <strong style={guideStrong}>URL prefix</strong> on the right. Use the <strong style={guideStrong}>URL prefix</strong> box on the right. It&apos;s the easier one.
+          </Step>
+          <Step n={4}>
+            Type your full website address into that box, exactly as it appears in your browser&apos;s address bar — including the <code>https://</code> part. For example: <code>https://www.yourbusiness.com</code>
+          </Step>
+          <Step n={5}>Click <strong style={guideStrong}>Continue</strong>.</Step>
           <p style={guidePLast}>
-            Google now asks you to prove you own it. That&apos;s the next step.
+            Google now needs you to prove the website is really yours. That&apos;s Step 2.
+          </p>
+          <p style={guideHint}>
+            Not sure whether your address uses &ldquo;www&rdquo; or not? Open your website, then copy exactly what shows in the address bar. Google treats <code>www.yourbusiness.com</code> and <code>yourbusiness.com</code> as two different websites, so this has to match.
           </p>
         </GuideSection>
 
-        <GuideSection title="Step 2 — Prove You Own It (Pick the Easiest Option)">
+        <GuideSection title="Step 2 — Prove the Website Is Yours">
           <p style={guideP}>
-            Google offers several ways to verify. You only need <strong style={guideStrong}>one</strong> of them to work. They&apos;re listed below easiest-first — try them in this order.
+            Google calls this <strong style={guideStrong}>verifying</strong>. It shows you a list of methods. You only need <strong style={guideStrong}>one</strong> of them to work — ignore the rest.
           </p>
-          <p style={guideP}><strong style={guideStrong}>Option A — Already use Google Analytics?</strong> If your website already has Google Analytics on it, and it&apos;s under this same Google account, expand the <strong style={guideStrong}>Google Analytics</strong> option and click <strong style={guideStrong}>Verify</strong>. It usually works instantly with nothing else to do.</p>
-          <p style={guideP}><strong style={guideStrong}>Option B — Already use Google Tag Manager?</strong> Same idea. Expand <strong style={guideStrong}>Google Tag Manager</strong> and click <strong style={guideStrong}>Verify</strong>.</p>
-          <p style={guideP}><strong style={guideStrong}>Option C — The HTML file.</strong> Expand <strong style={guideStrong}>HTML file</strong>, download the small file Google gives you, and upload it to your website so it sits at the top level (so it&apos;s reachable at something like <code>yourbusiness.com/google123abc.html</code>). If someone else manages your website, forward them the file and ask them to &ldquo;upload this to the root of the site&rdquo; — it&apos;s a routine request and takes them a minute. Then come back and click <strong style={guideStrong}>Verify</strong>.</p>
-          <p style={guideP}><strong style={guideStrong}>Option D — The HTML tag.</strong> Expand <strong style={guideStrong}>HTML tag</strong> and copy the line of code. If your site runs on WordPress, Squarespace, Wix, or Webflow, each has a box in its settings for exactly this kind of code — usually labelled something like &ldquo;header code,&rdquo; &ldquo;custom code,&rdquo; or &ldquo;code injection.&rdquo; Paste it there, save, then click <strong style={guideStrong}>Verify</strong>.</p>
+          <p style={guideP}>
+            <strong style={guideStrong}>Start here:</strong> if the list shows <strong style={guideStrong}>Google Analytics</strong> or <strong style={guideStrong}>Google Tag Manager</strong> and you already use either one, click it and hit <strong style={guideStrong}>Verify</strong>. It usually finishes instantly with nothing else to do.
+          </p>
+          <p style={guideP}>
+            Otherwise, use the <strong style={guideStrong}>HTML tag</strong> method. Click <strong style={guideStrong}>HTML tag</strong> to expand it, then click the <strong style={guideStrong}>Copy</strong> button next to the line of code. It looks something like this:
+          </p>
+          <p style={{ ...guideP, fontFamily: "'Courier New', monospace", fontSize: 11.5, background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 13px', wordBreak: 'break-all' }}>
+            &lt;meta name=&quot;google-site-verification&quot; content=&quot;AbC123...&quot; /&gt;
+          </p>
+          <p style={guideP}>
+            Now find your website platform below and follow those steps to paste it in. <strong style={guideStrong}>Leave the Search Console tab open</strong> — you&apos;ll come back to it.
+          </p>
+
+          <GuideSubsection title="WordPress">
+            <Step n={1}>Log into your WordPress admin — usually <code>yoursite.com/wp-admin</code>.</Step>
+            <Step n={2}>Most WordPress sites have an SEO plugin. In the left menu, look for <strong style={guideStrong}>Yoast SEO</strong>, <strong style={guideStrong}>Rank Math</strong>, or <strong style={guideStrong}>All in One SEO</strong>.</Step>
+            <Step n={3}>
+              <strong style={guideStrong}>If you have Yoast SEO:</strong> click Yoast SEO → <strong style={guideStrong}>Settings</strong> → <strong style={guideStrong}>Site connections</strong>. Paste the code into the <strong style={guideStrong}>Google</strong> box, then click <strong style={guideStrong}>Save changes</strong>.
+            </Step>
+            <Step n={4}>
+              <strong style={guideStrong}>If you have Rank Math:</strong> click Rank Math → <strong style={guideStrong}>General Settings</strong> → <strong style={guideStrong}>Webmaster Tools</strong>. Paste into the <strong style={guideStrong}>Google Search Console</strong> box and save.
+            </Step>
+            <Step n={5}>
+              <strong style={guideStrong}>If you have no SEO plugin:</strong> go to <strong style={guideStrong}>Appearance → Theme File Editor</strong>, open <code>header.php</code>, and paste the code on its own line right before <code>&lt;/head&gt;</code>. Click <strong style={guideStrong}>Update File</strong>. If that sounds risky, install the free plugin <strong style={guideStrong}>Insert Headers and Footers</strong> instead and paste it there — it&apos;s safer and does the same job.
+            </Step>
+            <p style={guidePLast}>Go back to the Search Console tab and click <strong style={guideStrong}>Verify</strong>.</p>
+          </GuideSubsection>
+
+          <GuideSubsection title="Squarespace">
+            <Step n={1}>Log into squarespace.com and open your site.</Step>
+            <Step n={2}>In the left menu click <strong style={guideStrong}>Settings</strong>.</Step>
+            <Step n={3}>Click <strong style={guideStrong}>Developer Tools</strong>, then <strong style={guideStrong}>Code Injection</strong>.</Step>
+            <Step n={4}>Paste the code into the <strong style={guideStrong}>Header</strong> box (the top one).</Step>
+            <Step n={5}>Click <strong style={guideStrong}>Save</strong> in the top-left.</Step>
+            <p style={guidePLast}>Go back to the Search Console tab and click <strong style={guideStrong}>Verify</strong>.</p>
+            <p style={guideHint}>Code Injection needs a paid Squarespace plan. On a free trial you won&apos;t see it — use the HTML file method in Search Console instead, or verify through Google Analytics.</p>
+          </GuideSubsection>
+
+          <GuideSubsection title="Wix">
+            <Step n={1}>Log into wix.com and open your site&apos;s dashboard.</Step>
+            <Step n={2}>In the left menu click <strong style={guideStrong}>Marketing &amp; SEO</strong>, then <strong style={guideStrong}>SEO Tools</strong>.</Step>
+            <Step n={3}>Click <strong style={guideStrong}>Site Verification</strong> (on some accounts it&apos;s called <strong style={guideStrong}>Verify your site</strong>).</Step>
+            <Step n={4}>Paste the code into the <strong style={guideStrong}>Google</strong> box.</Step>
+            <Step n={5}>Click <strong style={guideStrong}>Save</strong>.</Step>
+            <p style={guidePLast}>Go back to the Search Console tab and click <strong style={guideStrong}>Verify</strong>.</p>
+            <p style={guideHint}>Wix also has a one-click Search Console connection under Marketing &amp; SEO. If you see it, that works too and skips the copy-paste entirely.</p>
+          </GuideSubsection>
+
+          <GuideSubsection title="GoDaddy Website Builder">
+            <Step n={1}>Log into godaddy.com and open your website in the editor.</Step>
+            <Step n={2}>Click <strong style={guideStrong}>Settings</strong>, then look for <strong style={guideStrong}>Site-wide Code</strong> or <strong style={guideStrong}>Custom Code</strong>.</Step>
+            <Step n={3}>Paste the code into the <strong style={guideStrong}>Head</strong> or <strong style={guideStrong}>Header</strong> box.</Step>
+            <Step n={4}>Click <strong style={guideStrong}>Save</strong>, then <strong style={guideStrong}>Publish</strong> your site. The code isn&apos;t live until you publish.</Step>
+            <p style={guidePLast}>Go back to the Search Console tab and click <strong style={guideStrong}>Verify</strong>.</p>
+          </GuideSubsection>
+
+          <GuideSubsection title="Webflow">
+            <Step n={1}>Open your project in Webflow.</Step>
+            <Step n={2}>Click the <strong style={guideStrong}>Settings</strong> gear icon, then the <strong style={guideStrong}>Custom Code</strong> tab.</Step>
+            <Step n={3}>Paste the code into the <strong style={guideStrong}>Head Code</strong> box.</Step>
+            <Step n={4}>Click <strong style={guideStrong}>Save Changes</strong>, then <strong style={guideStrong}>Publish</strong> your site. It won&apos;t work until you publish.</Step>
+            <p style={guidePLast}>Go back to the Search Console tab and click <strong style={guideStrong}>Verify</strong>.</p>
+          </GuideSubsection>
+
+          <GuideSubsection title="Someone Else Built My Website">
+            <p style={guideP}>
+              This is normal and it&apos;s a quick ask. Send them this message:
+            </p>
+            <p style={{ ...guideP, background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px' }}>
+              &ldquo;Hi — I&apos;m setting up Google Search Console for our website. Can you add this verification tag to the &lt;head&gt; section of the site and let me know when it&apos;s live? Here&apos;s the code: [paste the code here]&rdquo;
+            </p>
+            <p style={guidePLast}>
+              Once they tell you it&apos;s done, go back to the Search Console tab and click <strong style={guideStrong}>Verify</strong>.
+            </p>
+          </GuideSubsection>
+
+          <GuideSubsection title="Plain HTML Website">
+            <Step n={1}>Open the HTML file for your homepage — usually called <code>index.html</code>.</Step>
+            <Step n={2}>Open it with Notepad (Windows) or TextEdit (Mac). Don&apos;t use Microsoft Word — it can break the file.</Step>
+            <Step n={3}>Press Ctrl+F (Cmd+F on Mac) and search for <code>&lt;/head&gt;</code>.</Step>
+            <Step n={4}>Click right before <code>&lt;/head&gt;</code> and paste the code on its own line.</Step>
+            <Step n={5}>Save the file and upload it back to your web host, the same way you normally would.</Step>
+            <p style={guidePLast}>Go back to the Search Console tab and click <strong style={guideStrong}>Verify</strong>.</p>
+          </GuideSubsection>
+        </GuideSection>
+
+        <GuideSection title="Step 3 — Confirm It Worked">
+          <p style={guideP}>
+            After you click Verify, Google shows one of two things:
+          </p>
+          <p style={guideP}>
+            <strong style={guideStrong}>&ldquo;Ownership verified&rdquo;</strong> — you&apos;re done. Click <strong style={guideStrong}>Go to property</strong> and you&apos;ll land on your new dashboard.
+          </p>
+          <p style={guideP}>
+            <strong style={guideStrong}>&ldquo;Verification failed&rdquo;</strong> — almost always one of these three:
+          </p>
+          <Step n={1}>You didn&apos;t publish your site after pasting the code. Squarespace, Wix, GoDaddy, and Webflow all need a <strong style={guideStrong}>Publish</strong> click before changes go live.</Step>
+          <Step n={2}>The code went into the Footer box instead of the Header box. It has to be the header.</Step>
+          <Step n={3}>The website address you typed in Step 1 doesn&apos;t match your real one — usually a missing or extra <code>www</code>. Go back and add it again the other way.</Step>
           <p style={guidePLast}>
-            Once any one of these succeeds, you&apos;ll see a &ldquo;Ownership verified&rdquo; message. That&apos;s the hard part done.
+            Fix whichever it was and click <strong style={guideStrong}>Verify</strong> again. You can retry as many times as you need.
           </p>
         </GuideSection>
 
-        <GuideSection title="Step 3 — Connect It To ProjectCheckin">
-          <Step n={1}>Come back to ProjectCheckin and click <strong style={guideStrong}>Account</strong> in the left sidebar.</Step>
-          <Step n={2}>Click the <strong style={guideStrong}>Connections</strong> tab.</Step>
-          <Step n={3}>Find <strong style={guideStrong}>Connect Google Search Console</strong> and click it to expand it.</Step>
-          <Step n={4}>If you already connected before and just verified your site now, click <strong style={guideStrong}>Check again</strong> — you don&apos;t need to sign in a second time. Otherwise click <strong style={guideStrong}>Connect Google Search Console</strong> and approve the request on Google&apos;s screen.</Step>
-          <Step n={5}>If you have more than one website on your Google account, pick the one you want from the dropdown and click <strong style={guideStrong}>Save selection</strong>.</Step>
+        <GuideSection title="Step 4 — Connect It To ProjectCheckin">
           <p style={guidePLast}>
-            That&apos;s it. Your search numbers will show on the <Link href="/reporting" style={guideLink}>Reporting</Link> page.
+            Now that Google knows the site is yours, follow the <Link href="/help/guides/gsc-connect" style={guideLink}>Connect Google Search Console</Link> guide. That part takes about 30 seconds.
           </p>
         </GuideSection>
 
         <GuideSection title="Why Am I Seeing Zeros?">
           <p style={guideP}>
-            This is normal and almost never a mistake. Google only starts collecting your search data <strong style={guideStrong}>from the day you verify</strong> — it doesn&apos;t backfill history you missed. Expect a few days before numbers appear, and a couple of weeks before they mean much.
+            This is normal, and it isn&apos;t a mistake. Google only starts recording your search data <strong style={guideStrong}>from the day you verify</strong>. It does not fill in history from before that.
           </p>
           <p style={guidePLast}>
-            Google&apos;s data also runs two to three days behind, so the last day or two will always look emptier than it really is. That&apos;s Google&apos;s reporting delay, not a problem with your website or with ProjectCheckin.
+            Expect a few days before any numbers appear, and two to three weeks before they tell you much. Google&apos;s reporting also runs two to three days behind, so the last couple of days always look emptier than they really are.
           </p>
         </GuideSection>
 
         <GuideSection title="Still Stuck?">
           <p style={guidePLast}>
-            If verification keeps failing, or you&apos;re not sure who manages your website, get in touch from the <Link href="/help" style={guideLink}>Help &amp; Support</Link> page and we&apos;ll walk through it with you.
+            Get in touch from the <Link href="/help" style={guideLink}>Help &amp; Support</Link> page and we&apos;ll walk through it with you.
           </p>
         </GuideSection>
       </div>
