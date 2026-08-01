@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { tierHasFeature } from '@/lib/planVersions'
+import { fetchPerformance } from '@/lib/gscApi'
 import { ReportingJobTableBody } from '@/components/ReportingJobTableBody'
 import { ReportingPhotoTableBody } from '@/components/ReportingPhotoTableBody'
 import DashboardShell from '@/components/DashboardShell'
@@ -135,6 +137,7 @@ export default async function ReportingPage({
     dir?: string
     photoSort?: string
     photoDir?: string
+    orgId?: string
   }>
 }) {
   const resolvedSearchParams = await Promise.resolve(searchParams)
@@ -150,10 +153,60 @@ export default async function ReportingPage({
     )
   }
 
+  // Superadmin can view any org's real numbers via ?orgId=, regardless of
+  // that org's own visibility toggle. Never trust this param from anyone else.
+  const isSuperAdmin = currentUser.role === 'SUPER_ADMIN'
+  const requestedOrgId = isSuperAdmin ? resolvedSearchParams?.orgId : undefined
+  const effectiveOrgId = requestedOrgId || currentUser.organizationId
+  const isSuperAdminView = isSuperAdmin && !!requestedOrgId
+
+  const viewedOrg = await prisma.organization.findUnique({
+    where: { id: effectiveOrgId },
+    select: {
+      name: true,
+      showEngagementMetrics: true,
+      showPortfolioViewsMetric: true,
+      planTier: true,
+      gscAccessToken: true,
+      gscRefreshToken: true,
+      gscPropertyUrl: true,
+      gscConnectionStatus: true,
+    },
+  })
+
+  if (!viewedOrg) {
+    return (
+      <DashboardShell title="Reporting">
+        <div className="db-shell-card">
+          <p style={{ fontSize: 13, color: 'var(--t2)' }}>Organization not found.</p>
+        </div>
+      </DashboardShell>
+    )
+  }
+
+  const showEngagement = isSuperAdminView || viewedOrg.showEngagementMetrics
+  const showPortfolioViews = isSuperAdminView || viewedOrg.showPortfolioViewsMetric
+
+  // ── Google Search Console (Elite + Titan) ──
+  // Fetched live on page load rather than synced by a cron: Search Console's
+  // own data only refreshes every few days, so a cached copy would be no
+  // fresher (design doc §2). Losing the plan hides the section but never
+  // deletes the connection, so re-upgrading needs no re-setup.
+  const showGsc = tierHasFeature(viewedOrg.planTier, 'gsc_integration')
+  const gscConnected =
+    showGsc && viewedOrg.gscConnectionStatus === 'connected' && !!viewedOrg.gscRefreshToken && !!viewedOrg.gscPropertyUrl
+
+  const gsc = gscConnected
+    ? await fetchPerformance(viewedOrg.gscRefreshToken!, viewedOrg.gscAccessToken, viewedOrg.gscPropertyUrl!)
+    : null
+  // A failed fetch degrades to the not-connected layout rather than taking the
+  // whole Reporting page down — every other section here is unrelated to GSC.
+  const gscData = gsc?.ok ? gsc.data : undefined
+
   // ── All-time totals ──
   const grouped = await prisma.checkInEvent.groupBy({
     by: ['eventType'],
-    where: { checkIn: { organizationId: currentUser.organizationId } },
+    where: { checkIn: { organizationId: effectiveOrgId } },
     _count: { _all: true },
   })
 
@@ -169,7 +222,7 @@ export default async function ReportingPage({
 
   const dailyRaw = await prisma.checkInEvent.findMany({
     where: {
-      checkIn: { organizationId: currentUser.organizationId },
+      checkIn: { organizationId: effectiveOrgId },
       createdAt: { gte: thirtyDaysAgo },
     },
     select: { eventType: true, createdAt: true },
@@ -225,7 +278,7 @@ export default async function ReportingPage({
   // ── Portfolio view counts (last 30 days) ──
   const portfolioRaw = await prisma.portfolioView.findMany({
     where: {
-      organizationId: currentUser.organizationId,
+      organizationId: effectiveOrgId,
       createdAt: { gte: thirtyDaysAgo },
     },
     select: { createdAt: true },
@@ -245,7 +298,7 @@ export default async function ReportingPage({
 
   // ── Per-job metrics ──
   const checkIns = await prisma.checkIn.findMany({
-    where: { organizationId: currentUser.organizationId },
+    where: { organizationId: effectiveOrgId },
     select: { id: true, doorType: true, city: true, state: true, timestamp: true },
     orderBy: { timestamp: 'desc' },
   })
@@ -253,7 +306,7 @@ export default async function ReportingPage({
   const eventRows = await prisma.checkInEvent.groupBy({
     by: ['checkInId', 'eventType'],
     where: {
-      checkIn: { organizationId: currentUser.organizationId },
+      checkIn: { organizationId: effectiveOrgId },
       eventType: { in: ['PAGE_VIEW', 'page_view', 'PHOTO_CLICK', 'photo_click', 'WEBSITE_CLICK', 'website_click', 'PHONE_CLICK', 'phone_click'] },
     },
     _count: { _all: true },
@@ -316,7 +369,7 @@ export default async function ReportingPage({
     where: {
       eventType: { in: ['PHOTO_CLICK', 'photo_click'] },
       metadata: { not: null },
-      checkIn: { organizationId: currentUser.organizationId },
+      checkIn: { organizationId: effectiveOrgId },
     },
     select: {
       checkInId: true,
@@ -397,6 +450,14 @@ export default async function ReportingPage({
   return (
     <DashboardShell title="Reporting">
 
+      {isSuperAdminView && (
+        <div style={{ background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E', fontSize: 12, fontWeight: 600, padding: '8px 14px', borderRadius: 8, marginBottom: 16 }}>
+          Viewing {viewedOrg.name}&apos;s reporting as SUPER_ADMIN — this customer&apos;s own toggles: Engagement Metrics {viewedOrg.showEngagementMetrics ? 'ON' : 'OFF'}, Portfolio Views {viewedOrg.showPortfolioViewsMetric ? 'ON' : 'OFF'}.
+        </div>
+      )}
+
+      {showEngagement && (
+      <>
       {/* ── Hero trend card ── */}
       <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
         <div style={{ padding: '18px 22px 12px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
@@ -476,8 +537,10 @@ export default async function ReportingPage({
           )
         })}
       </div>
+      </>
+      )}
 
-      {/* ── Google Business Profile section ── */}
+      {/* ── Google Business Profile section (always visible — not projectcheckin-URL tied) ── */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
@@ -512,9 +575,99 @@ export default async function ReportingPage({
         </div>
       </div>
 
+      {/* ── Google Search Console section (Elite + Titan only) ── */}
+      {showGsc && (
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Google Search Console Performance</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>
+              {gscData
+                ? `Last 28 days · ${viewedOrg.gscPropertyUrl}`
+                : "Clicks, impressions, and ranking position from your website's real Google Search data"}
+            </div>
+          </div>
+          <Link
+            href="/account"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'var(--surface)', border: '1px solid var(--border-2)', color: 'var(--t2)', textDecoration: 'none', flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            {gscData ? 'Manage connection' : 'Connect GSC'}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+            </svg>
+          </Link>
+        </div>
+
+        <div className="rpt-gbp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          {[
+            { label: 'Clicks', value: gscData?.totals.clicks },
+            { label: 'Impressions', value: gscData?.totals.impressions },
+            { label: 'Avg. Position', value: gscData?.totals.position },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px', boxShadow: 'var(--shadow-card)' }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--t3)', marginBottom: 8 }}>{label}</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: gscData ? 'var(--t1)' : 'var(--t3)', lineHeight: 1, letterSpacing: '-0.3px' }}>
+                {value === undefined ? '—' : value.toLocaleString()}
+              </div>
+              {!gscData && <div style={{ marginTop: 10, height: 4, borderRadius: 4, background: 'var(--surface-3)' }} />}
+            </div>
+          ))}
+        </div>
+
+        {!gscData ? (
+          <div style={{ marginTop: 10, background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--t3)', lineHeight: 1.5 }}>
+            Connect Google Search Console in{' '}
+            <Link href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
+              Account &rsaquo; Connections
+            </Link>{' '}
+            to see this data here.
+          </div>
+        ) : (
+          <>
+            {([
+              { title: 'Top Search Queries', header: 'Query', rows: gscData.topQueries },
+              { title: 'Top Pages', header: 'Page', rows: gscData.topPages },
+            ] as const).map(({ title, header, rows }) => (
+              <div key={title} className="db-shell-card" style={{ padding: 0, overflow: 'hidden', marginTop: 12 }}>
+                <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
+                  <div className="db-shell-card-title" style={{ marginBottom: 0 }}>{title}</div>
+                </div>
+                {rows.length === 0 ? (
+                  <div style={{ padding: 24, fontSize: 13, color: 'var(--t3)' }}>
+                    No Search Console data yet. Google needs a few days of search activity before this fills in.
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="db-shell-table">
+                      <thead>
+                        <tr><th>{header}</th><th>Clicks</th><th>Impressions</th></tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((row, i) => (
+                          <tr key={row.key || i}>
+                            <td>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: 'var(--surface-3)', color: 'var(--t3)', fontSize: 10, fontWeight: 700, marginRight: 8 }}>{i + 1}</span>
+                              {row.key}
+                            </td>
+                            <td>{row.clicks.toLocaleString()}</td>
+                            <td>{row.impressions.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+      )}
+
       {/* ── Engagement breakdown ── */}
-      <div className="rpt-engagement-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        {/* Donut card — flex-column so content fills full tile height */}
+      <div className="rpt-engagement-grid" style={{ display: 'grid', gridTemplateColumns: showEngagement ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 16 }}>
+        {/* Donut card — projectcheckin-URL engagement, gated. flex-column so content fills full tile height */}
+        {showEngagement && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 20px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)' }}>Engagement Breakdown</div>
           {engagementTotal > 0 ? (
@@ -563,9 +716,10 @@ export default async function ReportingPage({
             </div>
           )}
         </div>
+        )}
 
-        {/* Right column: Recent GBP Posts + Portfolio Views side by side */}
-        <div className="rpt-sidebar-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {/* Right column: Recent GBP Posts (always visible) + Portfolio Views (gated independently) */}
+        <div className="rpt-sidebar-grid" style={{ display: 'grid', gridTemplateColumns: showPortfolioViews ? '1fr 1fr' : '1fr', gap: 12 }}>
           {/* Recent GBP Posts */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 16px', boxShadow: 'var(--shadow-card)' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)', marginBottom: 14 }}>Recent GBP Posts</div>
@@ -582,7 +736,8 @@ export default async function ReportingPage({
             </div>
           </div>
 
-          {/* Portfolio Views */}
+          {/* Portfolio Views — gated independently via showPortfolioViewsMetric */}
+          {showPortfolioViews && (
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 16px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)', marginBottom: 6 }}>Portfolio Views</div>
             {portfolioTotal > 0 ? (
@@ -610,9 +765,12 @@ export default async function ReportingPage({
               </div>
             )}
           </div>
+          )}
         </div>
       </div>
 
+      {showEngagement && (
+      <>
       {/* ── Per-job table ── */}
       <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
@@ -686,6 +844,8 @@ export default async function ReportingPage({
           </div>
         )}
       </div>
+      </>
+      )}
 
     </DashboardShell>
   )
