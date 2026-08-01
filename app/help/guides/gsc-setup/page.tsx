@@ -87,37 +87,45 @@ export default function GscSetupGuidePage() {
 
           <GuideSubsection title="Squarespace">
             <Step n={1}>Log into squarespace.com and open your site.</Step>
-            <Step n={2}>In the left menu click <strong style={guideStrong}>Settings</strong>.</Step>
-            <Step n={3}>Click <strong style={guideStrong}>Developer Tools</strong>, then <strong style={guideStrong}>Code Injection</strong>.</Step>
-            <Step n={4}>Paste the code into the <strong style={guideStrong}>Header</strong> box (the top one).</Step>
-            <Step n={5}>Click <strong style={guideStrong}>Save</strong> in the top-left.</Step>
+            <Step n={2}>Open <strong style={guideStrong}>Code Injection</strong>. The quickest way to find it is the search box in your Squarespace admin — type &ldquo;code injection&rdquo; and click the result. (It lives under Website Tools, but Squarespace has moved this menu around between versions, so searching is more reliable than clicking through.)</Step>
+            <Step n={3}>Paste the code into the <strong style={guideStrong}>Header</strong> box — the top one.</Step>
+            <Step n={4}>Click <strong style={guideStrong}>Save</strong>.</Step>
             <p style={guidePLast}>Go back to the Search Console tab and click <strong style={guideStrong}>Verify</strong>.</p>
-            <p style={guideHint}>Code Injection needs a paid Squarespace plan. On a free trial you won&apos;t see it — use the HTML file method in Search Console instead, or verify through Google Analytics.</p>
+            <p style={guideHint}>Code Injection is included on the Core, Plus, and Advanced plans (and some older plans). If you can&apos;t find it at all, your plan likely doesn&apos;t include it — verify through Google Analytics instead, or use the HTML file method in Search Console.</p>
           </GuideSubsection>
 
           <GuideSubsection title="Wix">
             <Step n={1}>Log into wix.com and open your site&apos;s dashboard.</Step>
-            <Step n={2}>In the left menu click <strong style={guideStrong}>Marketing &amp; SEO</strong>, then <strong style={guideStrong}>SEO Tools</strong>.</Step>
-            <Step n={3}>Click <strong style={guideStrong}>Site Verification</strong> (on some accounts it&apos;s called <strong style={guideStrong}>Verify your site</strong>).</Step>
-            <Step n={4}>Paste the code into the <strong style={guideStrong}>Google</strong> box.</Step>
+            <Step n={2}>In the left menu click <strong style={guideStrong}>SEO &amp; GEO</strong>.</Step>
+            <Step n={3}>Scroll down to <strong style={guideStrong}>Tools and settings</strong> and click <strong style={guideStrong}>Site Verification</strong>.</Step>
+            <Step n={4}>Click <strong style={guideStrong}>Google</strong> to expand that section, then paste the code into the field.</Step>
             <Step n={5}>Click <strong style={guideStrong}>Save</strong>.</Step>
             <p style={guidePLast}>Go back to the Search Console tab and click <strong style={guideStrong}>Verify</strong>.</p>
-            <p style={guideHint}>Wix also has a one-click Search Console connection under Marketing &amp; SEO. If you see it, that works too and skips the copy-paste entirely.</p>
+            <p style={guideHint}>Your site has to be published first, and &ldquo;Let search engines index your site&rdquo; must be turned on in your SEO settings. Wix also offers a guided SEO Setup Checklist that connects you to Google in one flow — if you see it, that works too.</p>
           </GuideSubsection>
 
-          <GuideSubsection title="GoDaddy Website Builder">
-            <Step n={1}>Log into godaddy.com and open your website in the editor.</Step>
-            <Step n={2}>Click <strong style={guideStrong}>Settings</strong>, then look for <strong style={guideStrong}>Site-wide Code</strong> or <strong style={guideStrong}>Custom Code</strong>.</Step>
-            <Step n={3}>Paste the code into the <strong style={guideStrong}>Head</strong> or <strong style={guideStrong}>Header</strong> box.</Step>
-            <Step n={4}>Click <strong style={guideStrong}>Save</strong>, then <strong style={guideStrong}>Publish</strong> your site. The code isn&apos;t live until you publish.</Step>
-            <p style={guidePLast}>Go back to the Search Console tab and click <strong style={guideStrong}>Verify</strong>.</p>
+          <GuideSubsection title="GoDaddy Websites + Marketing">
+            <p style={guideP}>
+              <strong style={guideStrong}>The HTML tag method does not work on GoDaddy&apos;s website builder.</strong> GoDaddy only lets you add custom code inside a page&apos;s content, and Google requires this tag in the page&apos;s hidden header area. Pasting it into a page section will fail verification. Use one of these instead:
+            </p>
+            <p style={guideP}><strong style={guideStrong}>Option 1 — Google Analytics (easiest if you already use it).</strong> GoDaddy has a built-in Google Analytics connection in your site&apos;s Settings. Once Analytics is connected, go back to Search Console, expand the <strong style={guideStrong}>Google Analytics</strong> verification method, and click <strong style={guideStrong}>Verify</strong>.</p>
+            <p style={guideP}><strong style={guideStrong}>Option 2 — Verify through your domain instead.</strong> This works no matter what your site is built with, as long as your domain is registered at GoDaddy:</p>
+            <Step n={1}>In Search Console, add your website again — but this time use the <strong style={guideStrong}>Domain</strong> box on the left instead of URL prefix. Enter just <code>yourbusiness.com</code>, with no <code>https://</code> and no <code>www</code>.</Step>
+            <Step n={2}>Google shows you a <strong style={guideStrong}>TXT record</strong>. Click <strong style={guideStrong}>Copy</strong>.</Step>
+            <Step n={3}>In a new tab, log into godaddy.com, click your name in the top-right, and choose <strong style={guideStrong}>My Products</strong>.</Step>
+            <Step n={4}>Find your domain and click <strong style={guideStrong}>DNS</strong> next to it.</Step>
+            <Step n={5}>Click <strong style={guideStrong}>Add New Record</strong>. Set <strong style={guideStrong}>Type</strong> to <strong style={guideStrong}>TXT</strong>, set <strong style={guideStrong}>Name</strong> to <code>@</code>, and paste the copied value into <strong style={guideStrong}>Value</strong>. Leave TTL as-is.</Step>
+            <Step n={6}>Click <strong style={guideStrong}>Save</strong>, then go back to Search Console and click <strong style={guideStrong}>Verify</strong>.</Step>
+            <p style={guidePLast}>
+              DNS changes can take a few minutes to an hour. If it fails on the first try, wait 15 minutes and click Verify again — the record is fine, Google just hasn&apos;t seen it yet.
+            </p>
           </GuideSubsection>
 
           <GuideSubsection title="Webflow">
             <Step n={1}>Open your project in Webflow.</Step>
-            <Step n={2}>Click the <strong style={guideStrong}>Settings</strong> gear icon, then the <strong style={guideStrong}>Custom Code</strong> tab.</Step>
-            <Step n={3}>Paste the code into the <strong style={guideStrong}>Head Code</strong> box.</Step>
-            <Step n={4}>Click <strong style={guideStrong}>Save Changes</strong>, then <strong style={guideStrong}>Publish</strong> your site. It won&apos;t work until you publish.</Step>
+            <Step n={2}>Open <strong style={guideStrong}>Site settings</strong>, then click the <strong style={guideStrong}>Custom code</strong> tab.</Step>
+            <Step n={3}>Paste the code into the <strong style={guideStrong}>Head code</strong> field.</Step>
+            <Step n={4}>Click <strong style={guideStrong}>Save changes</strong>, then <strong style={guideStrong}>Publish</strong> your site. Custom code does not go live until you publish.</Step>
             <p style={guidePLast}>Go back to the Search Console tab and click <strong style={guideStrong}>Verify</strong>.</p>
           </GuideSubsection>
 

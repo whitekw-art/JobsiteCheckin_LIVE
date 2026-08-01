@@ -1459,7 +1459,7 @@ export default function AccountPage() {
 
             {/* GOOD · Embed widget (works on any website) */}
             <ConnCard
-              icon={<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>}
+              icon={<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>}
               title="Add a Jobs Gallery to Any Website"
               titleExtra={<TierLabel label="Good" />}
               sub="Paste one snippet — your published jobs appear automatically in a gallery on your site. Works anywhere."
@@ -1692,7 +1692,7 @@ export default function AccountPage() {
 
             {/* BETTER · Hosted subdomain via CNAME */}
             <ConnCard
-              icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="6" rx="1"/><rect x="2" y="15" width="20" height="6" rx="1"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>}
+              icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--sky-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="6" rx="1"/><rect x="2" y="15" width="20" height="6" rx="1"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>}
               title="Host a Branded Page on Your Domain (CNAME)"
               titleExtra={<TierLabel label="Better" />}
               sub="Add one CNAME record — we serve your jobs on your own domain. No code, no plugin."
@@ -1903,7 +1903,7 @@ export default function AccountPage() {
 
             {/* BEST · WordPress native publish */}
             <ConnCard
-              icon={<svg width="19" height="19" viewBox="0 0 24 24" fill="var(--t2)" stroke="none"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 1.4a8.6 8.6 0 0 1 4.86 1.49h-.1a1.2 1.2 0 0 0-1.16 1.23c0 .57.33 1.05.68 1.62.27.45.58 1.03.58 1.87 0 .58-.22 1.26-.52 2.2l-.68 2.26-2.45-7.3c.41-.02.78-.06.78-.06.36-.05.32-.58-.05-.56 0 0-1.1.09-1.82.09-.67 0-1.8-.09-1.8-.09-.36-.02-.4.54-.05.56 0 0 .35.04.72.06l1.06 2.9-1.49 4.46-2.48-7.36c.41-.02.78-.06.78-.06.36-.05.32-.58-.05-.56 0 0-1.1.09-1.82.09-.13 0-.28 0-.44-.01A8.6 8.6 0 0 1 12 3.4zM4.3 8.9l3.77 10.32A8.6 8.6 0 0 1 4.3 8.9zm8.2 3.62l2.28 6.24a.7.7 0 0 0 .06.1 8.6 8.6 0 0 1-5.1.06l1.9-5.5.86-.9zm5.9-2.05a8.6 8.6 0 0 1-2.42 8.5l2.35-6.8c.3-.9.44-1.62.44-2.27 0-.24-.02-.46-.05-.68.28.52.44 1.13.44 1.79z"/></svg>}
+              icon={<svg width="19" height="19" viewBox="0 0 24 24" fill="var(--sky-text)" stroke="none"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 1.4a8.6 8.6 0 0 1 4.86 1.49h-.1a1.2 1.2 0 0 0-1.16 1.23c0 .57.33 1.05.68 1.62.27.45.58 1.03.58 1.87 0 .58-.22 1.26-.52 2.2l-.68 2.26-2.45-7.3c.41-.02.78-.06.78-.06.36-.05.32-.58-.05-.56 0 0-1.1.09-1.82.09-.67 0-1.8-.09-1.8-.09-.36-.02-.4.54-.05.56 0 0 .35.04.72.06l1.06 2.9-1.49 4.46-2.48-7.36c.41-.02.78-.06.78-.06.36-.05.32-.58-.05-.56 0 0-1.1.09-1.82.09-.13 0-.28 0-.44-.01A8.6 8.6 0 0 1 12 3.4zM4.3 8.9l3.77 10.32A8.6 8.6 0 0 1 4.3 8.9zm8.2 3.62l2.28 6.24a.7.7 0 0 0 .06.1 8.6 8.6 0 0 1-5.1.06l1.9-5.5.86-.9zm5.9-2.05a8.6 8.6 0 0 1-2.42 8.5l2.35-6.8c.3-.9.44-1.62.44-2.27 0-.24-.02-.46-.05-.68.28.52.44 1.13.44 1.79z"/></svg>}
               title="Publish Into Your WordPress Site"
               titleExtra={<TierLabel label="Best" />}
               sub="Real posts in your own theme — the deepest local-SEO integration we offer."
@@ -2276,7 +2276,7 @@ export default function AccountPage() {
 
           {/* ── Connect Google Search Console (Elite + Titan) ── */}
           <ConnCard
-            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={hasGsc ? 'var(--t2)' : 'var(--t3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>}
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={hasGsc ? 'var(--sky-text)' : 'var(--t3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>}
             title="Connect Google Search Console"
             titleExtra={!hasGsc ? (
               <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: 'var(--surface-3)', color: 'var(--t2)' }}>Elite &amp; Titan</span>
