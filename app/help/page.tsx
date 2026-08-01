@@ -106,10 +106,16 @@ export default function HelpPage() {
             Give your job pages an address on your own domain, with DNS setup steps per registrar.
           </p>
           <Link href="/help/guides/gsc-setup" style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none', marginBottom: 2 }}>
-            Google Search Console Setup Guide
+            Set Up Google Search Console
+          </Link>
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '0 0 16px', lineHeight: 1.6 }}>
+            Don&apos;t have Search Console yet? Create it and verify your website, with step-by-step instructions for WordPress, Squarespace, Wix, GoDaddy, and more.
+          </p>
+          <Link href="/help/guides/gsc-connect" style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none', marginBottom: 2 }}>
+            Connect Google Search Console
           </Link>
           <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: 0, lineHeight: 1.6 }}>
-            Verify your website with Google so your real search clicks and impressions show on your Reporting page.
+            Link your Search Console to ProjectCheckin so your real search clicks and impressions show on your Reporting page.
           </p>
         </HelpSection>
 
