@@ -46,7 +46,7 @@ export default function FreePlanButton() {
           'Continue with free plan'
         )}
       </button>
-      <p className="text-xs text-gray-400 mt-2">No credit card required. Up to 5 published job pages.</p>
+      <p className="text-xs text-gray-400 mt-2">No credit card required.</p>
     </div>
   )
 }

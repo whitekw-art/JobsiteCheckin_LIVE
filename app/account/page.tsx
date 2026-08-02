@@ -2434,7 +2434,6 @@ export default function AccountPage() {
               If you <strong>cancel or downgrade</strong>:
             </p>
             <ul style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.7, paddingLeft: 18, marginBottom: 14 }}>
-              <li>Published job pages beyond your plan limit will be unpublished</li>
               <li>Higher-tier features will be turned off</li>
               {wpStatus === 'connected' && (
                 <li>

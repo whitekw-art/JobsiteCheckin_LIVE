@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { hasFeature } from '@/lib/planVersions'
 import { syncCheckIn, unsyncCheckIn } from '@/lib/wordpressSync'
 
 export async function POST(request: NextRequest) {
@@ -23,26 +22,6 @@ export async function POST(request: NextRequest) {
         { error: 'id and isPublic are required' },
         { status: 400 }
       )
-    }
-
-    // Free tier: max 5 published pages
-    if (isPublic) {
-      const org = await prisma.organization.findUnique({
-        where: { id: currentUser.organizationId },
-        select: { planTier: true, planVersion: true },
-      })
-
-      if (!hasFeature(org?.planTier, org?.planVersion, 'job_pages_unlimited')) {
-        const publishedCount = await prisma.checkIn.count({
-          where: { organizationId: currentUser.organizationId, isPublic: true },
-        })
-        if (publishedCount >= 5) {
-          return NextResponse.json(
-            { error: 'Free plan limit reached. Upgrade to publish more than 5 job pages.' },
-            { status: 403 }
-          )
-        }
-      }
     }
 
     const checkIn = await prisma.checkIn.findFirst({
