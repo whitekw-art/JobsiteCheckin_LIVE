@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-config'
 import { prisma } from '@/lib/prisma'
 import { slugify } from '@/lib/slugify'
+import { defaultProductsForTrade, normalizeProductOptions } from '@/lib/tradeProducts'
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -55,6 +56,18 @@ export async function PATCH(request: NextRequest) {
       return `https://www.${t}`
     }
 
+    // Seed the check-in product list from the chosen trade, but never clobber a list
+    // the customer has already edited (they can re-seed from Account → General).
+    const cleanTrade = trade?.trim() || null
+    const existingOptions = normalizeProductOptions(
+      (await prisma.organization.findUnique({
+        where: { id: user.organizationId },
+        select: { productOptions: true },
+      }))?.productOptions
+    )
+    const seededOptions =
+      existingOptions.length === 0 ? defaultProductsForTrade(cleanTrade) : existingOptions
+
     const updated = await prisma.organization.update({
       where: { id: user.organizationId },
       data: {
@@ -62,7 +75,8 @@ export async function PATCH(request: NextRequest) {
         slug,
         phone:             phone?.trim() || null,
         website:           normalizeWebsite(website),
-        trade:             trade?.trim() || null,
+        trade:             cleanTrade,
+        productOptions:    seededOptions,
         howHeardAbout:     howHeardAbout?.trim() || null,
       },
       select: {

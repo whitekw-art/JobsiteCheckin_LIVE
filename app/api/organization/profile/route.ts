@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { normalizeProductOptions } from '@/lib/tradeProducts'
 
 // Reject text with no digits at all (e.g. a name typed into a phone field) — permissive
 // otherwise, since phone format varies (extensions, international, partial numbers).
@@ -40,6 +41,8 @@ export async function GET() {
         phone: true,
         website: true,
         email: true,
+        trade: true,
+        productOptions: true,
         gbpReviewLink: true,
         portfolioPageUrl: true,
         portfolioIntro: true,
@@ -84,11 +87,13 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const { name, phone, website, email, gbpReviewLink, portfolioPageUrl, portfolioIntro, services, products, serviceArea, businessDescription } = (await request.json()) as {
+    const { name, phone, website, email, trade, productOptions, gbpReviewLink, portfolioPageUrl, portfolioIntro, services, products, serviceArea, businessDescription } = (await request.json()) as {
       name?: string
       phone?: string
       website?: string
       email?: string
+      trade?: string | null
+      productOptions?: unknown
       gbpReviewLink?: string
       portfolioPageUrl?: string | null
       portfolioIntro?: string | null
@@ -148,6 +153,10 @@ export async function PATCH(request: NextRequest) {
         phone: cleanPhone(phone),
         ...(website !== undefined && { website: normalizeWebsite(website) }),
         ...(email !== undefined && { email: email?.trim() || null }),
+        ...(trade !== undefined && { trade: trade?.trim() || null }),
+        // Normalized server-side so a malformed client payload can never poison the
+        // check-in dropdown (non-strings, blanks, dupes, a stored "Other", overlong lists).
+        ...(productOptions !== undefined && { productOptions: normalizeProductOptions(productOptions) }),
         ...(gbpReviewLink !== undefined && { gbpReviewLink: gbpReviewLink || null }),
         ...(portfolioPageUrl !== undefined && { portfolioPageUrl: portfolioPageUrl?.trim() || null }),
         ...(portfolioIntro !== undefined && { portfolioIntro: portfolioIntro?.trim() || null }),
@@ -159,6 +168,8 @@ export async function PATCH(request: NextRequest) {
         phone: true,
         website: true,
         email: true,
+        trade: true,
+        productOptions: true,
         gbpReviewLink: true,
         portfolioPageUrl: true,
         portfolioIntro: true,
