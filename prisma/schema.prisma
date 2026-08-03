@@ -16,6 +16,7 @@ model Organization {
   phone                    String?
   website                  String?
   trade                    String?
+  productOptions           Json                   @default("[]")
   howHeardAbout            String?
   onboardingComplete       Boolean                @default(false)
   stripeCustomerId         String?                @unique

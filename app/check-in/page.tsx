@@ -8,6 +8,7 @@ import imageCompression from 'browser-image-compression'
 import DashboardShell from '@/components/DashboardShell'
 import BeforeAfterCamera from '@/components/BeforeAfterCamera'
 import { tierHasFeature } from '@/lib/planVersions'
+import { OTHER_OPTION, normalizeProductOptions, defaultProductsForTrade } from '@/lib/tradeProducts'
 import '@/styles/checkin.css'
 
 function formatPhone(v: string): string {
@@ -44,6 +45,12 @@ function CheckInContent() {
   const [existingPhotoUrls, setExistingPhotoUrls] = useState<string[]>([])
   const [existingBeforePhotoUrl, setExistingBeforePhotoUrl] = useState<string | null>(null)
   const [existingAfterPhotoUrl, setExistingAfterPhotoUrl] = useState<string | null>(null)
+  // Product dropdown is driven by the org's own editable list (Account → General),
+  // not a hardcoded trade list. `doorType` still holds the final submitted value in
+  // both branches, so no submit-path changes are needed.
+  const [productOptions, setProductOptions] = useState<string[]>([])
+  const [productsLoaded, setProductsLoaded] = useState(false)
+  const [isOtherProduct, setIsOtherProduct] = useState(false)
 
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const libraryInputRef = useRef<HTMLInputElement>(null)
@@ -61,6 +68,29 @@ function CheckInContent() {
   useEffect(() => {
     setContactsSupported(typeof navigator !== 'undefined' && 'contacts' in navigator)
   }, [])
+
+  // Load this org's product/service list for the dropdown. Orgs that onboarded before
+  // the list existed have an empty column — fall back to their trade's defaults so the
+  // dropdown is never blank, with no data migration required.
+  useEffect(() => {
+    fetch('/api/organization/profile')
+      .then((r) => r.json())
+      .then((d) => {
+        const org = d?.organization
+        const saved = normalizeProductOptions(org?.productOptions)
+        setProductOptions(saved.length > 0 ? saved : defaultProductsForTrade(org?.trade))
+      })
+      .catch(() => {})
+      .finally(() => setProductsLoaded(true))
+  }, [])
+
+  // Edit mode: a saved value that isn't in the current list (e.g. it was entered as
+  // free text, or the list changed since) reopens as "Other" rather than silently
+  // disappearing from the dropdown.
+  useEffect(() => {
+    if (!productsLoaded || !doorType || isOtherProduct) return
+    if (!productOptions.includes(doorType)) setIsOtherProduct(true)
+  }, [productsLoaded, doorType, productOptions, isOtherProduct])
 
   const handlePickContact = async () => {
     try {
@@ -478,23 +508,44 @@ function CheckInContent() {
               </div>
             </div>
 
-            {/* Door type */}
+            {/* Product / service — options come from Account → General */}
             <div className="ci-field">
               <label className="ci-label" htmlFor="doorType">Product</label>
               <select
                 id="doorType"
                 className="ci-select"
-                value={doorType}
-                onChange={(e) => setDoorType(e.target.value)}
+                value={isOtherProduct ? OTHER_OPTION : doorType}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === OTHER_OPTION) {
+                    setIsOtherProduct(true)
+                    setDoorType('')
+                  } else {
+                    setIsOtherProduct(false)
+                    setDoorType(v)
+                  }
+                }}
               >
                 <option value="">Select Product</option>
-                <option value="Wood Door">Wood Door</option>
-                <option value="Iron Door">Iron Door</option>
-                <option value="Fiberglass Front Door">Fiberglass Front Door</option>
-                <option value="Fiberglass Back / Patio Door">Fiberglass Back / Patio Door</option>
-                <option value="Barn Door">Barn Door</option>
+                {productOptions.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+                <option value={OTHER_OPTION}>{OTHER_OPTION}</option>
               </select>
             </div>
+
+            {isOtherProduct && (
+              <div className="ci-field">
+                <label className="ci-label" htmlFor="otherProduct">Describe the product / service</label>
+                <input
+                  id="otherProduct"
+                  className="ci-input"
+                  placeholder="e.g. Attic decontamination"
+                  value={doorType}
+                  onChange={(e) => setDoorType(e.target.value)}
+                />
+              </div>
+            )}
 
             {/* Notes */}
             <div className="ci-field">
