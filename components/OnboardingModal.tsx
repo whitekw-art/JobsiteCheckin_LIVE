@@ -29,7 +29,7 @@ const PLAN_LABELS: Record<string, string> = {
 }
 
 const PLAN_FEATURES: Record<string, string[]> = {
-  free:  ['Job check-ins with photos (up to 5 per job)', 'Up to 5 published job pages on Google', 'Basic dashboard'],
+  free:  ['Job check-ins with photos (up to 5 per job)', 'Basic dashboard'],
   pro:   ['Unlimited published job pages with full SEO', 'Portfolio page', 'Analytics & click tracking', 'Google Business Profile post generator'],
   elite: ['Everything in Pro', 'Auto-formatted Google Business Profile posts', 'Professional before & after images', 'Ghost camera overlay', 'Drag-to-reveal widget'],
   titan: ['Everything in Elite', 'Automatic Google Business review requests', 'Custom AI copywriting agent', 'Custom AI Review Request Manager', 'Custom website widget for local SEO', 'Custom subdomain & white-label branding'],
