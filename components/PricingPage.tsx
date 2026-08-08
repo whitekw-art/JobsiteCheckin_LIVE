@@ -132,9 +132,9 @@ export default function PricingPage() {
             <div className="tier-name">Free</div>
             <div className="tier-price">$0<sub>/mo</sub></div>
             <div style={{ height: 18 }} />
-            <p className="tier-tagline">Try it on your first 5 jobs. No card, no commitment.</p>
+            <p className="tier-tagline">No card, no commitment.</p>
             <div className="pc-feats">
-              {['5 published job pages', '5 photos per job', '50 photos per month', 'Owner publish controls', 'Each job page built for Google search', 'Public portfolio page', 'No credit card required'].map(item => (
+              {['5 photos per job', '50 photos per month', 'Owner publish controls', 'Each job page built for Google search', 'Public portfolio page', 'No credit card required'].map(item => (
                 <div className="pf" key={item}><span className="pf-ck">&#10003;</span>{item}</div>
               ))}
             </div>
@@ -206,7 +206,7 @@ export default function PricingPage() {
 
         {/* SINGLE CTA BLOCK */}
         <div className="cta-block">
-          <p className="cta-block-label">Every plan starts with 5 free jobs. Pick your tier during signup — or start free and upgrade anytime.</p>
+          <p className="cta-block-label">Pick your tier during signup — or start free and upgrade anytime.</p>
           <Link href="/auth/register" className="btn-orange">Start Free</Link>
           <p className="cta-block-fine">
             <strong>Cancel anytime.</strong> No contracts. No setup fee. Your data is always yours.
@@ -278,13 +278,6 @@ export default function PricingPage() {
                 </tr>
 
                 <tr className="cat"><td colSpan={5}>Published Job Pages</td></tr>
-                <tr>
-                  <td>Published job pages</td>
-                  <td><span className="cv">5 total</span></td>
-                  <td><span className="cv">Unlimited</span></td>
-                  <td><span className="cv">Unlimited</span></td>
-                  <td><span className="cv">Unlimited</span></td>
-                </tr>
                 <tr>
                   <td>Drag-to-reveal before/after widget</td>
                   <td><span className="cdash">—</span></td>
@@ -443,7 +436,7 @@ export default function PricingPage() {
       {/* FINAL CTA BAND */}
       <div className="cta-band">
         <h2>Start free.<br />No credit card, no commitment.</h2>
-        <p>Five jobs. Zero cost. See if it works for your crew before you spend anything.</p>
+        <p>Zero cost. See if it works for your crew before you spend anything.</p>
         <Link href="/auth/register" className="btn-orange">Get Started Free</Link>
         <div className="fine">No credit card required &middot; Cancel anytime</div>
       </div>

@@ -4,6 +4,13 @@ import { useEffect, useState, FormEvent } from 'react'
 import { useSession } from 'next-auth/react'
 import DashboardShell from '@/components/DashboardShell'
 import { tierHasFeature } from '@/lib/planVersions'
+import {
+  TRADES,
+  OTHER_OPTION,
+  MAX_PRODUCT_OPTIONS,
+  defaultProductsForTrade,
+  normalizeProductOptions,
+} from '@/lib/tradeProducts'
 
 type Tab = 'general' | 'team' | 'billing' | 'connections'
 
@@ -13,6 +20,8 @@ interface OrganizationProfile {
   phone: string | null
   website: string | null
   email: string | null
+  trade: string | null
+  productOptions: unknown
   gbpReviewLink: string | null
   portfolioPageUrl: string | null
   portfolioIntro: string | null
@@ -246,6 +255,10 @@ export default function AccountPage() {
   const [orgEmail, setOrgEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [website, setWebsite] = useState('')
+  const [trade, setTrade] = useState('')
+  const [productList, setProductList] = useState<string[]>([])
+  const [newProduct, setNewProduct] = useState('')
+  const [productError, setProductError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -895,6 +908,13 @@ export default function AccountPage() {
         setOrgEmail(org.email || '')
         setPhone(org.phone || '')
         setWebsite(org.website || '')
+        setTrade(org.trade || '')
+        {
+          // Same fallback as the check-in form: pre-fill from trade defaults for orgs
+          // that predate this list, so the first save persists a sensible starting set.
+          const saved = normalizeProductOptions(org.productOptions)
+          setProductList(saved.length > 0 ? saved : defaultProductsForTrade(org.trade))
+        }
         setGbpReviewLinkInput(org.gbpReviewLink || '')
         setPortfolioUrlInput(org.portfolioPageUrl || '')
         // Parse AI business context if present
@@ -983,6 +1003,41 @@ export default function AccountPage() {
     }
   }
 
+  const handleAddProduct = () => {
+    const value = newProduct.trim()
+    setProductError(null)
+    if (!value) return
+    if (value.toLowerCase() === OTHER_OPTION.toLowerCase()) {
+      setProductError('"Other" is always available on the check-in form — no need to add it.')
+      return
+    }
+    if (productList.some((p) => p.toLowerCase() === value.toLowerCase())) {
+      setProductError('That product is already in your list.')
+      return
+    }
+    if (productList.length >= MAX_PRODUCT_OPTIONS) {
+      setProductError(`You can have up to ${MAX_PRODUCT_OPTIONS} products.`)
+      return
+    }
+    setProductList([...productList, value])
+    setNewProduct('')
+  }
+
+  const handleRemoveProduct = (value: string) => {
+    setProductError(null)
+    setProductList(productList.filter((p) => p !== value))
+  }
+
+  // Additive by design — merges defaults in without dropping anything the customer
+  // added themselves, so this is never a destructive click.
+  const handleLoadDefaults = () => {
+    setProductError(null)
+    const defaults = defaultProductsForTrade(trade)
+    if (defaults.length === 0) return
+    const existing = new Set(productList.map((p) => p.toLowerCase()))
+    setProductList([...productList, ...defaults.filter((d) => !existing.has(d.toLowerCase()))])
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!profile) return
@@ -998,6 +1053,8 @@ export default function AccountPage() {
           email: orgEmail.trim() || null,
           phone: phone.trim() || null,
           website: website.trim() || null,
+          trade: trade.trim() || null,
+          productOptions: productList,
           ...(isTitan && {
             services: aiServices,
             products: aiProducts,
@@ -1014,6 +1071,8 @@ export default function AccountPage() {
       setOrgEmail(updated.email || '')
       setPhone(updated.phone || '')
       setWebsite(updated.website || '')
+      setTrade(updated.trade || '')
+      setProductList(normalizeProductOptions(updated.productOptions))
       setMessage('Business profile updated.')
     } catch (err: any) {
       setError(err.message || 'Failed to update profile')
@@ -1098,6 +1157,104 @@ export default function AccountPage() {
                   onChange={(e) => setWebsite(e.target.value)}
                   placeholder="yourwebsite.com"
                 />
+              </div>
+
+              <div>
+                <label htmlFor="business-trade" className="db-shell-label">Trade / Industry</label>
+                <select
+                  id="business-trade"
+                  className="db-shell-input"
+                  style={{ width: '100%', minWidth: 0 }}
+                  value={trade}
+                  onChange={(e) => setTrade(e.target.value)}
+                >
+                  <option value="">Select your trade</option>
+                  {TRADES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <div style={{ fontSize: 11.5, color: 'var(--t3)', marginTop: 6, lineHeight: 1.5 }}>
+                  Changing this won&rsquo;t erase your product list below.
+                </div>
+              </div>
+
+              <div>
+                <label className="db-shell-label">Products / Services</label>
+                <div style={{ fontSize: 11.5, color: 'var(--t3)', marginBottom: 10, lineHeight: 1.5 }}>
+                  These are the options your team sees on the Check-In form. Add, remove, or rename them anytime.
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                  {productList.map((p) => (
+                    <div
+                      key={p}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        background: 'var(--app-bg)', border: '1px solid var(--border)',
+                        borderRadius: 7, padding: '9px 12px', fontSize: 13.5,
+                        color: 'var(--t1)', fontWeight: 500,
+                      }}
+                    >
+                      <span>{p}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveProduct(p)}
+                        aria-label={`Remove ${p}`}
+                        style={{
+                          width: 20, height: 20, borderRadius: '50%', border: 'none',
+                          background: 'transparent', color: 'var(--t3)', fontSize: 15,
+                          cursor: 'pointer', display: 'grid', placeItems: 'center', lineHeight: 1,
+                        }}
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+
+                  <div
+                    style={{
+                      display: 'flex', alignItems: 'center',
+                      background: 'var(--surface)', border: '1px dashed var(--border-2)',
+                      borderRadius: 7, padding: '9px 12px', fontSize: 13,
+                      color: 'var(--t3)', fontStyle: 'italic',
+                    }}
+                  >
+                    Other &mdash; always shown last, not editable
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    className="db-shell-input"
+                    style={{ flex: 1, minWidth: 0 }}
+                    value={newProduct}
+                    onChange={(e) => setNewProduct(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); handleAddProduct() }
+                    }}
+                    placeholder="Add a product or service..."
+                  />
+                  <button type="button" className="db-shell-btn" onClick={handleAddProduct}>Add</button>
+                </div>
+
+                {productError && (
+                  <div style={{ fontSize: 11.5, color: 'var(--red)', marginTop: 8 }}>{productError}</div>
+                )}
+
+                {defaultProductsForTrade(trade).length > 0 && (
+                  <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+                    <button
+                      type="button"
+                      onClick={handleLoadDefaults}
+                      style={{
+                        background: 'transparent', color: 'var(--t2)',
+                        border: '1px solid var(--border-2)', borderRadius: 7,
+                        padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >
+                      Load {trade} defaults
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* \u2500\u2500 AI Business Profile (Titan only) \u2500\u2500 */}
@@ -2434,7 +2591,6 @@ export default function AccountPage() {
               If you <strong>cancel or downgrade</strong>:
             </p>
             <ul style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.7, paddingLeft: 18, marginBottom: 14 }}>
-              <li>Published job pages beyond your plan limit will be unpublished</li>
               <li>Higher-tier features will be turned off</li>
               {wpStatus === 'connected' && (
                 <li>

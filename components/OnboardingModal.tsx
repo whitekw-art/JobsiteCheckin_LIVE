@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { tierHasFeature } from '@/lib/planVersions'
+import { TRADES } from '@/lib/tradeProducts'
 
 const WIDGET_PLATFORM_INSTRUCTIONS: Record<string, string> = {
   WordPress: '1. Log into WordPress and open the page where you want your work to show up (or create a new page).\n2. Click the + button to add a new block.\n3. Type "Custom HTML" in the search box and select it.\n4. Paste the code below into that block.\n5. Click Update (or Publish) in the top right to save your page.',
@@ -9,20 +10,6 @@ const WIDGET_PLATFORM_INSTRUCTIONS: Record<string, string> = {
   Webflow: '1. Open your site in the Webflow Designer and go to the page where you want your work to show up.\n2. In the left panel, find the Embed element and drag it onto the page.\n3. Double-click the Embed box you just added.\n4. Paste the code below into the box, then click Save & Close.\n5. Click Publish in the top right to make it live.',
   'Plain HTML': '1. Find the HTML file for the page where you want your work to show up. If someone else built your site, ask them for it — or log into your hosting account (GoDaddy, Bluehost, Netlify, etc.) and look for "File Manager" or "Site Files."\n2. Right-click that file and choose Open With → Notepad (Windows) or TextEdit (Mac). Don’t use Microsoft Word — it can break the file.\n3. Press Ctrl+F (Cmd+F on Mac) and search for </body>. That’s a marker near the end of the file.\n4. Click right before </body> and paste the code below.\n5. Save the file, then upload it back to your host the same way you found it. Most hosts show a Save or Publish button.\n6. Stuck? Your web host’s live chat can usually paste one snippet for you in a few minutes — just say "I need to add one HTML snippet before </body> on this page."',
 }
-
-const TRADES = [
-  'Door Installation',
-  'Garage Door',
-  'HVAC',
-  'Plumbing',
-  'Electrical',
-  'Roofing',
-  'Landscaping',
-  'Painting',
-  'Flooring',
-  'General Contractor',
-  'Other',
-]
 
 const HEARD_ABOUT = [
   'Google Search',
@@ -42,7 +29,7 @@ const PLAN_LABELS: Record<string, string> = {
 }
 
 const PLAN_FEATURES: Record<string, string[]> = {
-  free:  ['Job check-ins with photos (up to 5 per job)', 'Up to 5 published job pages on Google', 'Basic dashboard'],
+  free:  ['Job check-ins with photos (up to 5 per job)', 'Basic dashboard'],
   pro:   ['Unlimited published job pages with full SEO', 'Portfolio page', 'Analytics & click tracking', 'Google Business Profile post generator'],
   elite: ['Everything in Pro', 'Auto-formatted Google Business Profile posts', 'Professional before & after images', 'Ghost camera overlay', 'Drag-to-reveal widget'],
   titan: ['Everything in Elite', 'Automatic Google Business review requests', 'Custom AI copywriting agent', 'Custom AI Review Request Manager', 'Custom website widget for local SEO', 'Custom subdomain & white-label branding'],

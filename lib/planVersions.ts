@@ -15,7 +15,7 @@ export const CURRENT_PLAN_VERSION = 1
 
 export const PLAN_FEATURES: Record<string, Record<number, string[]>> = {
   free: {
-    1: ['check_in', 'photos_5_per_job', 'job_pages_5'],
+    1: ['check_in', 'photos_5_per_job', 'job_pages_unlimited'],
   },
   pro: {
     1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'gbp_post'],
