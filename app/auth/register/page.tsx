@@ -2,6 +2,7 @@
 
 import { FormEvent, useState, Suspense, useRef } from 'react'
 import { signIn } from 'next-auth/react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import '@/styles/register.css'
 
@@ -67,6 +68,9 @@ function EyeOff() {
 }
 
 function RegisterForm() {
+  const searchParams = useSearchParams()
+  const offer = searchParams.get('offer')
+
   const [firstName,   setFirstName]   = useState('')
   const [lastName,    setLastName]    = useState('')
   const [email,       setEmail]       = useState('')
@@ -162,7 +166,7 @@ function RegisterForm() {
           }
           stripeKeys.forEach(k => localStorage.removeItem(k))
         } catch { /* private browsing */ }
-        window.location.href = '/subscribe'
+        window.location.href = offer ? `/subscribe?offer=${encodeURIComponent(offer)}` : '/subscribe'
       } else {
         window.location.href = `/auth/signin?email=${encodeURIComponent(normEmail)}`
       }
