@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import type { MetadataRoute } from 'next'
 import { prisma } from '@/lib/prisma'
 import { slugify } from '@/lib/slugify'
+import { BLOG_POSTS } from '@/lib/blogPosts'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
@@ -105,10 +106,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'monthly',
       priority: 0.7,
     },
+    {
+      url: `${baseUrl}/blog`,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
   ]
+
+  const blogEntries: MetadataRoute.Sitemap = BLOG_POSTS.map((post) => ({
+    url: `${baseUrl}/blog/${post.slug}`,
+    lastModified: new Date(post.modifiedISO),
+    changeFrequency: 'monthly' as const,
+    priority: 0.8,
+  }))
 
   return [
     ...staticEntries,
+    ...blogEntries,
     ...jobEntries,
     ...portfolioEntries,
   ]
