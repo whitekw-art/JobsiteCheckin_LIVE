@@ -80,6 +80,7 @@ if (
   !pathname.startsWith('/jobs/') &&
   !pathname.startsWith('/portfolio/') &&
   !pathname.startsWith('/features/') &&
+  !pathname.startsWith('/blog') &&
   !pathname.startsWith('/mockups/') &&
   !pathname.startsWith('/sitemap') &&
   pathname !== '/robots.txt' &&

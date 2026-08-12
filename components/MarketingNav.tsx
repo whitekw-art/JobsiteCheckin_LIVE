@@ -90,6 +90,9 @@ export default function MarketingNav() {
           <li>
             <Link href="/pricing" className="nav-link" onClick={closeAll}>Pricing</Link>
           </li>
+          <li>
+            <Link href="/blog" className="nav-link" onClick={closeAll}>Blog</Link>
+          </li>
 
           {/* Mobile-only: auth actions live inside the drawer (hidden on desktop) */}
           <li className="nav-mobile-auth">
