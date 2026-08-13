@@ -1,8 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 /* =============================================
    BLOG — ProjectCheckin
    Editorial minimalism, deliberately restrained. Decorative
    imagery, badges, and gradient panels are all avoided here.
    Shares the landing-page type + color system.
+
+   The @import above is required, matching how every other
+   stylesheet in this app loads its fonts. Without it the
+   Playfair/Jakarta declarations below fall back to Georgia
+   and the system sans, and weight 600 gets faux-bolded.
 ============================================= */
 
 .blog-root {
@@ -32,6 +39,31 @@
 
 .blog-root a { color: var(--blog-navy); text-decoration: none; }
 .blog-root img { max-width: 100%; height: auto; display: block; }
+
+/* ─── DEFENSIVE: neutralize leaking global element selectors ───
+   styles/landing.css declares bare `nav { position: fixed; top: 0 }` and
+   `footer { background: #07283D }`. Next bundles CSS globally, so those
+   rules reach this route and hijack any semantic <nav>/<footer> here —
+   which pinned the table of contents over the article headline.
+   These selectors are scoped higher than a bare element selector, so they
+   win regardless of stylesheet order. Keep them if landing.css still has
+   bare element selectors; the alternative is dropping semantic elements,
+   which costs real SEO and accessibility value. */
+.blog-root nav.blog-breadcrumb,
+.blog-root nav.blog-toc {
+  position: static;
+  inset: auto;
+  background: transparent;
+  backdrop-filter: none;
+  z-index: auto;
+  border: none;
+}
+.blog-root nav.blog-toc { border: 1px solid var(--blog-border); }
+.blog-root footer.blog-footer {
+  position: static;
+  background: transparent;
+  color: var(--blog-muted-lt);
+}
 
 /* ─── BREADCRUMB ─── */
 .blog-breadcrumb {
