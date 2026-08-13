@@ -2,6 +2,13 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import MarketingNav from '@/components/MarketingNav'
 import { getPostsNewestFirst, postUrl, SITE_URL } from '@/lib/blogPosts'
+// MarketingNav ships no CSS of its own — it relies on the host page's
+// stylesheet for .nav-inner/.logo-img/.nav-links/.feat-drop, and on
+// `body { padding-top: 64px }` to clear its own fixed positioning.
+// Every marketing subpage pairs it with features.css; without this a
+// direct load of /blog renders the nav completely unstyled.
+// blog.css is imported second so it wins on any tie.
+import '@/styles/features.css'
 import '@/styles/blog.css'
 
 const BLOG_URL = `${SITE_URL}/blog`

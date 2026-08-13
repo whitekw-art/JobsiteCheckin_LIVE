@@ -6,6 +6,10 @@ import GoogleRankingFactors2026, {
   FAQ_ITEMS as RANKING_FACTORS_FAQ,
 } from '@/components/blog/GoogleRankingFactors2026'
 import { BLOG_POSTS, getPostBySlug, postUrl, SITE_URL } from '@/lib/blogPosts'
+// See the note in app/blog/page.tsx — MarketingNav depends on the host
+// page's stylesheet, so features.css must load alongside blog.css or a
+// direct load of a post renders the nav unstyled.
+import '@/styles/features.css'
 import '@/styles/blog.css'
 
 /**

@@ -65,6 +65,27 @@
   color: var(--blog-muted-lt);
 }
 
+/* MarketingNav renders a mobile-drawer auth block that must stay hidden on
+   desktop. Only landing.css defines that rule, so any page paired with
+   features.css shows a duplicated "Sign In / Register / Book a Demo" run
+   together in the nav bar. Scoped to .blog-root so this only corrects our
+   own pages. The same gap exists on the feature and pricing pages and is
+   worth its own fix in features.css. */
+.blog-root .nav-mobile-auth { display: none; }
+
+/* Same gap: .btn-sm-link (the orange "Book a Demo" button) is defined only in
+   landing.css, so it renders as plain text anywhere features.css is used.
+   Values mirror landing.css exactly. */
+.blog-root .btn-sm-link {
+  height: 36px; padding: 0 18px;
+  background: var(--blog-orange); color: #fff;
+  font-family: var(--blog-font); font-size: 13px; font-weight: 700;
+  border-radius: 8px; border: none; cursor: pointer;
+  display: inline-flex; align-items: center;
+  transition: background 150ms; text-decoration: none;
+}
+.blog-root .btn-sm-link:hover { background: var(--blog-orange-h); color: #fff; }
+
 /* ─── BREADCRUMB ─── */
 .blog-breadcrumb {
   max-width: var(--blog-measure);
@@ -426,6 +447,20 @@
 
 /* ─── MOBILE ─── */
 @media (max-width: 640px) {
+  /* Desktop auth buttons hide on phones; the drawer copies take over. */
+  .blog-root .btn-sm-link { display: none; }
+  /* On a phone the desktop auth buttons are hidden, so the drawer copy is
+     the only way to reach Sign In / Register. Mirrors landing.css. */
+  .blog-root .nav-links.open .nav-mobile-auth {
+    display: flex; flex-direction: column; align-items: stretch;
+    width: 100%; gap: 0; margin-top: 6px;
+  }
+  .blog-root .nav-links.open .nav-mobile-auth .nav-link { display: block; }
+  .blog-root .nav-links.open .nav-mobile-auth .btn-sm-link {
+    display: inline-flex; justify-content: center; width: 100%;
+    height: 46px; margin-top: 16px;
+  }
+
   .blog-root h1 { font-size: 29px; }
   .blog-index-header { padding: 44px 20px 28px; }
   .blog-index-header h1 { font-size: 28px; }
