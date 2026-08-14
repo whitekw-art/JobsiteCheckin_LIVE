@@ -5,7 +5,16 @@ import MarketingNav from '@/components/MarketingNav'
 import GoogleRankingFactors2026, {
   FAQ_ITEMS as RANKING_FACTORS_FAQ,
 } from '@/components/blog/GoogleRankingFactors2026'
-import { BLOG_POSTS, getPostBySlug, postUrl, SITE_URL } from '@/lib/blogPosts'
+import AiOverviews2026, {
+  FAQ_ITEMS as AI_OVERVIEWS_FAQ,
+} from '@/components/blog/AiOverviews2026'
+import {
+  BLOG_POSTS,
+  getPostBySlug,
+  getPostsNewestFirst,
+  postUrl,
+  SITE_URL,
+} from '@/lib/blogPosts'
 // See the note in app/blog/page.tsx — MarketingNav depends on the host
 // page's stylesheet, so features.css must load alongside blog.css or a
 // direct load of a post renders the nav unstyled.
@@ -23,6 +32,10 @@ const POST_CONTENT: Record<
   'google-ranking-factors-2026': {
     Body: GoogleRankingFactors2026,
     faq: RANKING_FACTORS_FAQ,
+  },
+  'ai-overviews-what-the-data-shows': {
+    Body: AiOverviews2026,
+    faq: AI_OVERVIEWS_FAQ,
   },
 }
 
@@ -77,6 +90,7 @@ export default async function BlogPostPage(
 
   const url = postUrl(post.slug)
   const { Body, faq } = content
+  const otherPosts = getPostsNewestFirst().filter((p) => p.slug !== post.slug)
 
   const blogPostingJsonLd = {
     '@context': 'https://schema.org',
@@ -161,6 +175,13 @@ export default async function BlogPostPage(
         <div className="blog-related">
           <h2>Keep Reading</h2>
           <ul>
+            {/* Other posts first, so every post cross-links to the rest of the
+                blog automatically as new ones are added. */}
+            {otherPosts.map((other) => (
+              <li key={other.slug}>
+                <Link href={`/blog/${other.slug}`}>{other.title}</Link>
+              </li>
+            ))}
             <li>
               <Link href="/features/local-job-pages">
                 How Local Job Pages turn finished work into indexed pages
