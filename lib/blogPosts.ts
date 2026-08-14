@@ -31,6 +31,22 @@ export type BlogPost = {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: 'ai-overviews-what-the-data-shows',
+    title: 'AI Overviews Are Cutting Clicks. Here’s What the Data Actually Shows.',
+    excerpt:
+      'The traffic drop is real and it’s measurable, but the response Google recommends is the same work that has always earned search visibility.',
+    metaDescription:
+      'Google’s AI Overviews are measurably reducing clicks to websites. Here’s what independent 2026 research from Pew, Oxford, and Washington University found, and what Google itself says to do about it.',
+    category: 'AI Search',
+    publishedISO: '2026-08-14',
+    modifiedISO: '2026-08-14',
+    publishedLabel: 'August 2026',
+    readTimeMinutes: 9,
+    subhead:
+      'The traffic drop is real and it’s measurable, but the response Google recommends is the same work that has always earned search visibility.',
+    kicker: 'AI Search — Updated for 2026',
+  },
+  {
     slug: 'google-ranking-factors-2026',
     title: '11 Google Ranking Factors That Actually Matter for Service Businesses in 2026',
     excerpt:
