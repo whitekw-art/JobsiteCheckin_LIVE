@@ -1,8 +1,20 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { US_STATES } from '@/lib/usStates'
 
 const FORMSPREE_ENDPOINT = 'https://formspree.io/f/xeajkanw'
+
+// Same prefixing rule used at registration/onboarding (app/auth/register/page.tsx,
+// app/api/organization/profile/route.ts) — bare domains get corrected automatically
+// so nobody has to type https:// themselves.
+function normalizeWebsite(v: string): string {
+  const t = v.trim()
+  if (!t) return ''
+  if (t.startsWith('http://') || t.startsWith('https://')) return t
+  if (t.startsWith('www.')) return `https://${t}`
+  return `https://www.${t}`
+}
 
 const PRIORITIES = [
   'Show up higher on Google Maps',
@@ -54,6 +66,11 @@ export default function AuditRequestModal({
 
     const form = e.currentTarget
     const data = new FormData(form)
+
+    const rawWebsite = data.get('website')
+    if (typeof rawWebsite === 'string') {
+      data.set('website', normalizeWebsite(rawWebsite))
+    }
 
     // Honeypot: real people never see this field, so anything in it is a bot.
     // Silently show success rather than telling the bot it failed.
@@ -155,21 +172,33 @@ export default function AuditRequestModal({
                   <label htmlFor="af-url">Website</label>
                   <input
                     id="af-url"
-                    type="url"
+                    type="text"
                     name="website"
-                    placeholder="https://"
+                    placeholder="yourwebsite.com"
                     required
                     autoComplete="url"
+                    inputMode="url"
                   />
 
-                  <label htmlFor="af-city">City and state</label>
-                  <input
-                    id="af-city"
-                    type="text"
-                    name="city_state"
-                    placeholder="Nashville, TN"
-                    required
-                  />
+                  <div className="blog-modal-row">
+                    <div>
+                      <label htmlFor="af-city">City</label>
+                      <input id="af-city" type="text" name="city" placeholder="Nashville" required />
+                    </div>
+                    <div>
+                      <label htmlFor="af-state">State</label>
+                      <select id="af-state" name="state" required defaultValue="">
+                        <option value="" disabled>
+                          Choose one
+                        </option>
+                        {US_STATES.map((s) => (
+                          <option key={s.abbr} value={s.abbr}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
                   <label htmlFor="af-priority">What matters most to you right now?</label>
                   <select id="af-priority" name="biggest_priority" required defaultValue="">
