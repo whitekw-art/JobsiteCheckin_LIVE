@@ -27,6 +27,14 @@ export type BlogPost = {
   subhead: string
   /** Small label above the H1. */
   kicker: string
+  /**
+   * Optional index thumbnail, e.g. `/blog/thumbs/<slug>.png`.
+   * Posts without one render as a text-only row with no placeholder and no
+   * layout shift — the <Image> is simply omitted. Keep both fields together;
+   * `thumbnailAlt` is required whenever `thumbnail` is set.
+   */
+  thumbnail?: string
+  thumbnailAlt?: string
 }
 
 export const BLOG_POSTS: BlogPost[] = [
@@ -45,6 +53,8 @@ export const BLOG_POSTS: BlogPost[] = [
     subhead:
       'The market stopped growing on its own this year, so the jobs go to the companies homeowners can actually find and verify.',
     kicker: 'Trade Guide — Updated for 2026',
+    thumbnail: '/blog/thumbs/window-door-companies-get-found-2026.png',
+    thumbnailAlt: 'Line illustration of a front door with a target mark on it',
   },
   {
     slug: 'ai-overviews-what-the-data-shows',
@@ -61,6 +71,8 @@ export const BLOG_POSTS: BlogPost[] = [
     subhead:
       'The traffic drop is real and it’s measurable, but the response Google recommends is the same work that has always earned search visibility.',
     kicker: 'AI Search — Updated for 2026',
+    thumbnail: '/blog/thumbs/ai-overviews-what-the-data-shows.jpg',
+    thumbnailAlt: 'Line illustration of scissors cutting the cord of a computer mouse',
   },
   {
     slug: 'google-ranking-factors-2026',
@@ -77,6 +89,8 @@ export const BLOG_POSTS: BlogPost[] = [
     subhead:
       'The ranking factors Google has confirmed or clearly signaled matter this year, explained plainly, with one thing to do about each one this week.',
     kicker: 'Local SEO Guide — Updated for 2026',
+    thumbnail: '/blog/thumbs/google-ranking-factors-2026.png',
+    thumbnailAlt: 'Illustration of a green zigzag arrow trending upward',
   },
 ]
 

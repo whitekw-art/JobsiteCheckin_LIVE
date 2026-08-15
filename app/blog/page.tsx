@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import MarketingNav from '@/components/MarketingNav'
 import { getPostsNewestFirst, postUrl, SITE_URL } from '@/lib/blogPosts'
 // MarketingNav ships no CSS of its own — it relies on the host page's
@@ -92,11 +93,8 @@ export default function BlogIndexPage() {
       </header>
 
       <main className="blog-index-main">
-        {posts.map((post, i) => (
+        {posts.map((post) => (
           <Link key={post.slug} href={`/blog/${post.slug}`} className="blog-post-row">
-            <div className="blog-post-num" aria-hidden="true">
-              {String(i + 1).padStart(2, '0')}
-            </div>
             <div className="blog-post-main">
               <div className="blog-post-cat">{post.category}</div>
               <h2 className="blog-post-title">{post.title}</h2>
@@ -109,6 +107,19 @@ export default function BlogIndexPage() {
                 </span>
               </div>
             </div>
+            {/* Omitted entirely when a post has no thumbnail — the row collapses
+                to text-only with no placeholder and no shift in the title's
+                left edge, since the image sits on the trailing side. */}
+            {post.thumbnail && (
+              <Image
+                className="blog-post-thumb"
+                src={post.thumbnail}
+                alt={post.thumbnailAlt ?? ''}
+                width={210}
+                height={158}
+                sizes="(max-width: 600px) 120px, (max-width: 900px) 154px, 210px"
+              />
+            )}
           </Link>
         ))}
       </main>
