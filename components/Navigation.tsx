@@ -11,7 +11,7 @@ export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Hide nav on public-facing pages
-  const isPublicPage = pathname?.startsWith('/portfolio/') || pathname?.startsWith('/jobs/') || pathname === '/privacy' || pathname === '/terms' || pathname === '/pricing' || pathname?.startsWith('/features/')
+  const isPublicPage = pathname?.startsWith('/portfolio/') || pathname?.startsWith('/jobs/') || pathname === '/privacy' || pathname === '/terms' || pathname === '/pricing' || pathname?.startsWith('/features/') || pathname === '/blog' || pathname?.startsWith('/blog/')
   const isSidebarPage = pathname === '/dashboard' || pathname?.startsWith('/dashboard/') || pathname === '/reporting' || pathname === '/account' || pathname === '/check-in'
   if (!session || isPublicPage || isSidebarPage) return null
 
