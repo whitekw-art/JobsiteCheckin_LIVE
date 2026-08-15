@@ -8,6 +8,9 @@ import GoogleRankingFactors2026, {
 import AiOverviews2026, {
   FAQ_ITEMS as AI_OVERVIEWS_FAQ,
 } from '@/components/blog/AiOverviews2026'
+import WindowDoorGetFound2026, {
+  FAQ_ITEMS as WINDOW_DOOR_FAQ,
+} from '@/components/blog/WindowDoorGetFound2026'
 import {
   BLOG_POSTS,
   getPostBySlug,
@@ -36,6 +39,10 @@ const POST_CONTENT: Record<
   'ai-overviews-what-the-data-shows': {
     Body: AiOverviews2026,
     faq: AI_OVERVIEWS_FAQ,
+  },
+  'window-door-companies-get-found-2026': {
+    Body: WindowDoorGetFound2026,
+    faq: WINDOW_DOOR_FAQ,
   },
 }
 
