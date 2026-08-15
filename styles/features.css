@@ -205,6 +205,21 @@ body {
 .nav-hamburger.open span:nth-child(2) { opacity: 0; }
 .nav-hamburger.open span:nth-child(3) { transform: translateY(-9px) rotate(-45deg); }
 
+/* MarketingNav renders a mobile-drawer auth block and an orange "Book a Demo"
+   button. Both were styled only in landing.css, so every page using this
+   stylesheet showed a duplicated "Sign In / Register / Book a Demo" in the nav
+   bar and an unstyled demo link. Values mirror landing.css exactly. */
+.nav-mobile-auth { display: none; }
+.btn-sm-link {
+  height: 36px; padding: 0 18px;
+  background: var(--orange); color: white;
+  font-family: var(--font); font-size: 13px; font-weight: 700;
+  border-radius: 8px; border: none; cursor: pointer;
+  display: inline-flex; align-items: center;
+  transition: background 150ms; text-decoration: none;
+}
+.btn-sm-link:hover { background: var(--orange-h); color: white; }
+
 /* ── BREADCRUMB ── */
 .breadcrumb {
   display: flex;
@@ -944,6 +959,7 @@ body {
   .nav-link   { display: none; }
   .nav-feat-wrap { display: none; }
   .btn-ghost  { display: none; }
+  .btn-sm-link { display: none; }
   .nav-hamburger { display: flex; }
   .nav-links.open {
     display: flex; flex-direction: column; align-items: flex-start; gap: 0;
@@ -969,6 +985,17 @@ body {
   .nav-links.open .feat-item { padding: 10px 0; border-bottom: 1px solid var(--border); border-radius: 0; }
   .nav-links.open .feat-item.sub { padding-left: 12px; }
   .nav-links.open .feat-divider { margin: 6px 0; }
+  /* Auth actions inside the mobile drawer — the only way to reach Sign In /
+     Register on a phone, since the desktop .nav-right buttons are hidden. */
+  .nav-links.open .nav-mobile-auth {
+    display: flex; flex-direction: column; align-items: stretch;
+    width: 100%; gap: 0; margin-top: 6px;
+  }
+  .nav-links.open .nav-mobile-auth .nav-link { display: block; }
+  .nav-links.open .nav-mobile-auth .btn-sm-link {
+    display: inline-flex; justify-content: center; width: 100%;
+    height: 46px; margin-top: 16px;
+  }
 }
 
 @media (max-width: 800px) {
