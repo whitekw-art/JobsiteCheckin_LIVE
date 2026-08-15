@@ -31,6 +31,22 @@ export type BlogPost = {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: 'window-door-companies-get-found-2026',
+    title: 'How Window, Door, and Garage Door Companies Get Found Online in 2026',
+    excerpt:
+      'The market stopped growing on its own this year, so the jobs go to the companies homeowners can actually find and verify.',
+    metaDescription:
+      'The 25C tax credit is gone and remodeling growth is slowing, so 2026 jobs go to whoever homeowners can find and verify. What the research says about how they actually shop for windows and doors.',
+    category: 'Trade Guides',
+    publishedISO: '2026-08-15',
+    modifiedISO: '2026-08-15',
+    publishedLabel: 'August 2026',
+    readTimeMinutes: 10,
+    subhead:
+      'The market stopped growing on its own this year, so the jobs go to the companies homeowners can actually find and verify.',
+    kicker: 'Trade Guide — Updated for 2026',
+  },
+  {
     slug: 'ai-overviews-what-the-data-shows',
     title: 'AI Overviews Are Cutting Clicks. Here’s What the Data Actually Shows.',
     excerpt:
