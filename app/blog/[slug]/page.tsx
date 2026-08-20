@@ -11,6 +11,9 @@ import AiOverviews2026, {
 import WindowDoorGetFound2026, {
   FAQ_ITEMS as WINDOW_DOOR_FAQ,
 } from '@/components/blog/WindowDoorGetFound2026'
+import GoogleReviews2026, {
+  FAQ_ITEMS as GOOGLE_REVIEWS_FAQ,
+} from '@/components/blog/GoogleReviews2026'
 import {
   BLOG_POSTS,
   getPostBySlug,
@@ -43,6 +46,10 @@ const POST_CONTENT: Record<
   'window-door-companies-get-found-2026': {
     Body: WindowDoorGetFound2026,
     faq: WINDOW_DOOR_FAQ,
+  },
+  'why-competitors-have-more-google-reviews-2026': {
+    Body: GoogleReviews2026,
+    faq: GOOGLE_REVIEWS_FAQ,
   },
 }
 
