@@ -39,6 +39,22 @@ export type BlogPost = {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: 'why-competitors-have-more-google-reviews-2026',
+    title: 'The Real Reason Getting Google Reviews Is So Hard, But Your Competitors Get Hundreds',
+    excerpt:
+      "Your review count is stuck for one main reason, and it's the one thing you actually control: how you ask.",
+    metaDescription:
+      "Why your Google review count lags behind a competitor's: an asking system, real technical reasons reviews vanish on Google, and one weekly fix that works.",
+    category: 'Reviews & Reputation',
+    publishedISO: '2026-08-20',
+    modifiedISO: '2026-08-20',
+    publishedLabel: 'August 2026',
+    readTimeMinutes: 8,
+    subhead:
+      'An asking system, a technical fix, and a weekly habit separate a business with a handful of reviews from one with hundreds. None of it is luck.',
+    kicker: 'Reviews & Reputation Guide — 2026',
+  },
+  {
     slug: 'window-door-companies-get-found-2026',
     title: 'How Window, Door, and Garage Door Companies Get Found Online in 2026',
     excerpt:
