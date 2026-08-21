@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://projectcheckin.com/privacy' },
 }
 
-const EFFECTIVE_DATE = 'July 29, 2026'
+const EFFECTIVE_DATE = 'August 16, 2026'
 const CONTACT_EMAIL = 'support@projectcheckin.com'
 
 export default function PrivacyPage() {
@@ -44,6 +44,7 @@ export default function PrivacyPage() {
               <li><strong>Job check-ins:</strong> job description, service type, location (city/state), job photos, and crew information you choose to enter.</li>
               <li><strong>Payment information:</strong> billing details collected and processed by Stripe. We do not store your credit card number — Stripe handles all payment data.</li>
               <li><strong>Connected website credentials:</strong> if you connect your own WordPress site (Titan plan), the site URL, username, and an application password you provide, stored in encrypted form.</li>
+              <li><strong>Job photos and job details used for AI features:</strong> if you choose to use an AI-assisted feature, such as AI-generated job descriptions, the job details and job photos associated with that check-in are transmitted to our AI provider for analysis. We do not collect any additional category of information for these features beyond what you already submit as part of a normal job check-in. You are responsible for the contents of the photographs you upload, including any personal or financial information visible in them.</li>
             </ul>
           </Subsection>
           <Subsection title="Information collected automatically">
@@ -71,7 +72,8 @@ export default function PrivacyPage() {
           <ul>
             <li><strong>Service providers:</strong> we use third-party vendors who process data on our behalf, including Stripe (payments), Resend (email delivery), Supabase (database hosting), and Vercel (application hosting). These providers are contractually bound to protect your data.</li>
             <li><strong>Public job pages:</strong> job information you submit for publication (job description, photos, location, service type) is made publicly visible on projectcheckin.com as part of the core service. You control what is submitted and can request removal.</li>
-            <li><strong>Your own connected website (Titan plan):</strong> if you choose to connect your own website, job content and photos you&apos;ve published are sent to and stored on that site, which you own and control. See Section 6 of our Terms of Service for how this works and what happens if you disconnect or downgrade.</li>
+            <li><strong>Your own connected website (Titan plan):</strong> if you choose to connect your own website, job content and photos you&apos;ve published are sent to and stored on that site, which you own and control. See Section 7 of our Terms of Service for how this works and what happens if you disconnect or downgrade.</li>
+            <li><strong>AI processing provider:</strong> when you use an AI-assisted feature, job details and job photos are transmitted to OpenAI for processing. OpenAI&apos;s use of this data is governed by OpenAI&apos;s API data usage policies. As of the effective date of this policy, data submitted through OpenAI&apos;s API is not used to train their models, and is retained by OpenAI for a limited period for abuse monitoring before deletion.</li>
             <li><strong>Legal requirements:</strong> we may disclose your information if required by law or in response to a valid legal process.</li>
             <li><strong>Business transfers:</strong> if ProjectCheckin is acquired or merged with another company, your information may be transferred as part of that transaction.</li>
           </ul>
