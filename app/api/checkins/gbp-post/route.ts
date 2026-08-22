@@ -46,7 +46,9 @@ export async function POST(request: NextRequest) {
       select: { planTier: true },
     })
     if (!org) return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
-    if (currentUser.role !== 'SUPER_ADMIN' && !tierHasFeature(org.planTier, 'gbp_integration')) {
+    // No SUPER_ADMIN exemption, corrected 2026-08-22 — see the full reasoning
+    // in app/api/organization/gbp/route.ts.
+    if (!tierHasFeature(org.planTier, 'gbp_integration')) {
       return NextResponse.json({ error: 'This feature requires the Elite or Titan plan' }, { status: 403 })
     }
 
