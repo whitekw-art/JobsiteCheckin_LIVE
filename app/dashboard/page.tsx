@@ -566,6 +566,7 @@ export default function Dashboard() {
   // than a button that would fail.
   const [gbpLive, setGbpLive] = useState(false)
   const [gbpPostingId, setGbpPostingId] = useState<string | null>(null)
+  const [gbpRetractingId, setGbpRetractingId] = useState<string | null>(null)
   const [gbpPostError, setGbpPostError] = useState<Record<string, string>>({})
 
   // Address editing (keyed by checkIn.id)
@@ -718,6 +719,40 @@ export default function Dashboard() {
       setGbpPostError((prev) => ({ ...prev, [checkInId]: 'Google could not publish this job. Please try again.' }))
     } finally {
       setGbpPostingId(null)
+    }
+  }
+
+  // Removes the post from Google and resets the job's local state back to
+  // postable. Not tier-gated — a downgraded customer still owns whatever they
+  // already posted and must be able to take it down.
+  const handleGbpRetract = async (checkInId: string) => {
+    setGbpRetractingId(checkInId)
+    setGbpPostError((prev) => {
+      const next = { ...prev }
+      delete next[checkInId]
+      return next
+    })
+    try {
+      const res = await fetch('/api/checkins/gbp-post', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkInId }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        setGbpPostError((prev) => ({
+          ...prev,
+          [checkInId]: data?.error || 'Could not remove this post. Please try again.',
+        }))
+        return
+      }
+      setCheckIns((prev) =>
+        prev.map((c) => (c.id === checkInId ? { ...c, gbpPostStatus: null, gbpPostUrl: null, gbpPostedAt: null } : c))
+      )
+    } catch {
+      setGbpPostError((prev) => ({ ...prev, [checkInId]: 'Could not remove this post. Please try again.' }))
+    } finally {
+      setGbpRetractingId(null)
     }
   }
 
@@ -1475,7 +1510,7 @@ export default function Dashboard() {
             >
               <IcoMenu />
             </button>
-            <h1 className="db-page-title">Jobs</h1>
+            <h1 className="db-page-title">Job Dashboard</h1>
             <div className="db-topbar-right">
               <Link className="db-btn-new" href="/check-in">
                 <IcoPlus />
@@ -2165,21 +2200,27 @@ export default function Dashboard() {
                                   {downloadingId === checkIn.id ? 'Preparing\u2026' : 'Download All'}
                                 </button>
                               )}
-                              {checkIn.isPublic && tierHasFeature(planTier, 'gbp_post') && (
+                              {/* The posted state stays visible even on an unpublished
+                                  job. Unpublishing tries to retract automatically, but
+                                  if that Google call fails the post is still live —
+                                  hiding the controls here would make it unremovable. */}
+                              {(checkIn.isPublic || checkIn.gbpPostStatus === 'posted') && tierHasFeature(planTier, 'gbp_post') && (
                                 !gbpLive ? (
-                                  // Not connected — keep the original copy-and-paste
-                                  // window so nobody loses a workflow they already have.
-                                  <button
-                                    className="db-btn-ghost"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setGbpPostId(checkIn.id)
-                                      setGbpCopied(false)
-                                    }}
-                                  >
-                                    <IcoGbp />
-                                    Post to Google Business
-                                  </button>
+                                  checkIn.isPublic ? (
+                                    // Not connected — keep the original copy-and-paste
+                                    // window so nobody loses a workflow they already have.
+                                    <button
+                                      className="db-btn-ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setGbpPostId(checkIn.id)
+                                        setGbpCopied(false)
+                                      }}
+                                    >
+                                      <IcoGbp />
+                                      Post to Google Business
+                                    </button>
+                                  ) : null
                                 ) : checkIn.gbpPostStatus === 'posted' ? (
                                   <>
                                     <span className="db-btn-ghost db-btn-gbp-posted">
@@ -2197,6 +2238,23 @@ export default function Dashboard() {
                                         View on Google
                                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                                       </a>
+                                    )}
+                                    <button
+                                      className="db-btn-ghost db-btn-gbp-remove"
+                                      disabled={gbpRetractingId === checkIn.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleGbpRetract(checkIn.id)
+                                      }}
+                                    >
+                                      {gbpRetractingId === checkIn.id ? (
+                                        <><span className="db-gbp-spinner" />Removing&hellip;</>
+                                      ) : (
+                                        <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Remove from Google</>
+                                      )}
+                                    </button>
+                                    {gbpPostError[checkIn.id] && (
+                                      <span className="db-gbp-error">{gbpPostError[checkIn.id]}</span>
                                     )}
                                   </>
                                 ) : (

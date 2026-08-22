@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { syncCheckIn, unsyncCheckIn } from '@/lib/wordpressSync'
+import { retractCheckInFromGbp } from '@/lib/gbpSync'
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,6 +59,28 @@ export async function POST(request: NextRequest) {
         console.error('WordPress sync failed after publish toggle:', err)
       }
     })
+
+    // Unpublishing a job also retracts it from Google, if it was posted there —
+    // an orphaned Google post pointing at a job page that is no longer public
+    // is worse than no post at all. retractCheckInFromGbp is a cheap no-op for
+    // the common case of a job that was never posted, so this is safe to call
+    // unconditionally on every unpublish rather than checking status first.
+    if (!isPublic) {
+      after(async () => {
+        try {
+          const result = await retractCheckInFromGbp(checkIn.id)
+          if (!result.ok) {
+            // Deliberately left as a live post with our record intact rather
+            // than silently forgotten: the job card keeps showing "Posted to
+            // Google" with its Remove button, which stays reachable on an
+            // unpublished job precisely for this case.
+            console.error('GBP retract failed after unpublish, post is still live:', checkIn.id, result.error)
+          }
+        } catch (err) {
+          console.error('GBP retract threw after unpublish:', err)
+        }
+      })
+    }
 
     return NextResponse.json({
       success: true,

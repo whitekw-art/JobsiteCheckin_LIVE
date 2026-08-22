@@ -4,17 +4,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { tierHasFeature } from '@/lib/planVersions'
-import { postCheckInToGbp } from '@/lib/gbpSync'
+import { postCheckInToGbp, retractCheckInFromGbp } from '@/lib/gbpSync'
 
-// Publish one completed job to the customer's Google Business Profile.
-// Design: docs/plans/2026-08-21-gbp-auto-posting-design.md
+// Publish (POST) or remove (DELETE) one job on the customer's Google Business
+// Profile. Design: docs/plans/2026-08-21-gbp-auto-posting-design.md
 //
-// Available on every paid plan (`gbp_post`). The Elite/Titan `gbp_auto_post`
-// key only governs whether this happens automatically on publish — it is not
-// checked here, because posting a job by hand is the Pro-tier feature.
+// POST is available on every paid plan (`gbp_post`). The Elite/Titan
+// `gbp_auto_post` key only governs whether this happens automatically on
+// publish — it is not checked here, because posting a job by hand is the
+// Pro-tier feature.
 //
-// The work itself lives in lib/gbpSync.ts so the Phase 2 auto-post hook can
-// call exactly the same code path rather than reimplementing it.
+// DELETE is deliberately NOT tier-gated: a customer who downgrades still owns
+// whatever they already posted and must be able to remove it. Gating cleanup
+// behind a plan they no longer have would strand them.
+//
+// The work itself lives in lib/gbpSync.ts so the Phase 2 auto-post hook and
+// the unpublish auto-retract hook can call exactly the same code paths
+// rather than reimplementing them.
 
 export async function POST(request: NextRequest) {
   try {
@@ -68,5 +74,39 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error posting job to Google Business Profile:', error)
     return NextResponse.json({ error: 'Failed to post this job to Google' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser || !currentUser.organizationId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (!['OWNER', 'ADMIN', 'SUPER_ADMIN'].includes(currentUser.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const body = (await request.json()) as { id?: string }
+    const id = (body.id || '').trim()
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 })
+    }
+
+    const checkIn = await prisma.checkIn.findFirst({
+      where: { id, organizationId: currentUser.organizationId },
+      select: { id: true },
+    })
+    if (!checkIn) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    const result = await retractCheckInFromGbp(checkIn.id)
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 502 })
+    }
+
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('Error removing job from Google Business Profile:', error)
+    return NextResponse.json({ error: 'Failed to remove this job from Google' }, { status: 500 })
   }
 }

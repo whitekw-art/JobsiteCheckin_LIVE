@@ -173,7 +173,7 @@ export default function DashboardShell({ title, children, action }: Props) {
             onClick={() => setSidebarOpen(false)}
           >
             <IcoJobs />
-            Jobs
+            Job Dashboard
           </Link>
 
           {canPublish && (
