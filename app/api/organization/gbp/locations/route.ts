@@ -26,8 +26,8 @@ export async function GET() {
       select: { id: true, planTier: true, gbpAccessToken: true, gbpRefreshToken: true, gbpConnectionStatus: true },
     })
     if (!org) return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
-    if (currentUser.role !== 'SUPER_ADMIN' && !tierHasFeature(org.planTier, 'gbp_post')) {
-      return NextResponse.json({ error: 'This feature requires a paid plan' }, { status: 403 })
+    if (currentUser.role !== 'SUPER_ADMIN' && !tierHasFeature(org.planTier, 'gbp_integration')) {
+      return NextResponse.json({ error: 'This feature requires the Elite or Titan plan' }, { status: 403 })
     }
     if (!org.gbpRefreshToken) {
       return NextResponse.json({ error: 'Connect your Google Business Profile first' }, { status: 400 })

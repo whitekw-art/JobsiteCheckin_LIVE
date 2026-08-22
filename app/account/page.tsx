@@ -775,16 +775,18 @@ export default function AccountPage() {
   // ── Google Business Profile ──
   // Status mirrors Organization.gbpConnectionStatus:
   //   'connected' | 'select_location' | 'no_locations' | null (never connected)
-  // Gating is deliberately two-level: `gbp_post` (every paid plan) covers
-  // connecting and posting by hand; `gbp_auto_post` (Elite + Titan) covers
-  // automatic posting, which is why a connected Pro org sees the automation row
-  // with an upgrade prompt rather than not seeing it at all.
-  const hasGbp = tierHasFeature(planTier, 'gbp_post')
+  // Gating, CORRECTED 2026-08-22: `gbp_integration` (Elite + Titan only) is the
+  // single gate for the real card below — connecting, the one-click button,
+  // and automatic posting. `gbp_post` (every paid plan) is a separate, older
+  // key that only covers the pre-existing copy-and-paste GBP modal on the
+  // dashboard job card, untouched by this card. A Pro org sees the exact same
+  // locked treatment as Free — there is no partial tier that can connect but
+  // not automate, so there is nothing to show "in place" for Pro here.
+  const hasGbp = tierHasFeature(planTier, 'gbp_integration')
   const [gbpStatus, setGbpStatus] = useState<string | null>(null)
   const [gbpLocationName, setGbpLocationName] = useState<string | null>(null)
   const [gbpLocations, setGbpLocations] = useState<{ name: string; title: string }[]>([])
   const [gbpChoice, setGbpChoice] = useState('')
-  const [gbpCanAutoPost, setGbpCanAutoPost] = useState(false)
   const [gbpAutoPost, setGbpAutoPost] = useState(false)
   const [gbpBusy, setGbpBusy] = useState(false)
   const [gbpError, setGbpError] = useState<string | null>(null)
@@ -985,7 +987,6 @@ export default function AccountPage() {
       const data = await res.json()
       setGbpStatus(data.status ?? null)
       setGbpLocationName(data.locationName ?? null)
-      setGbpCanAutoPost(Boolean(data.canAutoPost))
       setGbpAutoPost(Boolean(data.autoPost))
       // The picker is only meaningful mid-handshake, so the location list is
       // fetched on demand rather than on every Account page load.
@@ -1571,10 +1572,13 @@ export default function AccountPage() {
       {activeTab === 'connections' && (
         <div style={{ maxWidth: 560 }}>
 
-          {/* ── Connect Your Google Business Profile ── */}
+          {/* ── Connect Your Google Business Profile (Elite + Titan) ── */}
           <ConnCard
             icon={<GoogleGIcon />}
             title="Connect Your Google Business Profile"
+            titleExtra={!hasGbp ? (
+              <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: 'var(--surface-3)', color: 'var(--t2)' }}>Elite &amp; Titan</span>
+            ) : undefined}
             sub="Publish job updates to your Google listing"
             status={
               !hasGbp ? <StatusDot state="coming" label="Upgrade to Activate!" />
@@ -1675,34 +1679,19 @@ export default function AccountPage() {
                   <div style={{ fontSize: 12.5, color: 'var(--t2)' }}>{gbpLocationName || 'Your Google business listing'}</div>
                 </div>
 
-                {/* Automatic posting — Elite + Titan. Shown to Pro as well, with
-                    the toggle swapped for an upgrade prompt, so the value of the
-                    next tier is visible where it actually applies. */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: '1px solid var(--border)', ...(gbpCanAutoPost ? {} : { background: 'rgba(249,115,22,.05)' }) }}>
+                {/* Automatic posting. Reaching this card at all already requires
+                    gbp_integration (Elite + Titan), so there is no partial tier
+                    to show an upgrade prompt for — anyone here can toggle it. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>Post jobs automatically</span>
-                      {!gbpCanAutoPost && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: 'rgba(249,115,22,.12)', color: 'var(--orange)' }}>
-                          Elite &amp; Titan
-                        </span>
-                      )}
-                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>Post jobs automatically</span>
                     <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3, lineHeight: 1.5 }}>
-                      {!gbpCanAutoPost
-                        ? 'Right now you post each job to Google yourself. Upgrade and every job you publish goes up automatically.'
-                        : gbpAutoPost
-                          ? 'On — every job you publish goes straight to your Google listing. You can still post older jobs by hand any time.'
-                          : 'Off — nothing posts on its own. Use the Post to Google button on a job whenever you want it on your listing.'}
+                      {gbpAutoPost
+                        ? 'On — every job you publish goes straight to your Google listing. You can still post older jobs by hand any time.'
+                        : 'Off — nothing posts on its own. Use the Post to Google button on a job whenever you want it on your listing.'}
                     </div>
                   </div>
-                  {gbpCanAutoPost ? (
-                    <Toggle checked={gbpAutoPost} onChange={handleGbpAutoPostToggle} />
-                  ) : (
-                    <a href="/pricing" style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 14px', borderRadius: 7, fontSize: 12, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", background: 'var(--orange)', color: '#fff', textDecoration: 'none', flexShrink: 0 }}>
-                      Upgrade
-                    </a>
-                  )}
+                  <Toggle checked={gbpAutoPost} onChange={handleGbpAutoPostToggle} />
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: '1px solid var(--border)', opacity: .5 }}>

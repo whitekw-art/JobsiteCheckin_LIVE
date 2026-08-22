@@ -20,10 +20,12 @@ import {
 // Shape mirrors the Search Console route (app/api/organization/gsc/route.ts):
 // GET status, POST to start, PATCH to pick a location, DELETE to disconnect.
 //
-// Gating note: connecting and posting by hand is `gbp_post` (every paid plan).
-// Automatic posting is a separate `gbp_auto_post` key (Elite + Titan) and is
-// checked only where the auto-post preference is written — a Pro customer can
-// connect and post all day, they just cannot switch automation on.
+// Gating note, CORRECTED 2026-08-22: the real integration this route manages
+// — connecting a Google Business Profile at all, the one-click button, and
+// automatic posting — is `gbp_integration`, Elite + Titan only. `gbp_post` is
+// a separate, older key (every paid plan) that gates nothing here; it only
+// covers the pre-existing copy-and-paste GBP modal on the dashboard job card,
+// which Pro keeps unchanged. A Pro org never reaches this route successfully.
 //
 // The OAuth handshake itself finishes in ./callback/route.ts.
 
@@ -53,8 +55,8 @@ async function requireOwnerWithFeature() {
   if (!org) {
     return { error: NextResponse.json({ error: 'Organization not found' }, { status: 404 }) }
   }
-  if (currentUser.role !== 'SUPER_ADMIN' && !tierHasFeature(org.planTier, 'gbp_post')) {
-    return { error: NextResponse.json({ error: 'This feature requires a paid plan' }, { status: 403 }) }
+  if (currentUser.role !== 'SUPER_ADMIN' && !tierHasFeature(org.planTier, 'gbp_integration')) {
+    return { error: NextResponse.json({ error: 'This feature requires the Elite or Titan plan' }, { status: 403 }) }
   }
   return { org, role: currentUser.role }
 }
@@ -65,9 +67,7 @@ export async function GET() {
   try {
     const gate = await requireOwnerWithFeature()
     if ('error' in gate) return gate.error
-    const { org, role } = gate
-
-    const canAutoPost = role === 'SUPER_ADMIN' || tierHasFeature(org.planTier, 'gbp_auto_post')
+    const { org } = gate
 
     return NextResponse.json({
       connected: Boolean(org.gbpRefreshToken) && org.gbpConnectionStatus === 'connected',
@@ -75,10 +75,10 @@ export async function GET() {
       locationId: org.gbpLocationId,
       locationName: org.gbpLocationName,
       connectedAt: org.gbpConnectedAt,
-      // Surfaced so the card can render the upgrade prompt in place rather than
-      // hiding the automation row from customers who could buy it.
-      canAutoPost,
-      autoPost: canAutoPost && org.gbpAutoPost,
+      // Reaching this route at all already requires gbp_integration, so
+      // automation is never a further upsell from here — unlike the earlier
+      // design, there is no partial tier that can connect but not automate.
+      autoPost: org.gbpAutoPost,
     })
   } catch (error) {
     console.error('Error loading Google Business Profile connection:', error)
@@ -126,12 +126,15 @@ export async function POST() {
 
 // PATCH — two independent settings, either or both may be present:
 //   { locationId } — choose which listing to post to (multi-location accounts)
-//   { autoPost }   — switch automatic posting on/off (Elite + Titan only)
+//   { autoPost }   — switch automatic posting on/off
+// Both require gbp_integration, already enforced by requireOwnerWithFeature —
+// there is no partial tier that reaches this route without also being allowed
+// to flip automation, so no separate check is needed here.
 export async function PATCH(request: NextRequest) {
   try {
     const gate = await requireOwnerWithFeature()
     if ('error' in gate) return gate.error
-    const { org, role } = gate
+    const { org } = gate
 
     if (!org.gbpRefreshToken) {
       return NextResponse.json({ error: 'Connect your Google Business Profile first' }, { status: 400 })
@@ -141,12 +144,6 @@ export async function PATCH(request: NextRequest) {
     const data: { gbpAccountId?: string; gbpLocationId?: string; gbpLocationName?: string; gbpConnectionStatus?: string; gbpAutoPost?: boolean } = {}
 
     if (typeof body.autoPost === 'boolean') {
-      // The separate, higher gate. A Pro org can reach this route to pick a
-      // location but must not be able to flip automation on by calling the API
-      // directly — the UI hides the toggle, which is not a control.
-      if (role !== 'SUPER_ADMIN' && !tierHasFeature(org.planTier, 'gbp_auto_post')) {
-        return NextResponse.json({ error: 'Automatic posting requires the Elite or Titan plan' }, { status: 403 })
-      }
       data.gbpAutoPost = body.autoPost
     }
 
