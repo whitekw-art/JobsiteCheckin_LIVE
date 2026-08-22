@@ -47,6 +47,14 @@ model Organization {
   gscPropertyUrl           String?
   gscConnectionStatus      String?
   gscConnectedAt           DateTime?
+  gbpAccessToken           String?
+  gbpRefreshToken          String?
+  gbpAccountId             String?
+  gbpLocationId            String?
+  gbpLocationName          String?
+  gbpConnectionStatus      String?
+  gbpConnectedAt           DateTime?
+  gbpAutoPost              Boolean                @default(true)
   showEngagementMetrics    Boolean                @default(false)
   showPortfolioViewsMetric Boolean                @default(false)
   Invitations              Invitations[]
@@ -129,6 +137,10 @@ model CheckIn {
   wpMedia                  String?
   wpSyncedAt               DateTime?
   wpSyncStatus             String?
+  gbpPostName              String?
+  gbpPostUrl               String?
+  gbpPostedAt              DateTime?
+  gbpPostStatus            String?
   events                   CheckInEvent[]
 
   @@index([organizationId])

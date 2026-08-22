@@ -33,6 +33,9 @@ export async function GET() {
         homeCustomerName: true,
         homeCustomerPhone: true,
         homeCustomerEmail: true,
+        gbpPostUrl: true,
+        gbpPostedAt: true,
+        gbpPostStatus: true,
       },
       orderBy: {
         timestamp: 'desc',
