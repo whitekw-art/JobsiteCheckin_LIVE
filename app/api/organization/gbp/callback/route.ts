@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       select: { id: true, planTier: true },
     })
     if (!org) return backToAccount(OUTCOMES.failed)
-    if (currentUser.role !== 'SUPER_ADMIN' && !tierHasFeature(org.planTier, 'gbp_post')) {
+    if (currentUser.role !== 'SUPER_ADMIN' && !tierHasFeature(org.planTier, 'gbp_integration')) {
       return backToAccount(OUTCOMES.failed)
     }
 

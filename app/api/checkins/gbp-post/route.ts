@@ -9,10 +9,13 @@ import { postCheckInToGbp, retractCheckInFromGbp } from '@/lib/gbpSync'
 // Publish (POST) or remove (DELETE) one job on the customer's Google Business
 // Profile. Design: docs/plans/2026-08-21-gbp-auto-posting-design.md
 //
-// POST is available on every paid plan (`gbp_post`). The Elite/Titan
-// `gbp_auto_post` key only governs whether this happens automatically on
-// publish — it is not checked here, because posting a job by hand is the
-// Pro-tier feature.
+// POST requires `gbp_integration` (Elite + Titan). CORRECTED 2026-08-22: this
+// was originally gated on `gbp_post` (every paid plan), on the assumption that
+// manual posting was a Pro-tier feature and only automation was Elite/Titan.
+// Keith clarified the real scope: Pro keeps only the pre-existing
+// copy-and-paste GBP modal (still gated by `gbp_post`, on the dashboard job
+// card, untouched by this route) — the one-click button this route serves is
+// Elite + Titan only, same as automatic posting.
 //
 // DELETE is deliberately NOT tier-gated: a customer who downgrades still owns
 // whatever they already posted and must be able to remove it. Gating cleanup
@@ -43,8 +46,8 @@ export async function POST(request: NextRequest) {
       select: { planTier: true },
     })
     if (!org) return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
-    if (currentUser.role !== 'SUPER_ADMIN' && !tierHasFeature(org.planTier, 'gbp_post')) {
-      return NextResponse.json({ error: 'This feature requires a paid plan' }, { status: 403 })
+    if (currentUser.role !== 'SUPER_ADMIN' && !tierHasFeature(org.planTier, 'gbp_integration')) {
+      return NextResponse.json({ error: 'This feature requires the Elite or Titan plan' }, { status: 403 })
     }
 
     // Scoped to the caller's own organization — the id alone must never be
