@@ -10,6 +10,11 @@
 //   tierHasFeature (always reads CURRENT_PLAN_VERSION) from hasFeature (reads the
 //   org's stored planVersion) for every org still stored as v1. Once real
 //   customers exist, follow the rule as written — add a v2, don't edit v1.
+// v1 — 2026-08-22: `gbp_auto_post` added to elite + titan, same documented
+//   exception and same reasoning as the line above. Note the deliberate split:
+//   `gbp_post` (already on pro/elite/titan, unchanged) now means "connect the
+//   profile and post a job by hand"; `gbp_auto_post` means "every published job
+//   goes up automatically" and is the Elite upgrade. Do not merge the two keys.
 
 export const CURRENT_PLAN_VERSION = 1
 
@@ -21,10 +26,10 @@ export const PLAN_FEATURES: Record<string, Record<number, string[]>> = {
     1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'gbp_post'],
   },
   elite: {
-    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'gbp_post', 'before_after_tagging', 'gsc_integration'],
+    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'gbp_post', 'gbp_auto_post', 'before_after_tagging', 'gsc_integration'],
   },
   titan: {
-    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'api_access', 'white_label', 'gbp_post', 'before_after_tagging', 'review_request', 'ai_job_description', 'website_integration', 'gsc_integration'],
+    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'api_access', 'white_label', 'gbp_post', 'gbp_auto_post', 'before_after_tagging', 'review_request', 'ai_job_description', 'website_integration', 'gsc_integration'],
   },
 }
 

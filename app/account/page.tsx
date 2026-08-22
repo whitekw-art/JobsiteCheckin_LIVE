@@ -264,10 +264,11 @@ export default function AccountPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Controlled via NEXT_PUBLIC_GBP_API_READY env var
-  // Local: add NEXT_PUBLIC_GBP_API_READY=true to .env.local
-  // Vercel: add to staging/prod when Google API application is approved
-  const GBP_API_READY = process.env.NEXT_PUBLIC_GBP_API_READY === 'true'
+  // NEXT_PUBLIC_GBP_API_READY is gone as of 2026-08-22. It gated a placeholder
+  // card while the Google API application was pending; the real connection is
+  // now gated by plan tier and by whether a connection actually exists, which
+  // are both true facts rather than a manual switch someone has to remember to
+  // flip. The Vercel env var can be deleted from both environments.
 
   // Portfolio link state
   const [linkCopied, setLinkCopied] = useState(false)
@@ -771,11 +772,24 @@ export default function AccountPage() {
     } catch {}
   }
 
-  // Connections tab state (localStorage-backed, Phase 1)
-  const [gbpConnected, setGbpConnected] = useState(false)
-  const [postMode, setPostMode] = useState<'draft' | 'auto'>('draft')
-  const [servicesSync, setServicesSync] = useState(false)
+  // ── Google Business Profile ──
+  // Status mirrors Organization.gbpConnectionStatus:
+  //   'connected' | 'select_location' | 'no_locations' | null (never connected)
+  // Gating is deliberately two-level: `gbp_post` (every paid plan) covers
+  // connecting and posting by hand; `gbp_auto_post` (Elite + Titan) covers
+  // automatic posting, which is why a connected Pro org sees the automation row
+  // with an upgrade prompt rather than not seeing it at all.
+  const hasGbp = tierHasFeature(planTier, 'gbp_post')
+  const [gbpStatus, setGbpStatus] = useState<string | null>(null)
+  const [gbpLocationName, setGbpLocationName] = useState<string | null>(null)
+  const [gbpLocations, setGbpLocations] = useState<{ name: string; title: string }[]>([])
+  const [gbpChoice, setGbpChoice] = useState('')
+  const [gbpCanAutoPost, setGbpCanAutoPost] = useState(false)
+  const [gbpAutoPost, setGbpAutoPost] = useState(false)
+  const [gbpBusy, setGbpBusy] = useState(false)
+  const [gbpError, setGbpError] = useState<string | null>(null)
   const [showServicesTip, setShowServicesTip] = useState(false)
+  const gbpConnected = gbpStatus === 'connected'
 
   // ── Google Search Console (Elite + Titan) ──
   // Status mirrors Organization.gscConnectionStatus:
@@ -935,34 +949,172 @@ export default function AccountPage() {
     }
     loadProfile()
 
-    // Load GBP preferences from localStorage
-    setGbpConnected(localStorage.getItem('gbp_connected') === 'true')
-    setPostMode((localStorage.getItem('gbp_post_mode') as 'draft' | 'auto') || 'draft')
-    setServicesSync(localStorage.getItem('gbp_services_sync') === 'true')
+    // Clear the Phase 1 localStorage stub this feature replaced. Without this a
+    // returning customer keeps a stale `gbp_connected: true` in their browser
+    // forever — harmless now that nothing reads it, but it would mislead anyone
+    // debugging from devtools.
+    localStorage.removeItem('gbp_connected')
+    localStorage.removeItem('gbp_post_mode')
+    localStorage.removeItem('gbp_services_sync')
   }, [])
 
-  function handlePostModeChange(mode: 'draft' | 'auto') {
-    setPostMode(mode)
-    localStorage.setItem('gbp_post_mode', mode)
+  // Re-check after returning from Google's consent screen. The callback route
+  // redirects to /account?gbp=<outcome>; the param is stripped afterwards so a
+  // refresh doesn't replay a stale outcome message.
+  useEffect(() => {
+    if (!hasGbp) return
+    const outcome = new URLSearchParams(window.location.search).get('gbp')
+    if (outcome === 'denied') {
+      setGbpError('You cancelled the Google connection. Nothing was changed.')
+    } else if (outcome === 'failed') {
+      setGbpError('We could not finish connecting to Google. Please try again.')
+    }
+    if (outcome) {
+      setActiveTab('connections')
+      setOpenCards((prev) => ({ ...prev, gbp: true }))
+      window.history.replaceState({}, '', '/account')
+    }
+    reloadGbpStatus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasGbp])
+
+  async function reloadGbpStatus() {
+    try {
+      const res = await fetch('/api/organization/gbp')
+      if (!res.ok) return
+      const data = await res.json()
+      setGbpStatus(data.status ?? null)
+      setGbpLocationName(data.locationName ?? null)
+      setGbpCanAutoPost(Boolean(data.canAutoPost))
+      setGbpAutoPost(Boolean(data.autoPost))
+      // The picker is only meaningful mid-handshake, so the location list is
+      // fetched on demand rather than on every Account page load.
+      if (data.status === 'select_location') {
+        await loadGbpLocations()
+      }
+    } catch { /* leave prior status visible rather than flashing an error */ }
   }
 
-  function handleServicesSyncToggle() {
-    const next = !servicesSync
-    setServicesSync(next)
-    localStorage.setItem('gbp_services_sync', String(next))
+  async function loadGbpLocations() {
+    try {
+      const listRes = await fetch('/api/organization/gbp/locations')
+      if (!listRes.ok) return
+      const list = await listRes.json()
+      setGbpLocations(list.locations ?? [])
+      setGbpChoice(list.locations?.[0]?.name ?? '')
+    } catch { /* picker simply stays empty */ }
   }
 
-  function handleGbpConnect() {
-    // Phase 1: localStorage-only. Phase 2: real OAuth flow.
-    const next = !gbpConnected
-    setGbpConnected(next)
-    localStorage.setItem('gbp_connected', String(next))
-    if (!next) {
-      // Reset controls on disconnect
-      setPostMode('draft')
-      setServicesSync(false)
-      localStorage.removeItem('gbp_post_mode')
-      localStorage.removeItem('gbp_services_sync')
+  async function handleGbpConnect() {
+    setGbpBusy(true)
+    setGbpError(null)
+    try {
+      const res = await fetch('/api/organization/gbp', { method: 'POST' })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.consentUrl) {
+        setGbpError(data?.error || 'Could not start the connection. Please try again.')
+        setGbpBusy(false)
+        return
+      }
+      // Full navigation, not a router push — this leaves the app for Google.
+      window.location.assign(data.consentUrl)
+    } catch {
+      setGbpError('Could not start the connection. Please try again.')
+      setGbpBusy(false)
+    }
+  }
+
+  async function handleGbpSelectLocation() {
+    if (!gbpChoice) return
+    setGbpBusy(true)
+    setGbpError(null)
+    try {
+      const res = await fetch('/api/organization/gbp', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locationId: gbpChoice }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setGbpError(data?.error || 'Could not save your selection.')
+      } else {
+        setGbpStatus('connected')
+        setGbpLocationName(data.gbpLocationName ?? null)
+      }
+    } catch {
+      setGbpError('Could not save your selection.')
+    } finally {
+      setGbpBusy(false)
+    }
+  }
+
+  // Re-checks Google for listings without sending the customer through consent
+  // again — the recovery path for someone who signed in before claiming their
+  // business, or who signed in with the wrong Google account and has since
+  // fixed it on Google's side.
+  async function handleGbpCheckAgain() {
+    setGbpBusy(true)
+    setGbpError(null)
+    try {
+      const res = await fetch('/api/organization/gbp/locations')
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setGbpError(data?.error || 'Could not check your Google account. Please try again.')
+        return
+      }
+      const found = data.locations ?? []
+      if (found.length === 0) {
+        setGbpError('We still cannot find a business listing on that Google account.')
+        return
+      }
+      // The locations route promotes the stored status itself, so re-reading it
+      // keeps this component from having to duplicate that decision.
+      await reloadGbpStatus()
+    } catch {
+      setGbpError('Could not check your Google account. Please try again.')
+    } finally {
+      setGbpBusy(false)
+    }
+  }
+
+  async function handleGbpAutoPostToggle() {
+    const next = !gbpAutoPost
+    setGbpAutoPost(next) // optimistic — reverted below if the server disagrees
+    setGbpError(null)
+    try {
+      const res = await fetch('/api/organization/gbp', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autoPost: next }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        setGbpError(data?.error || 'Could not save that setting.')
+        setGbpAutoPost(!next)
+      }
+    } catch {
+      setGbpError('Could not save that setting.')
+      setGbpAutoPost(!next)
+    }
+  }
+
+  async function handleGbpDisconnect() {
+    if (!confirm('Disconnect your Google Business Profile? New jobs will stop posting to your listing. Posts already on Google stay there.')) return
+    setGbpBusy(true)
+    setGbpError(null)
+    try {
+      const res = await fetch('/api/organization/gbp', { method: 'DELETE' })
+      if (res.ok) {
+        setGbpStatus(null)
+        setGbpLocationName(null)
+        setGbpLocations([])
+      } else {
+        setGbpError('Could not disconnect. Please try again.')
+      }
+    } catch {
+      setGbpError('Could not disconnect. Please try again.')
+    } finally {
+      setGbpBusy(false)
     }
   }
 
@@ -1424,20 +1576,25 @@ export default function AccountPage() {
             icon={<GoogleGIcon />}
             title="Connect Your Google Business Profile"
             sub="Publish job updates to your Google listing"
-            status={!GBP_API_READY ? <StatusDot state="coming" label="Coming soon" /> : gbpConnected ? <StatusDot state="active" label="Active" /> : <StatusDot state="disabled" label="Disabled" />}
+            status={
+              !hasGbp ? <StatusDot state="coming" label="Upgrade to Activate!" />
+              : gbpStatus === 'connected' ? <StatusDot state="active" label="Active" />
+              : gbpStatus === 'select_location' || gbpStatus === 'no_locations' ? <StatusDot state="disabled" label="Action needed" />
+              : <StatusDot state="disabled" label="Not connected" />
+            }
             open={!!openCards['gbp']}
             onToggle={() => toggleCard('gbp')}
-            locked={!GBP_API_READY}
+            locked={!hasGbp}
           >
-            <div style={{ padding: '16px 20px', borderBottom: GBP_API_READY && !gbpConnected ? '1px solid var(--border)' : undefined }}>
+            <div style={{ padding: '16px 20px', borderBottom: gbpStatus ? '1px solid var(--border)' : undefined }}>
               <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: 'var(--t2)', lineHeight: 1.6 }}>
-                Businesses with active GBP posts get <strong style={{ color: 'var(--t1)' }}>42% more direction requests</strong> and <strong style={{ color: 'var(--t1)' }}>35% more website clicks</strong>. — Google
+                Businesses with photos on their Google listing get <strong style={{ color: 'var(--t1)' }}>42% more direction requests</strong> and <strong style={{ color: 'var(--t1)' }}>35% more website clicks</strong> than listings with none. — Google
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 18 }}>
                 {[
-                  'Every published job creates a Google Business post automatically',
-                  'Posts include your job photo, location, and work description',
-                  'Keeps your profile active — Google rewards consistent posting',
+                  'Post a finished job to Google in one click, photo and all',
+                  'Fill your Google listing with your own recent work',
+                  'Give Google real, specific job detail to describe your business with',
                 ].map((txt, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: 'var(--t2)', lineHeight: 1.5 }}>
                     <div style={{ width: 20, height: 20, background: 'var(--sky-dim)', color: 'var(--sky-text)', borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>
@@ -1447,37 +1604,108 @@ export default function AccountPage() {
                   </div>
                 ))}
               </div>
-              {!GBP_API_READY ? (
-                <button disabled style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderRadius: 8, background: 'var(--surface-3)', color: 'var(--t3)', border: '1px solid var(--border)', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'not-allowed' }}>
-                  <GoogleWordmark />
-                  Connect Google Business — Coming Soon
-                </button>
+
+              {gbpError && (
+                <div style={{ background: 'var(--red-bg)', border: '1px solid rgba(220,38,38,.22)', borderRadius: 8, padding: '10px 13px', marginBottom: 14, fontSize: 12, color: 'var(--red)', lineHeight: 1.55 }}>
+                  {gbpError}
+                </div>
+              )}
+
+              {!hasGbp ? (
+                <a href="/pricing" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderRadius: 8, background: 'var(--orange)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", textDecoration: 'none' }}>
+                  See plans
+                </a>
+              ) : gbpStatus === 'no_locations' ? (
+                <>
+                  {/* OAuth succeeded but this Google account manages no listing —
+                      almost always a personal Gmail rather than the business one.
+                      Needs its own state: a bare failure here reads as our bug. */}
+                  <div style={{ background: 'var(--amber-bg)', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', marginBottom: 14, fontSize: 12, color: 'var(--amber)', lineHeight: 1.55 }}>
+                    The Google account you signed in with doesn&apos;t manage a Google Business Profile. The most common reason is signing in with a personal Gmail instead of the account your business listing is on.
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button onClick={handleGbpConnect} disabled={gbpBusy} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderRadius: 8, background: '#fff', color: '#3c4043', border: '1px solid #dadce0', boxShadow: '0 1px 2px rgba(0,0,0,.08)', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: gbpBusy ? 'wait' : 'pointer' }}>
+                      <GoogleWordmark />
+                      Try a different Google account
+                    </button>
+                    <button onClick={handleGbpCheckAgain} disabled={gbpBusy} className="db-shell-btn" style={{ fontSize: 12 }}>
+                      {gbpBusy ? 'Checking…' : 'Check again'}
+                    </button>
+                  </div>
+                </>
+              ) : gbpStatus === 'select_location' ? (
+                <>
+                  <div style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, marginBottom: 12 }}>
+                    Your Google account manages more than one business. Pick the one your jobs should be posted to.
+                  </div>
+                  <label htmlFor="gbp-location" style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>
+                    Business location
+                  </label>
+                  <select
+                    id="gbp-location"
+                    value={gbpChoice}
+                    onChange={(e) => setGbpChoice(e.target.value)}
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, color: 'var(--t1)', fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: 14 }}
+                  >
+                    {gbpLocations.map((l) => (
+                      <option key={l.name} value={l.name}>{l.title}</option>
+                    ))}
+                  </select>
+                  <button onClick={handleGbpSelectLocation} disabled={gbpBusy || !gbpChoice} className="db-shell-btn" style={{ fontSize: 12 }}>
+                    {gbpBusy ? 'Saving…' : 'Save selection'}
+                  </button>
+                </>
               ) : !gbpConnected ? (
-                <button onClick={handleGbpConnect} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderRadius: 8, background: '#fff', color: '#3c4043', border: '1px solid #dadce0', boxShadow: '0 1px 2px rgba(0,0,0,.08)', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer' }}>
+                <button onClick={handleGbpConnect} disabled={gbpBusy} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderRadius: 8, background: '#fff', color: '#3c4043', border: '1px solid #dadce0', boxShadow: '0 1px 2px rgba(0,0,0,.08)', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: gbpBusy ? 'wait' : 'pointer' }}>
                   <GoogleWordmark />
-                  Connect Google Business Profile
+                  {gbpBusy ? 'Opening Google…' : 'Connect Google Business Profile'}
                 </button>
               ) : null}
             </div>
-            {GBP_API_READY && gbpConnected && (
+
+            {gbpConnected && (
               <>
                 <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)', marginBottom: 8 }}>Posting mode</div>
-                  <div style={{ display: 'flex', gap: 18, marginBottom: 6 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--t2)', cursor: 'pointer' }}>
-                      <input type="radio" name="postMode" value="auto" checked={postMode === 'auto'} onChange={() => handlePostModeChange('auto')} />
-                      Auto-publish
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--t2)', cursor: 'pointer' }}>
-                      <input type="radio" name="postMode" value="draft" checked={postMode === 'draft'} onChange={() => handlePostModeChange('draft')} />
-                      Review before posting
-                    </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 7 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
+                      Connected
+                    </span>
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--t3)', lineHeight: 1.5 }}>
-                    {postMode === 'auto' ? 'Posts go live on Google immediately when you publish a job.' : 'You approve each post from the job card before it goes live on Google.'}
-                  </div>
+                  <div style={{ fontSize: 12.5, color: 'var(--t2)' }}>{gbpLocationName || 'Your Google business listing'}</div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+
+                {/* Automatic posting — Elite + Titan. Shown to Pro as well, with
+                    the toggle swapped for an upgrade prompt, so the value of the
+                    next tier is visible where it actually applies. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: '1px solid var(--border)', ...(gbpCanAutoPost ? {} : { background: 'rgba(249,115,22,.05)' }) }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>Post jobs automatically</span>
+                      {!gbpCanAutoPost && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: 'rgba(249,115,22,.12)', color: 'var(--orange)' }}>
+                          Elite &amp; Titan
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3, lineHeight: 1.5 }}>
+                      {!gbpCanAutoPost
+                        ? 'Right now you post each job to Google yourself. Upgrade and every job you publish goes up automatically.'
+                        : gbpAutoPost
+                          ? 'On — every job you publish goes straight to your Google listing. You can still post older jobs by hand any time.'
+                          : 'Off — nothing posts on its own. Use the Post to Google button on a job whenever you want it on your listing.'}
+                    </div>
+                  </div>
+                  {gbpCanAutoPost ? (
+                    <Toggle checked={gbpAutoPost} onChange={handleGbpAutoPostToggle} />
+                  ) : (
+                    <a href="/pricing" style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 14px', borderRadius: 7, fontSize: 12, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", background: 'var(--orange)', color: '#fff', textDecoration: 'none', flexShrink: 0 }}>
+                      Upgrade
+                    </a>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: '1px solid var(--border)', opacity: .5 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>Sync services list</span>
@@ -1493,16 +1721,27 @@ export default function AccountPage() {
                         )}
                       </div>
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3, lineHeight: 1.5 }}>Auto-update your GBP services to match your trade types.</div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3, lineHeight: 1.5 }}>Keep your Google services list matched to your trade types. Coming later.</div>
                   </div>
-                  <Toggle checked={servicesSync} onChange={handleServicesSyncToggle} />
+                  {/* Deliberately inert: services sync is a different API surface
+                      (Business Information categories/serviceItems) and is out of
+                      scope for this build. Left visible rather than removed so the
+                      roadmap stays legible to the customer. */}
+                  <Toggle checked={false} onChange={() => {}} />
                 </div>
+
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 13px', fontSize: 12, color: 'var(--t2)', lineHeight: 1.6 }}>
+                    Google shows a post on your listing for <strong style={{ color: 'var(--t1)' }}>7 days</strong>, then moves it to your profile&apos;s post archive. That&apos;s Google&apos;s own behavior, not a ProjectCheckin limit — posting regularly is what keeps your listing looking active.
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>Disconnect</div>
-                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>Remove ProjectCheckin&apos;s access to your Google Business Profile.</div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>Remove ProjectCheckin&apos;s access to your Google Business Profile. Posts already on Google stay there.</div>
                   </div>
-                  <button onClick={handleGbpConnect} style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid rgba(220,38,38,.2)', flexShrink: 0 }}>
+                  <button onClick={handleGbpDisconnect} disabled={gbpBusy} style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: gbpBusy ? 'wait' : 'pointer', background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid rgba(220,38,38,.2)', flexShrink: 0 }}>
                     Disconnect
                   </button>
                 </div>

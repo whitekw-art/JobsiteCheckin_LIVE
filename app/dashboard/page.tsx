@@ -28,6 +28,9 @@ interface CheckIn {
   homeCustomerName?: string | null
   homeCustomerPhone?: string | null
   homeCustomerEmail?: string | null
+  gbpPostUrl?: string | null
+  gbpPostedAt?: string | null
+  gbpPostStatus?: string | null
 }
 
 interface EditAddr {
@@ -556,6 +559,15 @@ export default function Dashboard() {
   const [gbpPostId, setGbpPostId] = useState<string | null>(null)
   const [gbpCopied, setGbpCopied] = useState(false)
 
+  // ── Google Business Profile posting ──
+  // `gbpLive` is whether this org has an actual working connection, which is a
+  // different question from whether their plan allows posting — a Pro customer
+  // who has not connected yet still sees the old copy-and-paste window rather
+  // than a button that would fail.
+  const [gbpLive, setGbpLive] = useState(false)
+  const [gbpPostingId, setGbpPostingId] = useState<string | null>(null)
+  const [gbpPostError, setGbpPostError] = useState<Record<string, string>>({})
+
   // Address editing (keyed by checkIn.id)
   const [editAddresses, setEditAddresses] = useState<Record<string, EditAddr>>({})
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null)
@@ -662,7 +674,52 @@ export default function Dashboard() {
         if (d.organization?.portfolioPageUrl) setOrgPortfolioUrl(d.organization.portfolioPageUrl)
       })
       .catch(() => {})
+    // Cheap DB-backed status read. A failure here leaves gbpLive false, which
+    // degrades to the copy-and-paste window rather than breaking the card.
+    fetch('/api/organization/gbp')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setGbpLive(Boolean(d?.connected)))
+      .catch(() => {})
   }, [])
+
+  // Publish one job to the customer's Google listing. Optimistically updates
+  // the local row so the button settles into its posted state without a full
+  // refetch of every job.
+  const handleGbpPost = async (checkInId: string) => {
+    setGbpPostingId(checkInId)
+    setGbpPostError((prev) => {
+      const next = { ...prev }
+      delete next[checkInId]
+      return next
+    })
+    try {
+      const res = await fetch('/api/checkins/gbp-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkInId }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setGbpPostError((prev) => ({
+          ...prev,
+          [checkInId]: data?.error || 'Google could not publish this job. Please try again.',
+        }))
+        setCheckIns((prev) => prev.map((c) => (c.id === checkInId ? { ...c, gbpPostStatus: 'failed' } : c)))
+        return
+      }
+      setCheckIns((prev) =>
+        prev.map((c) =>
+          c.id === checkInId
+            ? { ...c, gbpPostStatus: 'posted', gbpPostUrl: data?.gbpPostUrl ?? null, gbpPostedAt: data?.gbpPostedAt ?? new Date().toISOString() }
+            : c
+        )
+      )
+    } catch {
+      setGbpPostError((prev) => ({ ...prev, [checkInId]: 'Google could not publish this job. Please try again.' }))
+    } finally {
+      setGbpPostingId(null)
+    }
+  }
 
   const fetchCheckIns = async () => {
     try {
@@ -2109,17 +2166,62 @@ export default function Dashboard() {
                                 </button>
                               )}
                               {checkIn.isPublic && tierHasFeature(planTier, 'gbp_post') && (
-                                <button
-                                  className="db-btn-ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setGbpPostId(checkIn.id)
-                                    setGbpCopied(false)
-                                  }}
-                                >
-                                  <IcoGbp />
-                                  Post to Google Business
-                                </button>
+                                !gbpLive ? (
+                                  // Not connected — keep the original copy-and-paste
+                                  // window so nobody loses a workflow they already have.
+                                  <button
+                                    className="db-btn-ghost"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setGbpPostId(checkIn.id)
+                                      setGbpCopied(false)
+                                    }}
+                                  >
+                                    <IcoGbp />
+                                    Post to Google Business
+                                  </button>
+                                ) : checkIn.gbpPostStatus === 'posted' ? (
+                                  <>
+                                    <span className="db-btn-ghost db-btn-gbp-posted">
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                      Posted to Google
+                                    </span>
+                                    {checkIn.gbpPostUrl && (
+                                      <a
+                                        href={checkIn.gbpPostUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="db-gbp-viewlink"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        View on Google
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                      </a>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      className={`db-btn-ghost ${checkIn.gbpPostStatus === 'failed' ? 'db-btn-gbp-failed' : 'db-btn-gbp'}`}
+                                      disabled={gbpPostingId === checkIn.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleGbpPost(checkIn.id)
+                                      }}
+                                    >
+                                      {gbpPostingId === checkIn.id ? (
+                                        <><span className="db-gbp-spinner" />Posting to Google&hellip;</>
+                                      ) : checkIn.gbpPostStatus === 'failed' ? (
+                                        <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Try posting again</>
+                                      ) : (
+                                        <><IcoGbp />Post to Google</>
+                                      )}
+                                    </button>
+                                    {gbpPostError[checkIn.id] && (
+                                      <span className="db-gbp-error">{gbpPostError[checkIn.id]}</span>
+                                    )}
+                                  </>
+                                )
                               )}
                               {tierHasFeature(planTier, 'review_request') && (
                               <button
