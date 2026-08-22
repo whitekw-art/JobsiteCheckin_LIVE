@@ -356,6 +356,53 @@ export async function createLocalPost(
   }
 }
 
+/**
+ * Delete a Local Post from Google.
+ *
+ * A 404 is treated as success — the post being gone is the goal state whether
+ * that happened because we deleted it, the customer deleted it by hand on
+ * Google's own dashboard, or it simply expired past its 7-day lifespan.
+ */
+export async function deleteLocalPost(
+  encryptedRefresh: string,
+  encryptedAccess: string | null,
+  postName: string
+): Promise<GbpResult<void>> {
+  const auth = authorizedClient(encryptedRefresh, encryptedAccess)
+  if (!auth) return { ok: false, needsReconnect: true, error: 'Your Google connection needs to be set up again.' }
+
+  let accessToken: string | null | undefined
+  try {
+    accessToken = (await auth.getAccessToken()).token
+  } catch (err) {
+    return { ok: false, ...classify(err, 'We could not reach Google to remove this post.') }
+  }
+  if (!accessToken) {
+    return { ok: false, needsReconnect: true, error: 'Your Google connection is no longer active. Please connect again.' }
+  }
+
+  try {
+    const res = await fetch(`${V4_BASE}/${postName}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    })
+    if (!res.ok && res.status !== 404) {
+      const detail = await res.text().catch(() => '')
+      if (res.status === 401 || res.status === 403) {
+        console.warn('GBP: delete rejected, authorization no longer valid', res.status, detail.slice(0, 400))
+        return { ok: false, needsReconnect: true, error: 'Your Google connection is no longer active. Please connect again.' }
+      }
+      console.error('GBP: localPosts.delete failed', res.status, detail.slice(0, 600))
+      return { ok: false, error: 'Google could not remove this post right now. Please try again.' }
+    }
+    return { ok: true }
+  } catch (err) {
+    console.error('GBP: localPosts.delete threw', err)
+    return { ok: false, error: 'Google could not remove this post right now. Please try again.' }
+  }
+}
+
 /** Best-effort revoke on disconnect. Never blocks clearing our own copy. */
 export async function revokeAccess(encryptedRefresh: string): Promise<void> {
   const refreshToken = decryptCredential(encryptedRefresh)

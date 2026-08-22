@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { slugify } from '@/lib/slugify'
 import { tierHasFeature } from '@/lib/planVersions'
-import { createLocalPost, buildPostSummary, type GbpResult } from '@/lib/gbpApi'
+import { createLocalPost, deleteLocalPost, buildPostSummary, type GbpResult } from '@/lib/gbpApi'
 
 // Orchestration for publishing a job to a customer's Google Business Profile.
 //
@@ -120,6 +120,66 @@ export async function postCheckInToGbp(checkInId: string): Promise<GbpResult<Gbp
   })
 
   return { ok: true, data: { searchUrl: result.data?.searchUrl ?? null, postedAt } }
+}
+
+export interface GbpRetractOutcome {
+  /** False when there was nothing to remove — the common case from the
+   *  unpublish hook, which calls this unconditionally on every job. */
+  removed: boolean
+}
+
+/**
+ * Remove a job's post from Google and clear our record of it, so the job goes
+ * back to "not posted" and can be posted again fresh.
+ *
+ * Two callers, both needing the same behavior: an explicit "Remove from
+ * Google" click, and the automatic best-effort call when a job is unpublished
+ * (app/api/checkins/publish/route.ts). Both must be safe to call on a job that
+ * was never posted.
+ *
+ * ── WHY THE LOCAL RECORD IS *NOT* CLEARED ON FAILURE ──
+ * The tempting shortcut is to clear our fields regardless, mirroring how
+ * revokeAccess shrugs off a failed revoke on disconnect. That is wrong here,
+ * and the two cases are not analogous. A failed revoke leaves a stale grant
+ * that costs nothing; a failed delete leaves a post still LIVE on the
+ * customer's Google listing. Clearing our copy at that point orphans it —
+ * the app forgets the post exists, so the customer can never remove it
+ * through us again, and it keeps pointing at a job page that may no longer
+ * be public.
+ *
+ * So the record survives a genuine failure and the job keeps showing as
+ * posted, which is the truth and leaves the retry reachable. Note
+ * deleteLocalPost already treats 404 as success, so "the post was deleted by
+ * hand on Google" and "the post expired" both land in the ok branch and do
+ * clear correctly — which is the case Keith actually hit on staging.
+ */
+export async function retractCheckInFromGbp(checkInId: string): Promise<GbpResult<GbpRetractOutcome>> {
+  const job = await prisma.checkIn.findUnique({
+    where: { id: checkInId },
+    select: {
+      id: true,
+      gbpPostName: true,
+      organization: { select: { gbpAccessToken: true, gbpRefreshToken: true } },
+    },
+  })
+  if (!job) return { ok: false, error: 'That job could not be found.' }
+
+  if (!job.gbpPostName || !job.organization?.gbpRefreshToken) {
+    return { ok: true, data: { removed: false } }
+  }
+
+  const result = await deleteLocalPost(job.organization.gbpRefreshToken, job.organization.gbpAccessToken, job.gbpPostName)
+  if (!result.ok) {
+    console.warn('GBP: could not delete post on Google, keeping local record so it stays retryable', checkInId, result.error)
+    return { ok: false, error: result.error, needsReconnect: result.needsReconnect }
+  }
+
+  await prisma.checkIn.update({
+    where: { id: job.id },
+    data: { gbpPostName: null, gbpPostUrl: null, gbpPostedAt: null, gbpPostStatus: null },
+  })
+
+  return { ok: true, data: { removed: true } }
 }
 
 /**
