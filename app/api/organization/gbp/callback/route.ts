@@ -80,7 +80,12 @@ export async function GET(request: NextRequest) {
       select: { id: true, planTier: true },
     })
     if (!org) return backToAccount(OUTCOMES.failed)
-    if (currentUser.role !== 'SUPER_ADMIN' && !tierHasFeature(org.planTier, 'gbp_integration')) {
+    // No SUPER_ADMIN exemption here, corrected 2026-08-22 — the check reads
+    // the org's own planTier, so an exemption never helped an org that
+    // genuinely qualifies, and only masked the admin panel's tier switcher
+    // when testing as SUPER_ADMIN. See app/api/organization/gbp/route.ts for
+    // the full reasoning.
+    if (!tierHasFeature(org.planTier, 'gbp_integration')) {
       return backToAccount(OUTCOMES.failed)
     }
 

@@ -27,6 +27,17 @@ import {
 // covers the pre-existing copy-and-paste GBP modal on the dashboard job card,
 // which Pro keeps unchanged. A Pro org never reaches this route successfully.
 //
+// NO SUPER_ADMIN BYPASS on the tier check, corrected 2026-08-22. An earlier
+// version exempted SUPER_ADMIN so support could manage an org's connection
+// regardless of tier — but the check reads the ORG's planTier, not the
+// signed-in admin's, so that exemption only ever mattered for an org below
+// Elite/Titan, and there is nothing to "manage" for an org that was never
+// entitled to a connection in the first place. It also broke Keith's actual
+// use of the admin panel's tier switcher: testing as SUPER_ADMIN always saw
+// the unlocked card no matter what tier the org was set to. Every other
+// tier-gated feature in the app (see app/dashboard/page.tsx's ai_job_
+// description and review_request checks) has never had this exemption.
+//
 // The OAuth handshake itself finishes in ./callback/route.ts.
 
 async function requireOwnerWithFeature() {
@@ -55,10 +66,10 @@ async function requireOwnerWithFeature() {
   if (!org) {
     return { error: NextResponse.json({ error: 'Organization not found' }, { status: 404 }) }
   }
-  if (currentUser.role !== 'SUPER_ADMIN' && !tierHasFeature(org.planTier, 'gbp_integration')) {
+  if (!tierHasFeature(org.planTier, 'gbp_integration')) {
     return { error: NextResponse.json({ error: 'This feature requires the Elite or Titan plan' }, { status: 403 }) }
   }
-  return { org, role: currentUser.role }
+  return { org }
 }
 
 // GET — connection status for the Account → Connections card. Never returns
