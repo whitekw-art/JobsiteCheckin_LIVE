@@ -15,7 +15,7 @@ const faqs: FaqItem[] = [
   },
   {
     q: 'How does the GBP posting work?',
-    a: 'After each job is published, ProjectCheckin generates a GBP post for you — formatted and ready. You copy it and paste it into your GBP. Takes about 30 seconds. Full auto-posting is coming in a future update.',
+    a: "Publish a job and it's on your Google Business Profile — images, content, and backlinks from real jobs straight to your site and GBP, all handled for you. This is the leveling up that separates you from your competitors. You decide how much say you want. Approve each one from your dashboard, or turn it on once and stop thinking about your Google presence entirely. Most owners start with approvals for a week, see what gets posted, then leave it alone. Either way, your profile keeps showing work from this month instead of work from two years ago — without anyone on your team spending a minute on it.",
   },
   {
     q: 'What trades does this work for?',
