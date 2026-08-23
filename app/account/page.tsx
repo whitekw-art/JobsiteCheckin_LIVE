@@ -1635,6 +1635,9 @@ export default function AccountPage() {
                     <button onClick={handleGbpCheckAgain} disabled={gbpBusy} className="db-shell-btn" style={{ fontSize: 12 }}>
                       {gbpBusy ? 'Checking…' : 'Check again'}
                     </button>
+                    <a href="/help/guides/gbp-connect" className="db-shell-btn" style={{ fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+                      Read the setup guide
+                    </a>
                   </div>
                 </>
               ) : gbpStatus === 'select_location' ? (
@@ -1660,10 +1663,20 @@ export default function AccountPage() {
                   </button>
                 </>
               ) : !gbpConnected ? (
-                <button onClick={handleGbpConnect} disabled={gbpBusy} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderRadius: 8, background: '#fff', color: '#3c4043', border: '1px solid #dadce0', boxShadow: '0 1px 2px rgba(0,0,0,.08)', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: gbpBusy ? 'wait' : 'pointer' }}>
-                  <GoogleWordmark />
-                  {gbpBusy ? 'Opening Google…' : 'Connect Google Business Profile'}
-                </button>
+                <>
+                  <button onClick={handleGbpConnect} disabled={gbpBusy} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderRadius: 8, background: '#fff', color: '#3c4043', border: '1px solid #dadce0', boxShadow: '0 1px 2px rgba(0,0,0,.08)', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: gbpBusy ? 'wait' : 'pointer' }}>
+                    <GoogleWordmark />
+                    {gbpBusy ? 'Opening Google…' : 'Connect Google Business Profile'}
+                  </button>
+                  {/* Offered before the customer clicks Connect, not only after
+                      it fails — picking the wrong Google account is the most
+                      common problem, and the guide covers it up front. */}
+                  <div style={{ marginTop: 12 }}>
+                    <a href="/help/guides/gbp-connect" style={{ fontSize: 12, color: 'var(--sky-text)', textDecoration: 'none', fontWeight: 600 }}>
+                      Not sure which Google account to use? Read the guide →
+                    </a>
+                  </div>
+                </>
               ) : null}
             </div>
 

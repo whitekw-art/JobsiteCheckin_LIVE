@@ -114,8 +114,14 @@ export default function HelpPage() {
           <Link href="/help/guides/gsc-connect" style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none', marginBottom: 2 }}>
             Connect Google Search Console
           </Link>
-          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: 0, lineHeight: 1.6 }}>
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '0 0 16px', lineHeight: 1.6 }}>
             Link your Search Console to ProjectCheckin so your real search clicks and impressions show on your Reporting page.
+          </p>
+          <Link href="/help/guides/gbp-connect" style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none', marginBottom: 2 }}>
+            Connect Your Google Business Profile
+          </Link>
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: 0, lineHeight: 1.6 }}>
+            Send finished jobs straight to your Google listing. Covers picking the right Google account, claiming a profile you don&apos;t have yet, and getting one back from whoever set it up.
           </p>
         </HelpSection>
 
