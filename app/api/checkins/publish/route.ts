@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { syncCheckIn, unsyncCheckIn } from '@/lib/wordpressSync'
-import { retractCheckInFromGbp } from '@/lib/gbpSync'
+import { autoPostCheckInIfEnabled, retractCheckInFromGbp, shouldAutoPostOnPublish } from '@/lib/gbpSync'
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,6 +60,45 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Publishing a job posts it to Google automatically, for orgs that have
+    // connected a listing and left "Post jobs automatically" on. Every gate
+    // (connection, preference, tier, already-posted) lives inside
+    // autoPostCheckInIfEnabled so this decision cannot drift from the one the
+    // manual button makes — a silent no-op is the normal path here, since most
+    // orgs have no GBP connection at all.
+    // Answered before responding, so the dashboard can render the job as
+    // already posting. Without it the card would show an enabled "Post to
+    // Google" button while the background post was mid-flight, and one
+    // impatient click would put a second post on the customer's listing.
+    let gbpAutoPostQueued = false
+    if (isPublic) {
+      try {
+        gbpAutoPostQueued = (await shouldAutoPostOnPublish(checkIn.id)).eligible
+      } catch (err) {
+        // A failed pre-check must never block publishing. The hook below
+        // re-checks anyway, so the only cost is the card not showing the
+        // posting state until its next refresh.
+        console.error('GBP auto-post pre-check failed:', checkIn.id, err)
+      }
+    }
+
+    if (gbpAutoPostQueued) {
+      after(async () => {
+        try {
+          const result = await autoPostCheckInIfEnabled(checkIn.id)
+          if (!result.ok) {
+            // The job stays published either way. The dashboard card shows the
+            // failed state with a retry, same as a failed manual post.
+            console.error('GBP auto-post failed after publish:', checkIn.id, result.error)
+          } else if (!result.data?.posted) {
+            console.log('GBP auto-post skipped after publish:', checkIn.id, result.data?.skipped)
+          }
+        } catch (err) {
+          console.error('GBP auto-post threw after publish:', err)
+        }
+      })
+    }
+
     // Unpublishing a job also retracts it from Google, if it was posted there —
     // an orphaned Google post pointing at a job page that is no longer public
     // is worse than no post at all. retractCheckInFromGbp is a cheap no-op for
@@ -88,6 +127,7 @@ export async function POST(request: NextRequest) {
         id: updated.id,
         isPublic: updated.isPublic,
       },
+      gbpAutoPostQueued,
     })
   } catch (error) {
     console.error('Error updating check-in publish state:', error)
