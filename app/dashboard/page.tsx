@@ -966,6 +966,27 @@ export default function Dashboard() {
           prev.map((c) => (c.id === checkIn.id ? { ...c, isPublic: newIsPublic } : c))
         )
       }
+
+      // The server posts to Google in the background after responding. Show the
+      // job as already posting so the manual button is locked out — otherwise
+      // an impatient click here would put a second post on the listing. Then
+      // refresh to pick up the real outcome (posted, with its link, or failed).
+      if (data.gbpAutoPostQueued) {
+        setGbpPostingId(checkIn.id)
+        setTimeout(() => {
+          fetchCheckIns()
+            .catch(() => {})
+            .finally(() => setGbpPostingId((cur) => (cur === checkIn.id ? null : cur)))
+        }, 6000)
+      } else if (newIsPublic === false) {
+        // Unpublishing retracts in the background too. Clearing locally keeps
+        // the card honest without waiting for a refresh.
+        setCheckIns((prev) =>
+          prev.map((c) =>
+            c.id === checkIn.id ? { ...c, gbpPostStatus: null, gbpPostUrl: null, gbpPostedAt: null } : c
+          )
+        )
+      }
       return true
     } catch (err: any) {
       const msg = err.message || 'Failed to update publish state'
@@ -2259,15 +2280,21 @@ export default function Dashboard() {
                                   </>
                                 ) : (
                                   <>
+                                    {/* `gbpPostStatus === 'posting'` is the server's
+                                        own claim on this job, so a background
+                                        auto-post still shows as in-flight after a
+                                        refresh — and the button stays locked,
+                                        which is what stops a second post landing
+                                        on the customer's listing. */}
                                     <button
                                       className={`db-btn-ghost ${checkIn.gbpPostStatus === 'failed' ? 'db-btn-gbp-failed' : 'db-btn-gbp'}`}
-                                      disabled={gbpPostingId === checkIn.id}
+                                      disabled={gbpPostingId === checkIn.id || checkIn.gbpPostStatus === 'posting'}
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         handleGbpPost(checkIn.id)
                                       }}
                                     >
-                                      {gbpPostingId === checkIn.id ? (
+                                      {gbpPostingId === checkIn.id || checkIn.gbpPostStatus === 'posting' ? (
                                         <><span className="db-gbp-spinner" />Posting to Google&hellip;</>
                                       ) : checkIn.gbpPostStatus === 'failed' ? (
                                         <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Try posting again</>

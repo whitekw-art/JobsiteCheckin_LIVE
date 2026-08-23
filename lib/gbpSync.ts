@@ -71,6 +71,42 @@ export async function postCheckInToGbp(checkInId: string): Promise<GbpResult<Gbp
     return { ok: false, error: 'Finish setting up your Google Business Profile connection first.' }
   }
 
+  // ── Claim this job before calling Google ──
+  // Two callers can now race for the same job: the auto-post hook that fires on
+  // publish, and the manual button. Without a claim, both would reach
+  // createLocalPost and the customer would get two posts on their listing for
+  // one job — visible, embarrassing, and only removable one at a time.
+  //
+  // The claim is a conditional UPDATE: flip to 'posting' only from a state that
+  // is not already in flight. Postgres serializes the two writes, so exactly one
+  // caller sees count === 1 and proceeds.
+  //
+  // `gbpPostedAt` doubles as the claim timestamp so a claim orphaned by a crash
+  // or a timeout can be reclaimed instead of wedging the job forever. On success
+  // it is overwritten with the real post time; on failure it is cleared.
+  const STALE_CLAIM_MS = 5 * 60 * 1000
+  const claimedAt = new Date()
+  const staleBefore = new Date(claimedAt.getTime() - STALE_CLAIM_MS)
+
+  const claim = await prisma.checkIn.updateMany({
+    where: {
+      id: job.id,
+      OR: [
+        { gbpPostStatus: { not: 'posting' } },
+        { gbpPostStatus: null },
+        // Reclaim a stuck 'posting' left behind by a crashed run.
+        { AND: [{ gbpPostStatus: 'posting' }, { gbpPostedAt: { lt: staleBefore } }] },
+      ],
+    },
+    data: { gbpPostStatus: 'posting', gbpPostedAt: claimedAt },
+  })
+
+  if (claim.count === 0) {
+    // Someone else is mid-post for this job. Reporting success avoids showing
+    // the customer an error for what is really "already happening".
+    return { ok: false, error: 'This job is already being posted to Google. Give it a moment.' }
+  }
+
   // `notes` is the real narrative — hand-written or AI-generated. `seoDescription`
   // is the auto-built template ("Installed a Wood Door at ...") meant for a meta
   // tag, so it is the fallback rather than the first choice. Same priority the
@@ -99,9 +135,10 @@ export async function postCheckInToGbp(checkInId: string): Promise<GbpResult<Gbp
 
   if (!result.ok) {
     // Recorded so the job card can offer a retry rather than silently reverting
-    // to looking like it was never attempted.
+    // to looking like it was never attempted. Clearing the claim timestamp
+    // releases the job for an immediate retry.
     await prisma.checkIn
-      .update({ where: { id: job.id }, data: { gbpPostStatus: 'failed' } })
+      .update({ where: { id: job.id }, data: { gbpPostStatus: 'failed', gbpPostedAt: null } })
       .catch((err) => console.error('GBP: could not record failed post status', err))
     // Re-shaped rather than returned directly: the failure carries no data, and
     // the two result types differ in their success payload.
@@ -120,6 +157,101 @@ export async function postCheckInToGbp(checkInId: string): Promise<GbpResult<Gbp
   })
 
   return { ok: true, data: { searchUrl: result.data?.searchUrl ?? null, postedAt } }
+}
+
+/** Why an auto-post did nothing, for the log line. */
+export type GbpAutoPostSkipReason =
+  | 'not_connected'
+  | 'auto_post_off'
+  | 'tier'
+  | 'not_public'
+  | 'already_posted'
+
+export interface GbpAutoPostOutcome {
+  posted: boolean
+  /** Present only when `posted` is false. */
+  skipped?: GbpAutoPostSkipReason
+  searchUrl?: string | null
+}
+
+/**
+ * Whether publishing this job should trigger an automatic Google post.
+ *
+ * Split out from the posting itself so the publish route can answer the
+ * question *synchronously, before responding* — the dashboard needs to know an
+ * auto-post is coming so it can show the job as already posting. Without that,
+ * the card would sit on an enabled "Post to Google" button while the background
+ * post was mid-flight, and one impatient click would put a second post on the
+ * customer's listing.
+ *
+ * Silently returns a skip reason in every case a customer hasn't opted in,
+ * which is the overwhelmingly common path: most orgs have no GBP connection at
+ * all, so this has to be cheap and quiet rather than noisy.
+ *
+ * The tier is re-checked here even though the connection couldn't have been
+ * made without it. A downgrade leaves the stored tokens in place by design
+ * (disconnecting on downgrade would be hostile), so without this check an org
+ * that dropped to Pro would keep auto-posting off the old grant.
+ */
+export async function shouldAutoPostOnPublish(
+  checkInId: string
+): Promise<{ eligible: boolean; skipped?: GbpAutoPostSkipReason }> {
+  const job = await prisma.checkIn.findUnique({
+    where: { id: checkInId },
+    select: {
+      isPublic: true,
+      gbpPostStatus: true,
+      organization: {
+        select: {
+          planTier: true,
+          gbpAutoPost: true,
+          gbpRefreshToken: true,
+          gbpConnectionStatus: true,
+        },
+      },
+    },
+  })
+  if (!job || !job.organization) return { eligible: false, skipped: 'not_connected' }
+  const org = job.organization
+
+  if (!org.gbpRefreshToken || org.gbpConnectionStatus !== 'connected') {
+    return { eligible: false, skipped: 'not_connected' }
+  }
+  if (!org.gbpAutoPost) return { eligible: false, skipped: 'auto_post_off' }
+  if (!tierHasFeature(org.planTier, 'gbp_integration')) return { eligible: false, skipped: 'tier' }
+  if (!job.isPublic) {
+    // Guards a race where the job was unpublished again between the response
+    // and the background hook running.
+    return { eligible: false, skipped: 'not_public' }
+  }
+  if (job.gbpPostStatus === 'posted' || job.gbpPostStatus === 'posting') {
+    // Republishing a job that is still live on Google must not create a second
+    // post. Unpublishing clears this field on a successful retract, so the
+    // normal unpublish/republish cycle does post again — this only skips when
+    // a real post is still standing, or one is already in flight.
+    return { eligible: false, skipped: 'already_posted' }
+  }
+  return { eligible: true }
+}
+
+/**
+ * Post a job to Google automatically, if this org has asked for that.
+ *
+ * Called from the publish route's `after()` hook. Re-runs the full eligibility
+ * check rather than trusting the route's earlier answer, since the two happen
+ * either side of the HTTP response and the job could have changed in between.
+ */
+export async function autoPostCheckInIfEnabled(checkInId: string): Promise<GbpResult<GbpAutoPostOutcome>> {
+  const gate = await shouldAutoPostOnPublish(checkInId)
+  if (!gate.eligible) {
+    return { ok: true, data: { posted: false, skipped: gate.skipped } }
+  }
+
+  const result = await postCheckInToGbp(checkInId)
+  if (!result.ok) {
+    return { ok: false, error: result.error, needsReconnect: result.needsReconnect }
+  }
+  return { ok: true, data: { posted: true, searchUrl: result.data?.searchUrl ?? null } }
 }
 
 export interface GbpRetractOutcome {
