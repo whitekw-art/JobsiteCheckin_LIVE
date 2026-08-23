@@ -136,7 +136,7 @@ export default function GbpConnectGuidePage() {
             You can also turn on <strong style={guideStrong}>Post jobs automatically</strong> in the same Connections card. With that on, publishing a job sends it to Google on its own — you don&apos;t have to click anything.
           </p>
           <p style={guideP}>
-            <strong style={guideStrong}>Google shows a post on your listing for 7 days</strong>, then moves it into your profile&apos;s post archive. That&apos;s Google&apos;s own behavior, not a limit we set. It&apos;s also the reason posting regularly matters — a listing with something from this week reads as an active business.
+            <strong style={guideStrong}>Google archives a post after 6 months.</strong> That&apos;s Google&apos;s own behavior, not a limit we set. It&apos;s also the reason posting as you finish work matters — a listing showing this month&apos;s jobs reads as an active business, and one showing work from two years ago doesn&apos;t.
           </p>
           <p style={guidePLast}>
             Changed your mind about a job? <strong style={guideStrong}>Remove from Google</strong> on the job card takes the post down. Unpublishing a job removes its post automatically, too.

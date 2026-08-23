@@ -1734,7 +1734,7 @@ export default function AccountPage() {
 
                 <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 13px', fontSize: 12, color: 'var(--t2)', lineHeight: 1.6 }}>
-                    Google shows a post on your listing for <strong style={{ color: 'var(--t1)' }}>7 days</strong>, then moves it to your profile&apos;s post archive. That&apos;s Google&apos;s own behavior, not a ProjectCheckin limit — posting regularly is what keeps your listing looking active.
+                    Google archives a post after <strong style={{ color: 'var(--t1)' }}>6 months</strong>. That&apos;s Google&apos;s own behavior, not a ProjectCheckin limit — and it&apos;s why posting as you finish work matters: a listing showing this month&apos;s jobs reads as an active business.
                   </div>
                 </div>
 

@@ -83,7 +83,7 @@ export default function MarketingNav() {
                 AI Copywriter Agent <span className="feat-new">New</span>
               </Link>
               <Link href="/features/ai-review-request" className="feat-item sub" onClick={closeAll}>
-                AI Review Request Agent <span className="feat-soon">Soon</span>
+                AI Review Request Agent
               </Link>
             </div>
           </li>
