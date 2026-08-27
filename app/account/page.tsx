@@ -774,7 +774,9 @@ export default function AccountPage() {
 
   // ── Google Business Profile ──
   // Status mirrors Organization.gbpConnectionStatus:
-  //   'connected' | 'select_location' | 'no_locations' | null (never connected)
+  //   'connected' | 'select_location' | 'no_locations'
+  //   | 'needs_reconnect' (grant died on Google's side, added 2026-08-27)
+  //   | null (never connected)
   // Gating, CORRECTED 2026-08-22: `gbp_integration` (Elite + Titan only) is the
   // single gate for the real card below — connecting, the one-click button,
   // and automatic posting. `gbp_post` (every paid plan) is a separate, older
@@ -795,7 +797,9 @@ export default function AccountPage() {
 
   // ── Google Search Console (Elite + Titan) ──
   // Status mirrors Organization.gscConnectionStatus:
-  //   'connected' | 'select_property' | 'no_properties' | null (never connected)
+  //   'connected' | 'select_property' | 'no_properties'
+  //   | 'needs_reconnect' (grant died on Google's side, added 2026-08-27)
+  //   | null (never connected)
   const hasGsc = tierHasFeature(planTier, 'gsc_integration')
   const [gscStatus, setGscStatus] = useState<string | null>(null)
   const [gscPropertyUrl, setGscPropertyUrl] = useState<string | null>(null)
@@ -1583,6 +1587,7 @@ export default function AccountPage() {
             status={
               !hasGbp ? <StatusDot state="coming" label="Upgrade to Activate!" />
               : gbpStatus === 'connected' ? <StatusDot state="active" label="Active" />
+              : gbpStatus === 'needs_reconnect' ? <StatusDot state="disabled" label="Reconnect needed" />
               : gbpStatus === 'select_location' || gbpStatus === 'no_locations' ? <StatusDot state="disabled" label="Action needed" />
               : <StatusDot state="disabled" label="Not connected" />
             }
@@ -1660,6 +1665,22 @@ export default function AccountPage() {
                   </select>
                   <button onClick={handleGbpSelectLocation} disabled={gbpBusy || !gbpChoice} className="db-shell-btn" style={{ fontSize: 12 }}>
                     {gbpBusy ? 'Saving…' : 'Save selection'}
+                  </button>
+                </>
+              ) : gbpStatus === 'needs_reconnect' ? (
+                <>
+                  {/* The grant died on Google's side. Without this branch the
+                      card falls through to the plain "Connect" state below,
+                      which is what made this failure invisible: a working
+                      connection appeared to vanish with no reason given. The
+                      most common cause is the customer revoking access from
+                      their own Google Account permissions page. */}
+                  <div style={{ background: 'var(--amber-bg)', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', fontSize: 12, color: 'var(--amber)', lineHeight: 1.55 }}>
+                    Google is no longer accepting our connection to your Business Profile, so your jobs have stopped posting. This usually means access was removed from your Google account. Reconnecting takes a few seconds and nothing already posted to Google is affected.
+                  </div>
+                  <button onClick={handleGbpConnect} disabled={gbpBusy} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderRadius: 8, marginTop: 12, background: '#fff', color: '#3c4043', border: '1px solid #dadce0', boxShadow: '0 1px 2px rgba(0,0,0,.08)', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: gbpBusy ? 'wait' : 'pointer' }}>
+                    <GoogleWordmark />
+                    {gbpBusy ? 'Opening Google\u2026' : 'Reconnect Google Business Profile'}
                   </button>
                 </>
               ) : !gbpConnected ? (
@@ -2684,6 +2705,7 @@ export default function AccountPage() {
               !hasGsc ? <StatusDot state="coming" label="Elite & Titan only" />
               : gscStatus === 'connected' ? <StatusDot state="active" label="Active" />
               : gscStatus === 'select_property' ? <StatusDot state="disabled" label="Almost done" />
+              : gscStatus === 'needs_reconnect' ? <StatusDot state="disabled" label="Reconnect needed" />
               : gscStatus === 'no_properties' ? <StatusDot state="disabled" label="Action needed" />
               : <StatusDot state="disabled" label="Not connected" />
             }
@@ -2764,6 +2786,24 @@ export default function AccountPage() {
                     style={{ marginTop: 12, background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', padding: 0 }}
                   >
                     Check again
+                  </button>
+                </>
+              ) : gscStatus === 'needs_reconnect' ? (
+                <>
+                  {/* Mirror of the GBP branch. Without it this falls through to
+                      the plain "Connect" state below and the customer is given
+                      no reason their working connection disappeared. Written
+                      when the Reporting page detects a 401 from Google. */}
+                  <div style={{ background: 'var(--amber-bg)', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', fontSize: 12, color: 'var(--amber)', lineHeight: 1.55 }}>
+                    Google is no longer accepting our connection to your Search Console account, so your Reporting numbers have stopped updating. This usually means access was removed from your Google account. Reconnecting takes a few seconds.
+                  </div>
+                  <button
+                    onClick={handleGscConnect}
+                    disabled={gscBusy}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderRadius: 8, marginTop: 12, background: '#fff', color: '#3c4043', border: '1px solid #dadce0', boxShadow: '0 1px 2px rgba(0,0,0,.08)', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: gscBusy ? 'wait' : 'pointer' }}
+                  >
+                    <GoogleWordmark />
+                    {gscBusy ? 'Opening Google\u2026' : 'Reconnect Search Console'}
                   </button>
                 </>
               ) : (

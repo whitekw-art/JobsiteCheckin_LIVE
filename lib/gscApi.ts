@@ -308,15 +308,26 @@ function round1(n: number): number {
 /**
  * Turn a Google API error into something a customer can act on.
  *
- * 401/403 means the grant is gone (revoked in their Google account, or the
- * property was un-shared) — that needs a reconnect, not a retry, so it is
- * reported separately from a transient failure.
+ * 401 means the grant is gone — revoked from the customer's own Google
+ * account, expired, or invalidated because a sibling integration sharing this
+ * OAuth client was disconnected. That needs a reconnect, not a retry.
+ *
+ * NARROWED to 401 only, 2026-08-27. This previously also treated 403 as
+ * "reconnect". Google returns 403 both for quota exhaustion and for a property
+ * the account can no longer read, neither of which is the grant itself being
+ * gone. Since `needsReconnect` now persists to the database and flips the
+ * customer's connection card, a false positive is worse than a retryable
+ * error, so 403 falls through to the generic path.
  */
 function classify(err: unknown, fallback: string): { error: string; needsReconnect?: boolean } {
   const status = (err as { code?: number; status?: number })?.code ?? (err as { status?: number })?.status
-  if (status === 401 || status === 403) {
+  if (status === 401) {
     console.warn('GSC: authorization rejected', status)
     return { error: 'Your Google connection is no longer active. Please connect again.', needsReconnect: true }
+  }
+  if (status === 403) {
+    console.warn('GSC: request forbidden (quota, or a property this account can no longer read)', status)
+    return { error: fallback }
   }
   console.error('GSC: request failed', err)
   return { error: fallback }

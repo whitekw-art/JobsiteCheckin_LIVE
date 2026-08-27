@@ -568,6 +568,12 @@ export default function Dashboard() {
   const [gbpPostingId, setGbpPostingId] = useState<string | null>(null)
   const [gbpRetractingId, setGbpRetractingId] = useState<string | null>(null)
   const [gbpPostError, setGbpPostError] = useState<Record<string, string>>({})
+  // Set when Google rejects our stored grant (HTTP 409 from the post route).
+  // The error text alone tells the customer to reconnect but gives them no way
+  // to get there, and the Connections card is three clicks away - that gap is
+  // what let a dead connection sit unnoticed. Keyed by job id to match the
+  // error map, since the banner renders inside a single job card.
+  const [gbpNeedsReconnect, setGbpNeedsReconnect] = useState<Record<string, boolean>>({})
 
   // Address editing (keyed by checkIn.id)
   const [editAddresses, setEditAddresses] = useState<Record<string, EditAddr>>({})
@@ -693,6 +699,11 @@ export default function Dashboard() {
       delete next[checkInId]
       return next
     })
+    setGbpNeedsReconnect((prev) => {
+      const next = { ...prev }
+      delete next[checkInId]
+      return next
+    })
     try {
       const res = await fetch('/api/checkins/gbp-post', {
         method: 'POST',
@@ -705,6 +716,11 @@ export default function Dashboard() {
           ...prev,
           [checkInId]: data?.error || 'Google could not publish this job. Please try again.',
         }))
+        // 409 specifically means the stored grant is dead, not that this job
+        // failed - retrying cannot help, so offer the reconnect route instead.
+        if (res.status === 409 || data?.needsReconnect) {
+          setGbpNeedsReconnect((prev) => ({ ...prev, [checkInId]: true }))
+        }
         setCheckIns((prev) => prev.map((c) => (c.id === checkInId ? { ...c, gbpPostStatus: 'failed' } : c)))
         return
       }
@@ -744,6 +760,9 @@ export default function Dashboard() {
           ...prev,
           [checkInId]: data?.error || 'Could not remove this post. Please try again.',
         }))
+        if (res.status === 409 || data?.needsReconnect) {
+          setGbpNeedsReconnect((prev) => ({ ...prev, [checkInId]: true }))
+        }
         return
       }
       setCheckIns((prev) =>
@@ -2275,7 +2294,17 @@ export default function Dashboard() {
                                       )}
                                     </button>
                                     {gbpPostError[checkIn.id] && (
-                                      <span className="db-gbp-error">{gbpPostError[checkIn.id]}</span>
+                                      <span className="db-gbp-error">
+                                        {gbpPostError[checkIn.id]}
+                                        {gbpNeedsReconnect[checkIn.id] && (
+                                          <>
+                                            {' '}
+                                            <a href="/account?tab=connections" className="db-gbp-reconnect">
+                                              Reconnect Google
+                                            </a>
+                                          </>
+                                        )}
+                                      </span>
                                     )}
                                   </>
                                 ) : (
@@ -2303,7 +2332,17 @@ export default function Dashboard() {
                                       )}
                                     </button>
                                     {gbpPostError[checkIn.id] && (
-                                      <span className="db-gbp-error">{gbpPostError[checkIn.id]}</span>
+                                      <span className="db-gbp-error">
+                                        {gbpPostError[checkIn.id]}
+                                        {gbpNeedsReconnect[checkIn.id] && (
+                                          <>
+                                            {' '}
+                                            <a href="/account?tab=connections" className="db-gbp-reconnect">
+                                              Reconnect Google
+                                            </a>
+                                          </>
+                                        )}
+                                      </span>
                                     )}
                                   </>
                                 )

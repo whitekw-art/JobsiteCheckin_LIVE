@@ -472,15 +472,27 @@ function truncate(text: string, max: number): string {
 /**
  * Turn a Google API error into something a customer can act on.
  *
- * 401/403 means the grant is gone (revoked in their Google account, or the
- * listing was un-shared) — that needs a reconnect, not a retry, so it is
- * reported separately from a transient failure.
+ * 401 means the grant is gone — revoked from the customer's own Google
+ * account, expired, or invalidated because a sibling integration sharing this
+ * OAuth client was disconnected. That needs a reconnect, not a retry.
+ *
+ * NARROWED to 401 only, 2026-08-27. This previously also treated 403 as
+ * "reconnect", but Google returns 403 for quota exhaustion as well as for
+ * revocation, and `needsReconnect` now PERSISTS to the database and flips the
+ * customer's connection card. Telling a working customer to reconnect because
+ * of a transient quota blip is worse than showing a retryable error, so 403
+ * falls through to the generic path until there is real evidence a revoked
+ * grant returns 403 on these endpoints.
  */
 function classify(err: unknown, fallback: string): { error: string; needsReconnect?: boolean } {
   const status = (err as { code?: number; status?: number })?.code ?? (err as { status?: number })?.status
-  if (status === 401 || status === 403) {
+  if (status === 401) {
     console.warn('GBP: authorization rejected', status)
     return { error: 'Your Google connection is no longer active. Please connect again.', needsReconnect: true }
+  }
+  if (status === 403) {
+    console.warn('GBP: request forbidden (quota, or a permission that is not the grant itself)', status)
+    return { error: fallback }
   }
   console.error('GBP: request failed', err)
   return { error: fallback }

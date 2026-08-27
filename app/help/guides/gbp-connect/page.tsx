@@ -150,6 +150,9 @@ export default function GbpConnectGuidePage() {
           <p style={guidePLast}>
             Your Google Business Profile itself is untouched, and <strong style={guideStrong}>posts already on your listing stay there</strong> — they&apos;re your content on your profile. This only stops ProjectCheckin from adding new ones.
           </p>
+          <p style={guidePLast}>
+            <strong style={guideStrong}>If you also use our Search Console connection, that one keeps working.</strong> The two share a single sign-in with Google, so disconnecting one deliberately leaves the other alone. To remove ProjectCheckin from your Google account entirely, disconnect both here, or remove our access from your Google Account permissions page.
+          </p>
         </GuideSection>
 
         <GuideSection title="Still Stuck?">
