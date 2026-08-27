@@ -39,6 +39,22 @@ export type BlogPost = {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: 'why-google-business-profile-not-showing-up-maps',
+    title: "Why Isn't My Google Business Profile Showing Up on Google Maps?",
+    excerpt:
+      'A profile that fails to appear is either incomplete or out-ranked by competitors, and the two problems have different fixes.',
+    metaDescription:
+      "Your Google Business Profile is either incomplete or out-ranked, and the fixes differ. How to tell which one you have, using Google's own documentation.",
+    category: 'Local SEO',
+    publishedISO: '2026-08-26',
+    modifiedISO: '2026-08-26',
+    publishedLabel: 'August 2026',
+    readTimeMinutes: 11,
+    subhead:
+      'A profile that fails to appear is either incomplete or out-ranked by competitors. This guide explains how to determine which condition applies to your business, and what to correct in each case.',
+    kicker: 'Local SEO Guide \u2014 2026',
+  },
+  {
     slug: 'why-competitors-have-more-google-reviews-2026',
     title: 'The Real Reason Getting Google Reviews Is So Hard, But Your Competitors Get Hundreds',
     excerpt:
