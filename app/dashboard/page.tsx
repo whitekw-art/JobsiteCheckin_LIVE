@@ -28,6 +28,9 @@ interface CheckIn {
   homeCustomerName?: string | null
   homeCustomerPhone?: string | null
   homeCustomerEmail?: string | null
+  gbpPostUrl?: string | null
+  gbpPostedAt?: string | null
+  gbpPostStatus?: string | null
 }
 
 interface EditAddr {
@@ -556,6 +559,22 @@ export default function Dashboard() {
   const [gbpPostId, setGbpPostId] = useState<string | null>(null)
   const [gbpCopied, setGbpCopied] = useState(false)
 
+  // ── Google Business Profile posting ──
+  // `gbpLive` is whether this org has an actual working connection, which is a
+  // different question from whether their plan allows posting — a Pro customer
+  // who has not connected yet still sees the old copy-and-paste window rather
+  // than a button that would fail.
+  const [gbpLive, setGbpLive] = useState(false)
+  const [gbpPostingId, setGbpPostingId] = useState<string | null>(null)
+  const [gbpRetractingId, setGbpRetractingId] = useState<string | null>(null)
+  const [gbpPostError, setGbpPostError] = useState<Record<string, string>>({})
+  // Set when Google rejects our stored grant (HTTP 409 from the post route).
+  // The error text alone tells the customer to reconnect but gives them no way
+  // to get there, and the Connections card is three clicks away - that gap is
+  // what let a dead connection sit unnoticed. Keyed by job id to match the
+  // error map, since the banner renders inside a single job card.
+  const [gbpNeedsReconnect, setGbpNeedsReconnect] = useState<Record<string, boolean>>({})
+
   // Address editing (keyed by checkIn.id)
   const [editAddresses, setEditAddresses] = useState<Record<string, EditAddr>>({})
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null)
@@ -662,7 +681,99 @@ export default function Dashboard() {
         if (d.organization?.portfolioPageUrl) setOrgPortfolioUrl(d.organization.portfolioPageUrl)
       })
       .catch(() => {})
+    // Cheap DB-backed status read. A failure here leaves gbpLive false, which
+    // degrades to the copy-and-paste window rather than breaking the card.
+    fetch('/api/organization/gbp')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setGbpLive(Boolean(d?.connected)))
+      .catch(() => {})
   }, [])
+
+  // Publish one job to the customer's Google listing. Optimistically updates
+  // the local row so the button settles into its posted state without a full
+  // refetch of every job.
+  const handleGbpPost = async (checkInId: string) => {
+    setGbpPostingId(checkInId)
+    setGbpPostError((prev) => {
+      const next = { ...prev }
+      delete next[checkInId]
+      return next
+    })
+    setGbpNeedsReconnect((prev) => {
+      const next = { ...prev }
+      delete next[checkInId]
+      return next
+    })
+    try {
+      const res = await fetch('/api/checkins/gbp-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkInId }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setGbpPostError((prev) => ({
+          ...prev,
+          [checkInId]: data?.error || 'Google could not publish this job. Please try again.',
+        }))
+        // 409 specifically means the stored grant is dead, not that this job
+        // failed - retrying cannot help, so offer the reconnect route instead.
+        if (res.status === 409 || data?.needsReconnect) {
+          setGbpNeedsReconnect((prev) => ({ ...prev, [checkInId]: true }))
+        }
+        setCheckIns((prev) => prev.map((c) => (c.id === checkInId ? { ...c, gbpPostStatus: 'failed' } : c)))
+        return
+      }
+      setCheckIns((prev) =>
+        prev.map((c) =>
+          c.id === checkInId
+            ? { ...c, gbpPostStatus: 'posted', gbpPostUrl: data?.gbpPostUrl ?? null, gbpPostedAt: data?.gbpPostedAt ?? new Date().toISOString() }
+            : c
+        )
+      )
+    } catch {
+      setGbpPostError((prev) => ({ ...prev, [checkInId]: 'Google could not publish this job. Please try again.' }))
+    } finally {
+      setGbpPostingId(null)
+    }
+  }
+
+  // Removes the post from Google and resets the job's local state back to
+  // postable. Not tier-gated — a downgraded customer still owns whatever they
+  // already posted and must be able to take it down.
+  const handleGbpRetract = async (checkInId: string) => {
+    setGbpRetractingId(checkInId)
+    setGbpPostError((prev) => {
+      const next = { ...prev }
+      delete next[checkInId]
+      return next
+    })
+    try {
+      const res = await fetch('/api/checkins/gbp-post', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkInId }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        setGbpPostError((prev) => ({
+          ...prev,
+          [checkInId]: data?.error || 'Could not remove this post. Please try again.',
+        }))
+        if (res.status === 409 || data?.needsReconnect) {
+          setGbpNeedsReconnect((prev) => ({ ...prev, [checkInId]: true }))
+        }
+        return
+      }
+      setCheckIns((prev) =>
+        prev.map((c) => (c.id === checkInId ? { ...c, gbpPostStatus: null, gbpPostUrl: null, gbpPostedAt: null } : c))
+      )
+    } catch {
+      setGbpPostError((prev) => ({ ...prev, [checkInId]: 'Could not remove this post. Please try again.' }))
+    } finally {
+      setGbpRetractingId(null)
+    }
+  }
 
   const fetchCheckIns = async () => {
     try {
@@ -872,6 +983,27 @@ export default function Dashboard() {
       if (typeof newIsPublic === 'boolean') {
         setCheckIns((prev) =>
           prev.map((c) => (c.id === checkIn.id ? { ...c, isPublic: newIsPublic } : c))
+        )
+      }
+
+      // The server posts to Google in the background after responding. Show the
+      // job as already posting so the manual button is locked out — otherwise
+      // an impatient click here would put a second post on the listing. Then
+      // refresh to pick up the real outcome (posted, with its link, or failed).
+      if (data.gbpAutoPostQueued) {
+        setGbpPostingId(checkIn.id)
+        setTimeout(() => {
+          fetchCheckIns()
+            .catch(() => {})
+            .finally(() => setGbpPostingId((cur) => (cur === checkIn.id ? null : cur)))
+        }, 6000)
+      } else if (newIsPublic === false) {
+        // Unpublishing retracts in the background too. Clearing locally keeps
+        // the card honest without waiting for a refresh.
+        setCheckIns((prev) =>
+          prev.map((c) =>
+            c.id === checkIn.id ? { ...c, gbpPostStatus: null, gbpPostUrl: null, gbpPostedAt: null } : c
+          )
         )
       }
       return true
@@ -1418,7 +1550,7 @@ export default function Dashboard() {
             >
               <IcoMenu />
             </button>
-            <h1 className="db-page-title">Jobs</h1>
+            <h1 className="db-page-title">Job Dashboard</h1>
             <div className="db-topbar-right">
               <Link className="db-btn-new" href="/check-in">
                 <IcoPlus />
@@ -2108,18 +2240,112 @@ export default function Dashboard() {
                                   {downloadingId === checkIn.id ? 'Preparing\u2026' : 'Download All'}
                                 </button>
                               )}
-                              {checkIn.isPublic && tierHasFeature(planTier, 'gbp_post') && (
-                                <button
-                                  className="db-btn-ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setGbpPostId(checkIn.id)
-                                    setGbpCopied(false)
-                                  }}
-                                >
-                                  <IcoGbp />
-                                  Post to Google Business
-                                </button>
+                              {/* The posted state stays visible even on an unpublished
+                                  job. Unpublishing tries to retract automatically, but
+                                  if that Google call fails the post is still live —
+                                  hiding the controls here would make it unremovable. */}
+                              {(checkIn.isPublic || checkIn.gbpPostStatus === 'posted') && tierHasFeature(planTier, 'gbp_post') && (
+                                !gbpLive ? (
+                                  checkIn.isPublic ? (
+                                    // Not connected — keep the original copy-and-paste
+                                    // window so nobody loses a workflow they already have.
+                                    <button
+                                      className="db-btn-ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setGbpPostId(checkIn.id)
+                                        setGbpCopied(false)
+                                      }}
+                                    >
+                                      <IcoGbp />
+                                      Post to Google Business
+                                    </button>
+                                  ) : null
+                                ) : checkIn.gbpPostStatus === 'posted' ? (
+                                  <>
+                                    <span className="db-btn-ghost db-btn-gbp-posted">
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                      Posted to Google
+                                    </span>
+                                    {checkIn.gbpPostUrl && (
+                                      <a
+                                        href={checkIn.gbpPostUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="db-gbp-viewlink"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        View on Google
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                      </a>
+                                    )}
+                                    <button
+                                      className="db-btn-ghost db-btn-gbp-remove"
+                                      disabled={gbpRetractingId === checkIn.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleGbpRetract(checkIn.id)
+                                      }}
+                                    >
+                                      {gbpRetractingId === checkIn.id ? (
+                                        <><span className="db-gbp-spinner" />Removing&hellip;</>
+                                      ) : (
+                                        <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Remove from Google</>
+                                      )}
+                                    </button>
+                                    {gbpPostError[checkIn.id] && (
+                                      <span className="db-gbp-error">
+                                        {gbpPostError[checkIn.id]}
+                                        {gbpNeedsReconnect[checkIn.id] && (
+                                          <>
+                                            {' '}
+                                            <a href="/account?tab=connections" className="db-gbp-reconnect">
+                                              Reconnect Google
+                                            </a>
+                                          </>
+                                        )}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    {/* `gbpPostStatus === 'posting'` is the server's
+                                        own claim on this job, so a background
+                                        auto-post still shows as in-flight after a
+                                        refresh — and the button stays locked,
+                                        which is what stops a second post landing
+                                        on the customer's listing. */}
+                                    <button
+                                      className={`db-btn-ghost ${checkIn.gbpPostStatus === 'failed' ? 'db-btn-gbp-failed' : 'db-btn-gbp'}`}
+                                      disabled={gbpPostingId === checkIn.id || checkIn.gbpPostStatus === 'posting'}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleGbpPost(checkIn.id)
+                                      }}
+                                    >
+                                      {gbpPostingId === checkIn.id || checkIn.gbpPostStatus === 'posting' ? (
+                                        <><span className="db-gbp-spinner" />Posting to Google&hellip;</>
+                                      ) : checkIn.gbpPostStatus === 'failed' ? (
+                                        <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Try posting again</>
+                                      ) : (
+                                        <><IcoGbp />Post to Google</>
+                                      )}
+                                    </button>
+                                    {gbpPostError[checkIn.id] && (
+                                      <span className="db-gbp-error">
+                                        {gbpPostError[checkIn.id]}
+                                        {gbpNeedsReconnect[checkIn.id] && (
+                                          <>
+                                            {' '}
+                                            <a href="/account?tab=connections" className="db-gbp-reconnect">
+                                              Reconnect Google
+                                            </a>
+                                          </>
+                                        )}
+                                      </span>
+                                    )}
+                                  </>
+                                )
                               )}
                               {tierHasFeature(planTier, 'review_request') && (
                               <button

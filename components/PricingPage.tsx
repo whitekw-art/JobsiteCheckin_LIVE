@@ -174,7 +174,8 @@ export default function PricingPage() {
               {['Before & after photo tagging', 'Ghost camera overlay', '2,000 photos per month', 'Drag-to-reveal widget on job pages'].map(item => (
                 <div className="pf" key={item}><span className="pf-ck">&#10003;</span>{item}</div>
               ))}
-              <div className="pf"><span className="pf-ck">&#10003;</span>Google Business Profile auto-posts <span className="soon-badge">Soon</span></div>
+              <div className="pf"><span className="pf-ck">&#10003;</span>Your Google profile is optimized and refreshed with every job <span className="new-badge">New</span></div>
+              <div className="pf"><span className="pf-ck">&#10003;</span>Real Google Search data in your reporting</div>
             </div>
           </div>
 
@@ -194,8 +195,8 @@ export default function PricingPage() {
                 <div className="pf" key={item}><span className="pf-ck">&#10003;</span>{item}</div>
               ))}
               <div className="pf"><span className="pf-ck">&#10003;</span>AI copywriting agent <span className="new-badge">New</span></div>
-              <div className="pf"><span className="pf-ck">&#10003;</span>AI review request agent <span className="soon-badge">Soon</span></div>
-              <div className="pf"><span className="pf-ck">&#10003;</span>CRM &amp; QuickBooks integration <span className="soon-badge">Soon</span></div>
+              <div className="pf"><span className="pf-ck">&#10003;</span>AI review agent that follows up with every customer for you</div>
+              <div className="pf"><span className="pf-ck">&#10003;</span>CRM &amp; QuickBooks integration</div>
               <div className="pf"><span className="pf-ck">&#10003;</span>Job widget for any website</div>
               <div className="pf"><span className="pf-ck">&#10003;</span>Branded project page on your own domain, stronger SEO</div>
               <div className="pf"><span className="pf-ck">&#10003;</span>Full WordPress integration, maximum SEO <span className="new-badge">New</span></div>
@@ -247,10 +248,18 @@ export default function PricingPage() {
               </thead>
               <tbody>
 
-                <tr className="cat"><td colSpan={5}>Job Documentation</td></tr>
+                {/* Rows are grouped by WHICH PLAN UNLOCKS THEM, not by feature
+                    category. The old category grouping (Job Documentation,
+                    Published Job Pages, GBP, …) meant scanning down gave
+                    Free→Elite, Elite→Titan, Pro→Elite, all-Titan, Pro→Elite —
+                    eight categories with no cascade, and no way to answer "what
+                    does Elite actually buy me" without reading every row.
+                    Grouping by unlock tier makes the checkmarks a staircase. */}
+
+                <tr className="cat"><td colSpan={5}>Every plan</td></tr>
                 <tr>
-                  <td>Photos per job</td>
-                  <td><span className="cv">5</span></td>
+                  <td>Job check-ins with photos</td>
+                  <td><span className="cv">5 / job</span></td>
                   <td><span className="cv">Unlimited</span></td>
                   <td><span className="cv">Unlimited</span></td>
                   <td><span className="cv">Unlimited</span></td>
@@ -263,6 +272,59 @@ export default function PricingPage() {
                   <td><span className="cv">No limit</span></td>
                 </tr>
                 <tr>
+                  <td>Published job pages Google can index</td>
+                  <td><span className="cv">Unlimited</span></td>
+                  <td><span className="cv">Unlimited</span></td>
+                  <td><span className="cv">Unlimited</span></td>
+                  <td><span className="cv">Unlimited</span></td>
+                </tr>
+                <tr>
+                  <td>Support</td>
+                  <td><span className="cv">Email</span></td>
+                  <td><span className="cv">Priority</span></td>
+                  <td><span className="cv">Priority</span></td>
+                  <td><span className="cv">Dedicated</span></td>
+                </tr>
+
+                <tr className="cat"><td colSpan={5}>Pro and up</td></tr>
+                <tr>
+                  <td>Ready-to-post Google write-up for every job</td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="ck">✓</span></td>
+                  <td><span className="ck">✓</span></td>
+                  <td><span className="ck">✓</span></td>
+                </tr>
+                <tr>
+                  <td>Performance dashboard — views, clicks, engagement</td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="ck">✓</span></td>
+                  <td><span className="ck">✓</span></td>
+                  <td><span className="ck">✓</span></td>
+                </tr>
+
+                <tr className="cat"><td colSpan={5}>Elite and up</td></tr>
+                <tr>
+                  <td>Finished work published to your Google Business Profile how customers love</td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="ck">✓</span></td>
+                  <td><span className="ck">✓</span></td>
+                </tr>
+                <tr>
+                  <td>Approve each post, or set it and forget it</td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="ck">✓</span></td>
+                  <td><span className="ck">✓</span></td>
+                </tr>
+                <tr>
+                  <td>Real Google Search data in your reporting</td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="cdash">—</span></td>
+                  <td><span className="ck">✓</span></td>
+                  <td><span className="ck">✓</span></td>
+                </tr>
+                <tr>
                   <td>Before &amp; after photo tagging</td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
@@ -270,14 +332,12 @@ export default function PricingPage() {
                   <td><span className="ck">✓</span></td>
                 </tr>
                 <tr>
-                  <td>Ghost camera — shoot after photo over the before</td>
+                  <td>Ghost camera — shoot the after photo over the before</td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="ck">✓</span></td>
                   <td><span className="ck">✓</span></td>
                 </tr>
-
-                <tr className="cat"><td colSpan={5}>Published Job Pages</td></tr>
                 <tr>
                   <td>Drag-to-reveal before/after widget</td>
                   <td><span className="cdash">—</span></td>
@@ -286,21 +346,16 @@ export default function PricingPage() {
                   <td><span className="ck">✓</span></td>
                 </tr>
                 <tr>
-                  <td>Job widget for any website</td>
-                  <td><span className="cdash">—</span></td>
-                  <td><span className="cdash">—</span></td>
-                  <td><span className="cdash">—</span></td>
-                  <td><span className="ck">✓</span></td>
-                </tr>
-                <tr>
-                  <td>Branded project page on your own domain, stronger SEO</td>
-                  <td><span className="cdash">—</span></td>
+                  <td>Neighborhood-level visibility tracking</td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="ck">✓</span></td>
+                  <td><span className="ck">✓</span></td>
                 </tr>
+
+                <tr className="cat"><td colSpan={5}>Titan only</td></tr>
                 <tr>
-                  <td>Full WordPress integration, maximum SEO</td>
+                  <td>Your jobs on your own website — widget, your domain, or WordPress</td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
@@ -311,96 +366,42 @@ export default function PricingPage() {
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
-                  <td><span className="cs">Soon</span></td>
-                </tr>
-
-                <tr className="cat"><td colSpan={5}>Google Business Profile</td></tr>
-                <tr>
-                  <td>Post generator — formatted and ready to copy</td>
-                  <td><span className="cdash">—</span></td>
-                  <td><span className="ck">✓</span></td>
-                  <td><span className="ck">✓</span></td>
                   <td><span className="ck">✓</span></td>
                 </tr>
                 <tr>
-                  <td>Auto-posting directly to your profile</td>
-                  <td><span className="cdash">—</span></td>
-                  <td><span className="cdash">—</span></td>
-                  <td><span className="cs">Soon</span></td>
-                  <td><span className="cs">Soon</span></td>
-                </tr>
-
-                <tr className="cat"><td colSpan={5}>Review Requests</td></tr>
-                <tr>
-                  <td>One-tap review request — pre-written text or email</td>
+                  <td>One-tap review request — pre-written text or email, sent from your own phone</td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="ck">✓</span></td>
                 </tr>
                 <tr>
-                  <td>Automated Google review requests</td>
-                  <td><span className="cdash">—</span></td>
-                  <td><span className="cdash">—</span></td>
-                  <td><span className="cdash">—</span></td>
-                  <td><span className="ck">✓</span></td>
-                </tr>
-
-                <tr className="cat"><td colSpan={5}>Job Stats</td></tr>
-                <tr>
-                  <td>Performance dashboard — views, clicks, engagement</td>
-                  <td><span className="cdash">—</span></td>
-                  <td><span className="ck">✓</span></td>
-                  <td><span className="ck">✓</span></td>
-                  <td><span className="ck">✓</span></td>
-                </tr>
-                <tr>
-                  <td>Neighborhood-level visibility tracking</td>
-                  <td><span className="cdash">—</span></td>
-                  <td><span className="cdash">—</span></td>
-                  <td><span className="cs">Soon</span></td>
-                  <td><span className="cs">Soon</span></td>
-                </tr>
-
-                <tr className="cat"><td colSpan={5}>AI &amp; Automation</td></tr>
-                <tr>
-                  <td>AI copywriting agent — generates job descriptions from your photos</td>
+                  <td>AI review agent — reaches out to each customer in your voice, follows up on its own, and knows when to stop</td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="ck">✓</span></td>
                 </tr>
                 <tr>
-                  <td>AI-personalized review request message</td>
+                  <td>AI writes the job description from your photos</td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
-                  <td><span className="cs">Soon</span></td>
+                  <td><span className="ck">✓</span></td>
                 </tr>
-
-                <tr className="cat"><td colSpan={5}>Integrations &amp; API</td></tr>
                 <tr>
                   <td>API access</td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
-                  <td><span className="cs">Soon</span></td>
+                  <td><span className="ck">✓</span></td>
                 </tr>
                 <tr>
                   <td>QuickBooks &amp; CRM sync</td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
                   <td><span className="cdash">—</span></td>
-                  <td><span className="cs">Soon</span></td>
-                </tr>
-
-                <tr className="cat"><td colSpan={5}>Support</td></tr>
-                <tr>
-                  <td>Support</td>
-                  <td><span className="cv">Email</span></td>
-                  <td><span className="cv">Priority email</span></td>
-                  <td><span className="cv">Priority email</span></td>
-                  <td><span className="cv">Dedicated</span></td>
+                  <td><span className="ck">✓</span></td>
                 </tr>
 
               </tbody>

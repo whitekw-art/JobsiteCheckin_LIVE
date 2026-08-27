@@ -583,3 +583,25 @@
   .blog-toc ol { columns: 1; }
   .blog-toc { padding: 20px 22px; }
 }
+
+/* Touch tap targets.
+   Measured on a real 390px viewport: table-of-contents links rendered 17px
+   tall, breadcrumb links 15px, and "All posts" 18px — all well under the
+   ~48px Google recommends for touch, which made in-article navigation
+   genuinely hard to hit on a phone. Scoped to the same 640px breakpoint the
+   rest of the mobile rules use, so the desktop layout is unchanged. Links
+   inside running prose are deliberately excluded: inline links are exempt
+   from tap-target guidance, and padding them would break the text baseline. */
+@media (max-width: 640px) {
+  .blog-toc a,
+  .blog-related a {
+    display: block;
+    padding: 9px 0;
+  }
+  .blog-toc li { margin-bottom: 0; }
+  .blog-related li { margin-bottom: 0; }
+  .blog-breadcrumb a {
+    display: inline-block;
+    padding: 9px 2px;
+  }
+}

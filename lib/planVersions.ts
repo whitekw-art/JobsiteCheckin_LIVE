@@ -10,6 +10,21 @@
 //   tierHasFeature (always reads CURRENT_PLAN_VERSION) from hasFeature (reads the
 //   org's stored planVersion) for every org still stored as v1. Once real
 //   customers exist, follow the rule as written — add a v2, don't edit v1.
+// v1 — 2026-08-22: `gbp_integration` added to elite + titan, same documented
+//   exception and same reasoning as the line above. `gbp_post` (unchanged,
+//   still on pro/elite/titan) gates only the pre-existing copy-and-paste GBP
+//   modal, exactly as it did before this feature existed. `gbp_integration`
+//   is a SEPARATE, Elite+Titan-only gate for the real thing: connecting a
+//   Google Business Profile, the one-click "Post to Google" button, and (once
+//   built) automatic posting on publish. A Pro org never has `gbp_integration`
+//   and so can never connect — same locked treatment as Free. CORRECTED
+//   2026-08-22: an earlier version of this key was named `gbp_auto_post` and
+//   was believed to gate only future automation, with the manual button meant
+//   to be on every paid plan via `gbp_post`. That was a real misunderstanding
+//   during scoping, caught after Phase 1 had already shipped to staging —
+//   Keith confirmed the manual button and the automation are BOTH Elite+Titan
+//   only; Pro keeps the old copy-paste modal and nothing more. Renamed rather
+//   than reinterpreted so the key's name matches what it actually gates.
 
 export const CURRENT_PLAN_VERSION = 1
 
@@ -21,10 +36,10 @@ export const PLAN_FEATURES: Record<string, Record<number, string[]>> = {
     1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'gbp_post'],
   },
   elite: {
-    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'gbp_post', 'before_after_tagging', 'gsc_integration'],
+    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'gbp_post', 'gbp_integration', 'before_after_tagging', 'gsc_integration'],
   },
   titan: {
-    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'api_access', 'white_label', 'gbp_post', 'before_after_tagging', 'review_request', 'ai_job_description', 'website_integration', 'gsc_integration'],
+    1: ['check_in', 'photos_unlimited', 'job_pages_unlimited', 'dashboard', 'geo_grid', 'api_access', 'white_label', 'gbp_post', 'gbp_integration', 'before_after_tagging', 'review_request', 'ai_job_description', 'website_integration', 'gsc_integration'],
   },
 }
 

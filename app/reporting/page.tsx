@@ -171,6 +171,9 @@ export default async function ReportingPage({
       gscRefreshToken: true,
       gscPropertyUrl: true,
       gscConnectionStatus: true,
+      gbpConnectionStatus: true,
+      gbpLocationName: true,
+      gbpRefreshToken: true,
     },
   })
 
@@ -187,6 +190,25 @@ export default async function ReportingPage({
   const showEngagement = isSuperAdminView || viewedOrg.showEngagementMetrics
   const showPortfolioViews = isSuperAdminView || viewedOrg.showPortfolioViewsMetric
 
+  // ── Google Business Profile ──
+  // The profile metrics themselves (views, direction requests) need the
+  // Business Profile Performance API and are deliberately not built yet — see
+  // the reporting-restructure work tracked separately. What matters here is
+  // that these sections stop telling a connected customer to connect, which
+  // they did unconditionally because the markup was a hardcoded placeholder.
+  const gbpConnected =
+    viewedOrg.gbpConnectionStatus === 'connected' && !!viewedOrg.gbpRefreshToken
+
+  // Recent posts need no Google call at all — we record every post we make.
+  const recentGbpPosts = gbpConnected
+    ? await prisma.checkIn.findMany({
+        where: { organizationId: effectiveOrgId, gbpPostStatus: 'posted' },
+        select: { id: true, doorType: true, city: true, state: true, gbpPostUrl: true, gbpPostedAt: true },
+        orderBy: { gbpPostedAt: 'desc' },
+        take: 5,
+      })
+    : []
+
   // ── Google Search Console (Elite + Titan) ──
   // Fetched live on page load rather than synced by a cron: Search Console's
   // own data only refreshes every few days, so a cached copy would be no
@@ -202,6 +224,27 @@ export default async function ReportingPage({
   // A failed fetch degrades to the not-connected layout rather than taking the
   // whole Reporting page down — every other section here is unrelated to GSC.
   const gscData = gsc?.ok ? gsc.data : undefined
+
+  // A revoked grant is a connection problem, not a transient read failure, so
+  // it gets written back rather than silently rendering an empty section every
+  // time this page loads. Added 2026-08-27 with the matching GBP change: the
+  // two integrations share one OAuth client, so disconnecting one used to kill
+  // the other while both cards kept showing green.
+  //
+  // Only fires for a real SUPER_ADMIN-free view of the org's own data. When an
+  // admin is inspecting another org via ?orgId= we still record it, because the
+  // grant is genuinely dead for that org either way.
+  //
+  // `needsReconnect` is set only on a 401 (see classify() in lib/gscApi.ts), so
+  // a quota 403 cannot flip a working customer's card.
+  if (gsc && !gsc.ok && gsc.needsReconnect) {
+    await prisma.organization
+      .update({
+        where: { id: effectiveOrgId },
+        data: { gscConnectionStatus: 'needs_reconnect' },
+      })
+      .catch((err) => console.error('GSC: could not record needs_reconnect status', effectiveOrgId, err))
+  }
 
   // ── All-time totals ──
   const grouped = await prisma.checkInEvent.groupBy({
@@ -545,13 +588,17 @@ export default async function ReportingPage({
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Google Business Profile Performance</div>
-            <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Profile views, direction requests, and search appearances from your Google listing</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>
+              {gbpConnected
+                ? viewedOrg.gbpLocationName || 'Your connected Google listing'
+                : 'Profile views, direction requests, and search appearances from your Google listing'}
+            </div>
           </div>
           <Link
             href="/account"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'var(--surface)', border: '1px solid var(--border-2)', color: 'var(--t2)', textDecoration: 'none', flexShrink: 0 }}
           >
-            Connect GBP
+            {gbpConnected ? 'Manage connection' : 'Connect GBP'}
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
             </svg>
@@ -567,11 +614,17 @@ export default async function ReportingPage({
           ))}
         </div>
         <div style={{ marginTop: 10, background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--t3)', lineHeight: 1.5 }}>
-          Connect your Google Business Profile in{' '}
-          <Link href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
-            Account &rsaquo; Connections
-          </Link>{' '}
-          to see GBP metrics here.
+          {gbpConnected ? (
+            <>Your Google Business Profile is connected and your jobs are posting to it. These profile numbers come from Google and are coming to this page soon.</>
+          ) : (
+            <>
+              Connect your Google Business Profile in{' '}
+              <Link href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
+                Account &rsaquo; Connections
+              </Link>{' '}
+              to see GBP metrics here.
+            </>
+          )}
         </div>
       </div>
 
@@ -723,17 +776,58 @@ export default async function ReportingPage({
           {/* Recent GBP Posts */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 16px', boxShadow: 'var(--shadow-card)' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)', marginBottom: 14 }}>Recent GBP Posts</div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100% - 30px)', gap: 10, paddingTop: 8 }}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
-              </svg>
-              <div style={{ fontSize: 11, color: 'var(--t3)', textAlign: 'center', lineHeight: 1.5 }}>
-                No posts yet.{' '}
-                <Link href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
-                  Connect GBP
-                </Link>
+            {recentGbpPosts.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {recentGbpPosts.map((post) => {
+                  const place = [post.city, post.state].filter(Boolean).join(', ')
+                  const row = (
+                    <>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--t1)', lineHeight: 1.35 }}>
+                        {post.doorType || 'Job'}{place ? ` — ${place}` : ''}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>
+                        {post.gbpPostedAt
+                          ? post.gbpPostedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                          : ''}
+                      </div>
+                    </>
+                  )
+                  // Google only returns a public post link sometimes, so the row
+                  // has to read correctly with or without one.
+                  return post.gbpPostUrl ? (
+                    <a
+                      key={post.id}
+                      href={post.gbpPostUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ textDecoration: 'none', display: 'block' }}
+                    >
+                      {row}
+                    </a>
+                  ) : (
+                    <div key={post.id}>{row}</div>
+                  )
+                })}
               </div>
-            </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100% - 30px)', gap: 10, paddingTop: 8 }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+                </svg>
+                <div style={{ fontSize: 11, color: 'var(--t3)', textAlign: 'center', lineHeight: 1.5 }}>
+                  {gbpConnected ? (
+                    <>No posts yet. Publish a job to send it to your Google listing.</>
+                  ) : (
+                    <>
+                      No posts yet.{' '}
+                      <Link href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
+                        Connect GBP
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Portfolio Views — gated independently via showPortfolioViewsMetric */}
