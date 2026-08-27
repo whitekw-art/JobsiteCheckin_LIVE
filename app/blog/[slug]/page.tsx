@@ -14,6 +14,9 @@ import WindowDoorGetFound2026, {
 import GoogleReviews2026, {
   FAQ_ITEMS as GOOGLE_REVIEWS_FAQ,
 } from '@/components/blog/GoogleReviews2026'
+import GbpNotShowingUp2026, {
+  FAQ_ITEMS as GBP_NOT_SHOWING_FAQ,
+} from '@/components/blog/GbpNotShowingUp2026'
 import {
   BLOG_POSTS,
   getPostBySlug,
@@ -50,6 +53,10 @@ const POST_CONTENT: Record<
   'why-competitors-have-more-google-reviews-2026': {
     Body: GoogleReviews2026,
     faq: GOOGLE_REVIEWS_FAQ,
+  },
+  'why-google-business-profile-not-showing-up-maps': {
+    Body: GbpNotShowingUp2026,
+    faq: GBP_NOT_SHOWING_FAQ,
   },
 }
 
