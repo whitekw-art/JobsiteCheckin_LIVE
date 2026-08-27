@@ -20,6 +20,34 @@ export interface GbpPostOutcome {
 }
 
 /**
+ * Record that the stored Google grant no longer works.
+ *
+ * Both API modules already detect a revoked grant and return `needsReconnect`,
+ * but before 2026-08-27 that signal died in a log line: the org row kept
+ * saying 'connected', the Account card kept showing a green dot, and auto-post
+ * kept firing into a dead connection. Keith hit exactly this on staging -
+ * posting failed with no indication anything was wrong until he opened Account
+ * and reconnected.
+ *
+ * Writing 'needs_reconnect' composes with the existing gates rather than
+ * needing new ones: every check in this file and in the routes compares
+ * against 'connected', so auto-post stops on its own, the API's `connected`
+ * flag flips false, and the Reporting section reverts. `gbpConnectionStatus`
+ * is already a nullable String column, so this value needs no migration.
+ *
+ * Never throws: callers include a background `after()` hook, where an
+ * unhandled rejection would be invisible.
+ */
+async function markGbpNeedsReconnect(organizationId: string): Promise<void> {
+  await prisma.organization
+    .update({
+      where: { id: organizationId },
+      data: { gbpConnectionStatus: 'needs_reconnect' },
+    })
+    .catch((err) => console.error('GBP: could not record needs_reconnect status', organizationId, err))
+}
+
+/**
  * Publish one job to the org's connected listing.
  *
  * Records `gbpPostStatus` on the CheckIn whether it succeeds or fails, so the
@@ -140,6 +168,13 @@ export async function postCheckInToGbp(checkInId: string): Promise<GbpResult<Gbp
     await prisma.checkIn
       .update({ where: { id: job.id }, data: { gbpPostStatus: 'failed', gbpPostedAt: null } })
       .catch((err) => console.error('GBP: could not record failed post status', err))
+    // A dead grant is not a per-job failure, it is a connection failure, and
+    // leaving the org row on 'connected' is what made this invisible before.
+    // Marking it here also stops auto-post from retrying into a grant that
+    // cannot recover on its own, since every gate checks for 'connected'.
+    if (result.needsReconnect) {
+      await markGbpNeedsReconnect(org.id)
+    }
     // Re-shaped rather than returned directly: the failure carries no data, and
     // the two result types differ in their success payload.
     return { ok: false, error: result.error, needsReconnect: result.needsReconnect }
@@ -249,6 +284,9 @@ export async function autoPostCheckInIfEnabled(checkInId: string): Promise<GbpRe
 
   const result = await postCheckInToGbp(checkInId)
   if (!result.ok) {
+    // No markGbpNeedsReconnect call here on purpose: postCheckInToGbp already
+    // wrote it. Repeating it would be a second pointless write on the path
+    // that runs inside a background after() hook.
     return { ok: false, error: result.error, needsReconnect: result.needsReconnect }
   }
   return { ok: true, data: { posted: true, searchUrl: result.data?.searchUrl ?? null } }
@@ -291,7 +329,8 @@ export async function retractCheckInFromGbp(checkInId: string): Promise<GbpResul
     select: {
       id: true,
       gbpPostName: true,
-      organization: { select: { gbpAccessToken: true, gbpRefreshToken: true } },
+      // `id` is here for markGbpNeedsReconnect below, not for the delete call.
+      organization: { select: { id: true, gbpAccessToken: true, gbpRefreshToken: true } },
     },
   })
   if (!job) return { ok: false, error: 'That job could not be found.' }
@@ -303,6 +342,9 @@ export async function retractCheckInFromGbp(checkInId: string): Promise<GbpResul
   const result = await deleteLocalPost(job.organization.gbpRefreshToken, job.organization.gbpAccessToken, job.gbpPostName)
   if (!result.ok) {
     console.warn('GBP: could not delete post on Google, keeping local record so it stays retryable', checkInId, result.error)
+    if (result.needsReconnect) {
+      await markGbpNeedsReconnect(job.organization.id)
+    }
     return { ok: false, error: result.error, needsReconnect: result.needsReconnect }
   }
 

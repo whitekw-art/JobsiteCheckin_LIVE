@@ -61,6 +61,9 @@ async function requireOwnerWithFeature() {
       gbpConnectionStatus: true,
       gbpConnectedAt: true,
       gbpAutoPost: true,
+      // Needed by DELETE only: GBP and GSC share one OAuth grant, so
+      // disconnecting one must not revoke the other. See the comment there.
+      gscRefreshToken: true,
     },
   })
   if (!org) {
@@ -214,7 +217,12 @@ export async function DELETE() {
     if ('error' in gate) return gate.error
     const { org } = gate
 
-    if (org.gbpRefreshToken) {
+    // Mirror of the guard in app/api/organization/gsc/route.ts - read that
+    // comment for the full reasoning. Short version: GBP and GSC share one
+    // OAuth client and one combined authorization, so revoking here while GSC
+    // is still connected would silently kill GSC's access too.
+    const gscStillConnected = Boolean(org.gscRefreshToken)
+    if (org.gbpRefreshToken && !gscStillConnected) {
       await revokeAccess(org.gbpRefreshToken)
     }
 

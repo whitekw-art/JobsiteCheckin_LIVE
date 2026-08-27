@@ -42,6 +42,9 @@ async function requireOwnerWithFeature() {
       gscPropertyUrl: true,
       gscConnectionStatus: true,
       gscConnectedAt: true,
+      // Needed by DELETE only: GSC and GBP share one OAuth grant, so
+      // disconnecting one must not revoke the other. See the comment there.
+      gbpRefreshToken: true,
     },
   })
   if (!org) {
@@ -163,7 +166,21 @@ export async function DELETE() {
     if ('error' in gate) return gate.error
     const { org } = gate
 
-    if (org.gscRefreshToken) {
+    // GSC and GBP authorize through the SAME OAuth client, and both consent
+    // URLs set `include_granted_scopes: true`, which merges their scopes into
+    // one combined authorization on the customer's Google account. Google's
+    // docs are explicit that revoking a token representing a combined
+    // authorization revokes every scope in it at once - so revoking here while
+    // GBP is still connected silently kills GBP's access, with our own GBP row
+    // left reading "connected". That is a real bug this guard exists to
+    // prevent; it was hit on staging 2026-08-26.
+    //
+    // So: revoke on Google's side only when nothing else is still using the
+    // grant. When GBP still holds a token we clear our own credentials and
+    // leave Google's authorization intact for it. The customer can always
+    // revoke the whole app from their own Google Account permissions page.
+    const gbpStillConnected = Boolean(org.gbpRefreshToken)
+    if (org.gscRefreshToken && !gbpStillConnected) {
       await revokeAccess(org.gscRefreshToken)
     }
 

@@ -225,6 +225,27 @@ export default async function ReportingPage({
   // whole Reporting page down — every other section here is unrelated to GSC.
   const gscData = gsc?.ok ? gsc.data : undefined
 
+  // A revoked grant is a connection problem, not a transient read failure, so
+  // it gets written back rather than silently rendering an empty section every
+  // time this page loads. Added 2026-08-27 with the matching GBP change: the
+  // two integrations share one OAuth client, so disconnecting one used to kill
+  // the other while both cards kept showing green.
+  //
+  // Only fires for a real SUPER_ADMIN-free view of the org's own data. When an
+  // admin is inspecting another org via ?orgId= we still record it, because the
+  // grant is genuinely dead for that org either way.
+  //
+  // `needsReconnect` is set only on a 401 (see classify() in lib/gscApi.ts), so
+  // a quota 403 cannot flip a working customer's card.
+  if (gsc && !gsc.ok && gsc.needsReconnect) {
+    await prisma.organization
+      .update({
+        where: { id: effectiveOrgId },
+        data: { gscConnectionStatus: 'needs_reconnect' },
+      })
+      .catch((err) => console.error('GSC: could not record needs_reconnect status', effectiveOrgId, err))
+  }
+
   // ── All-time totals ──
   const grouped = await prisma.checkInEvent.groupBy({
     by: ['eventType'],

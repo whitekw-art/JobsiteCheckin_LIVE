@@ -998,6 +998,16 @@
   line-height: 1.4;
 }
 
+/* Shown beside .db-gbp-error only when Google rejected the stored grant.
+   Retrying cannot fix that, so the customer needs a route to Connections
+   rather than a button that will fail again. */
+.db-gbp-reconnect {
+  color: var(--sky-text);
+  font-weight: 700;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
 .db-gbp-spinner {
   width: 12px;
   height: 12px;
