@@ -31,11 +31,11 @@ const faqs: FaqItem[] = [
   },
   {
     q: 'Is there a contract or commitment?',
-    a: "No contract, no commitment. Cancel anytime from your account settings. You keep every project page and portfolio entry you've published — they stay live as long as you're a subscriber.",
+    a: "There is no contract and no commitment. Cancel anytime from your account settings. You keep every project page and portfolio entry you've published — they stay live as long as you're a subscriber.",
   },
   {
     q: "My crew isn't tech-savvy. Will they actually use this?",
-    a: "No app to download, no account to create. You send your crew a link — they open it in their phone browser, take photos, add a quick note, and hit submit. Most crews are doing it on their first job. If they can text, they can do this.",
+    a: "Your crew doesn't need to download an app or create an account. You send your crew a link — they open it in their phone browser, take photos, add a quick note, and hit submit. Most crews are doing it on their first job. If they can text, they can do this.",
   },
   {
     q: 'How long does it take to get set up?',
@@ -1167,8 +1167,8 @@ export default function LandingPage({ registrationOpen = false }: { registration
                       <option value="">Not sure yet...</option>
                       <option value="free">Free &mdash; just getting started</option>
                       <option value="pro">Pro ($49.50/mo founding rate)</option>
-                      <option value="elite">Elite ($74.50/mo founding rate)</option>
-                      <option value="titan">Titan ($149.50/mo founding rate)</option>
+                      <option value="elite">Elite ($149.00/mo founding rate)</option>
+                      <option value="titan">Titan ($299.00/mo founding rate)</option>
                     </select>
                   </div>
                   {submitError && (
