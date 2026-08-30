@@ -73,7 +73,7 @@ const faqJsonLd = {
       name: 'Is there a contract or commitment?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'No contract, no commitment. Cancel anytime from your account settings. You keep every project page and portfolio entry you\'ve published — they stay live as long as you\'re a subscriber.',
+        text: 'There is no contract and no commitment. Cancel anytime from your account settings. You keep every project page and portfolio entry you\'ve published — they stay live as long as you\'re a subscriber.',
       },
     },
     {
@@ -81,7 +81,7 @@ const faqJsonLd = {
       name: 'My crew isn\'t tech-savvy. Will they actually use this?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'No app to download, no account to create. You send your crew a link — they open it in their phone browser, take photos, add a quick note, and hit submit. Most crews are doing it on their first job. If they can text, they can do this.',
+        text: 'Your crew doesn\'t need to download an app or create an account. You send your crew a link — they open it in their phone browser, take photos, add a quick note, and hit submit. Most crews are doing it on their first job. If they can text, they can do this.',
       },
     },
     {
@@ -143,7 +143,7 @@ const organizationJsonLd = {
         '@type': 'AggregateOffer',
         priceCurrency: 'USD',
         lowPrice: '0',
-        highPrice: '149.50',
+        highPrice: '299.00',
         offerCount: '4',
       },
       featureList: [

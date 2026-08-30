@@ -17,11 +17,11 @@ function Ck() {
 const faqs = [
   {
     q: 'Can I cancel anytime?',
-    a: "Yes. Cancel from your account settings, no questions asked. There's no contract, no cancellation fee, and no phone call required. If you cancel, your subscription ends at your next billing date — not immediately.",
+    a: "Yes. Cancel from your account settings whenever you want. There's no contract and no cancellation fee, and you don't need to call anyone. If you cancel, your subscription ends at your next billing date — not immediately.",
   },
   {
     q: 'Can I upgrade or downgrade my plan anytime?',
-    a: "Yes. Upgrade anytime and your new features activate immediately. Downgrade takes effect at the start of your next billing cycle. No penalties, no approval process, no phone call required.",
+    a: "Yes. Upgrade anytime and your new features activate immediately. Downgrade takes effect at the start of your next billing cycle. There's no penalty and nobody has to approve it — you handle it yourself from your account settings.",
   },
   {
     q: 'What trades does ProjectCheckin work for?',
@@ -37,7 +37,7 @@ const faqs = [
   },
   {
     q: 'Is there a setup fee or onboarding cost?',
-    a: 'None. No setup fee, no onboarding package, no minimum contract. Create your account, add your business info, and send your crew the check-in link. Your first job can be published the same day.',
+    a: "None. You won't pay a setup fee, buy an onboarding package, or sign a minimum-term contract. Create your account, add your business info, and send your crew the check-in link. Your first job can be published the same day.",
   },
   {
     q: 'What payment methods do you accept?',
@@ -51,8 +51,8 @@ const faqs = [
 
 const tiers = {
   pro:   { monthly: '$49.50', annual: '$41.25', annualTotal: '$495', annualSave: '$99' },
-  elite: { monthly: '$74.50', annual: '$62.08', annualTotal: '$745', annualSave: '$149' },
-  titan: { monthly: '$149.50', annual: '$124.58', annualTotal: '$1,495', annualSave: '$299' },
+  elite: { monthly: '$149.00', annual: '$124.17', annualTotal: '$1,490', annualSave: '$298' },
+  titan: { monthly: '$299.00', annual: '$249.17', annualTotal: '$2,990', annualSave: '$598' },
 }
 
 export default function PricingPage() {
@@ -81,7 +81,7 @@ export default function PricingPage() {
           Founding member pricing — first 20 businesses only
         </div>
         <h1>Clear pricing.<br />No surprises.</h1>
-        <p className="hero-trust">No agency. No contract. No SEO knowledge needed.</p>
+        <p className="hero-trust">You don't need an agency, a contract, or any SEO knowledge.</p>
         <p className="hero-fine">No credit card required &middot; Cancel anytime</p>
       </div>
 
@@ -132,7 +132,7 @@ export default function PricingPage() {
             <div className="tier-name">Free</div>
             <div className="tier-price">$0<sub>/mo</sub></div>
             <div style={{ height: 18 }} />
-            <p className="tier-tagline">No card, no commitment.</p>
+            <p className="tier-tagline">No card required — you're never locked in.</p>
             <div className="pc-feats">
               {['5 photos per job', '50 photos per month', 'Owner publish controls', 'Each job page built for Google search', 'Public portfolio page', 'No credit card required'].map(item => (
                 <div className="pf" key={item}><span className="pf-ck">&#10003;</span>{item}</div>
@@ -166,7 +166,7 @@ export default function PricingPage() {
             <div className="tier-per-biz">per business &middot; unlimited users</div>
             {billingAnnual
               ? <div className="tier-annual-note">billed {tiers.elite.annualTotal}/yr &middot; save {tiers.elite.annualSave}</div>
-              : <div className="tier-was">Was $149/mo</div>
+              : <div className="tier-was">Was $298/mo</div>
             }
             <p className="tier-tagline">Before &amp; after proof that closes quotes and wins jobs.</p>
             <div className="pc-feats">
@@ -186,7 +186,7 @@ export default function PricingPage() {
             <div className="tier-per-biz">per business &middot; unlimited users</div>
             {billingAnnual
               ? <div className="tier-annual-note">billed {tiers.titan.annualTotal}/yr &middot; save {tiers.titan.annualSave}</div>
-              : <div className="tier-was">Was $299/mo</div>
+              : <div className="tier-was">Was $598/mo</div>
             }
             <p className="tier-tagline">Review requests, unlimited photos, and AI agents that work for you.</p>
             <div className="pc-feats">
@@ -210,7 +210,7 @@ export default function PricingPage() {
           <p className="cta-block-label">Pick your tier during signup — or start free and upgrade anytime.</p>
           <Link href="/auth/register" className="btn-orange">Start Free</Link>
           <p className="cta-block-fine">
-            <strong>Cancel anytime.</strong> No contracts. No setup fee. Your data is always yours.
+            <strong>Cancel anytime.</strong> There's no contract and no setup fee, and your data is always yours.
           </p>
         </div>
       </div>
@@ -436,7 +436,7 @@ export default function PricingPage() {
 
       {/* FINAL CTA BAND */}
       <div className="cta-band">
-        <h2>Start free.<br />No credit card, no commitment.</h2>
+        <h2>Start free.<br />No credit card required — you're never locked in.</h2>
         <p>Zero cost. See if it works for your crew before you spend anything.</p>
         <Link href="/auth/register" className="btn-orange">Get Started Free</Link>
         <div className="fine">No credit card required &middot; Cancel anytime</div>
