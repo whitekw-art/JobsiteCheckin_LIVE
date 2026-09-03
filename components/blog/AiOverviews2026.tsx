@@ -30,6 +30,7 @@ export const FAQ_ITEMS = [
 ]
 
 const TOC = [
+  { id: 's0', label: 'Why the Incentives Shifted' },
   { id: 's1', label: 'What the Data Actually Shows' },
   { id: 's2', label: 'It’s Google, Not ChatGPT' },
   { id: 's3', label: 'Getting Cited Isn’t the Whole Answer' },
@@ -37,6 +38,7 @@ const TOC = [
   { id: 's5', label: 'Google Says There’s No Special Trick' },
   { id: 'f1', label: '1. Specific, Checkable Facts' },
   { id: 'f2', label: '2. Consistent, Accurate Business Information' },
+  { id: 'f3', label: '3. Name Yourself Inside the Content' },
 ]
 
 const PEW_2026 =
@@ -50,6 +52,7 @@ const GEO_PAPER = 'https://arxiv.org/abs/2311.09735'
 const GOOGLE_AI_DOCS = 'https://developers.google.com/search/docs/appearance/ai-features'
 const GBP_GUIDELINES = 'https://support.google.com/business/answer/3038177'
 const WORDCAMP = 'https://us.wordcamp.org/2025/session/keynote/'
+const ZITRON_GOOGLE = 'https://www.wheresyoured.at/the-men-who-killed-google/'
 
 /** Every source here is non-commercial or primary: nonprofit research, academic
  *  preprints, and Google's own documentation. No SEO vendor is cited or linked. */
@@ -63,6 +66,11 @@ const SOURCES = [
     href: PEW_2025,
     label: 'Pew Research Center, “Do people click on links in Google AI summaries?”',
     detail: ' (July 2025). Browsing data from 900 U.S. adults, 68,879 searches, March 2025.',
+  },
+  {
+    href: ZITRON_GOOGLE,
+    label: 'Ed Zitron, “The Man Who Killed Google Search”',
+    detail: ' (April 2024). Sourced from internal Google documents and depositions made public in the DOJ v. Google antitrust trial.',
   },
   {
     href: WASHU,
@@ -127,10 +135,27 @@ export default function AiOverviews2026() {
         </ol>
       </nav>
 
+      <section className="blog-section" id="s0">
+        <h2>Why the Incentives Shifted</h2>
+        <p>
+          Google’s own incentives help explain why this shift happened.{' '}
+          <a href={ZITRON_GOOGLE} target="_blank" rel="noopener noreferrer">
+            Internal Google documents made public in the DOJ’s antitrust trial
+          </a>{' '}
+          show that in February 2019, Google’s ads leadership declared a “code yellow” over
+          weak search-query growth. The head of Google Search at the time warned internally that
+          queries could be increased in user-negative ways, such as disabling spell correction, and
+          said search was getting too close to the money. By May 2020, Google had replaced that role
+          with a new head of Search from the ads side, and the outgoing search chief moved to lead
+          Google’s education division after nearly twenty years building search.
+        </p>
+      </section>
+
       <section className="blog-section" id="s1">
         <h2>What the Data Actually Shows</h2>
         <p>
-          Start with how common this is now. In a survey of 5,119 U.S. adults conducted in February
+          The result of that shift is measurable, and it lines up with what those internal documents
+          predicted. Start with how common this is now. In a survey of 5,119 U.S. adults conducted in February
           2026,{' '}
           <a href={PEW_2026} target="_blank" rel="noopener noreferrer">
             Pew Research Center
@@ -419,6 +444,37 @@ export default function AiOverviews2026() {
             wraps up is enough, and the{' '}
             <Link href="/features/gbp-post-generator">GBP Post Generator</Link> writes those from the
             job you already logged.
+          </p>
+        </div>
+      </section>
+
+      <section className="blog-factor" id="f3">
+        <div className="blog-factor-head">
+          <div className="blog-factor-num" aria-hidden="true">
+            03
+          </div>
+          <div className="blog-factor-titlewrap">
+            <h2>Name Yourself Inside the Content</h2>
+          </div>
+        </div>
+        <div className="blog-factor-body">
+          <h3>What the Research Shows</h3>
+          <p>
+            Pew found that 88% of AI summaries cited three or more sources, which means a summary
+            rarely carries a single business’s identity through cleanly. A paragraph that answers a
+            question well but never says who wrote it can get folded into a summary with no
+            attribution attached, even when the underlying content was accurate and specific.
+          </p>
+          <h3 className="blog-action">Do This Week</h3>
+          <p>
+            Read back through your last few published job pages and count how many times your
+            business name and city actually appear inside the writing itself, not just in the page
+            title or the schema. A sentence like &ldquo;Our crew installed this door in
+            [city]&rdquo; carries your identity into whatever gets pulled from it. A sentence that
+            only says &ldquo;the crew installed this door&rdquo; does not. The{' '}
+            <Link href="/features/ai-copywriter">AI Copywriter Agent</Link> already includes the
+            city and state in every description by default, so the part worth checking for yourself
+            is whether your business name appears in the writing, not just in the page footer.
           </p>
         </div>
       </section>

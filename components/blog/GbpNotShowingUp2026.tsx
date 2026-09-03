@@ -365,6 +365,14 @@ export default function GbpNotShowingUp2026() {
           The result is a profile that describes the work your company is performing currently rather
           than the business your company ran two years ago.
         </p>
+        <p>
+          Getting these three factors right earns your business a place in front of a searcher. It
+          does not by itself guarantee a click — see{' '}
+          <Link href="/blog/ai-overviews-what-the-data-shows">
+            why AI Overviews are cutting clicks even for well-ranked pages
+          </Link>{' '}
+          for what the data actually shows about that gap.
+        </p>
       </section>
 
       <section className="blog-section" id="out-of-circulation">
