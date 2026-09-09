@@ -332,6 +332,38 @@
 }
 .blog-faq-item p { font-size: 16px; margin: 0; }
 
+/* Collapsible FAQ (Storyblok-authored posts). Scoped to `details` so the
+   hardcoded posts, which render `div.blog-faq-item`, are unaffected. */
+details.blog-faq-item {
+  border-bottom: 1px solid var(--blog-border);
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+details.blog-faq-item summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+}
+details.blog-faq-item summary::-webkit-details-marker { display: none; }
+details.blog-faq-item summary h3 { margin: 0; }
+details.blog-faq-item summary::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  margin-top: 7px;
+  border-right: 1.5px solid var(--blog-muted);
+  border-bottom: 1.5px solid var(--blog-muted);
+  transform: rotate(45deg);
+  transition: transform .18s ease;
+}
+details.blog-faq-item[open] summary::after { transform: rotate(-135deg); margin-top: 11px; }
+details.blog-faq-item > p { margin-top: 10px; }
+
 .blog-related { margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--blog-border); }
 .blog-related h2 {
   font-size: 12px;

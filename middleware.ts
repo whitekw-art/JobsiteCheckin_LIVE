@@ -81,6 +81,13 @@ if (
   !pathname.startsWith('/portfolio/') &&
   !pathname.startsWith('/features/') &&
   !pathname.startsWith('/blog') &&
+  // CMS evaluation only: the Storyblok editor loads this route in an iframe,
+  // where the session cookie is not sent, so it must resolve without auth.
+  // Noindexed in next.config.js; content is the same marketing copy already
+  // public on the live landing page.
+  !pathname.startsWith('/landing-preview') &&
+  !pathname.startsWith('/feature-preview') &&
+  !pathname.startsWith('/pricing-preview') &&
   !pathname.startsWith('/mockups/') &&
   !pathname.startsWith('/sitemap') &&
   pathname !== '/robots.txt' &&

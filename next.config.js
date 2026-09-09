@@ -1,3 +1,20 @@
+// CMS evaluation only. The Storyblok visual editor renders a page in an iframe
+// on its own domain, which X-Frame-Options: SAMEORIGIN blocks outright.
+// X-Frame-Options has no usable "allow one origin" value (ALLOW-FROM is dead in
+// Chrome), so it is omitted on the preview routes and replaced with an ENFORCED
+// frame-ancestors allowing only Storyblok — strictly tighter than the
+// demo-portfolio exception below, which permits framing by anyone. Only the
+// preview routes are affected; the app, the real blog, the real landing page,
+// and customer pages all keep full protection.
+const STORYBLOK_PREVIEW_HEADERS = [
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' },
+  { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+  { key: 'Content-Security-Policy', value: 'frame-ancestors https://app.storyblok.com' },
+]
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
@@ -21,7 +38,7 @@ const nextConfig = {
         // Every path EXCEPT the single named exception below (Next.js merges
         // headers from multiple matching rules rather than overriding them,
         // so the exception must be excluded here, not just added separately).
-        source: '/:path((?!portfolio/wave-advisory-3e10).*)',
+        source: '/:path((?!portfolio/wave-advisory-3e10|blog-preview/|landing-preview|feature-preview/|pricing-preview).*)',
         headers: [
           // Clickjacking: no page should be framed by another site by default.
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
@@ -70,6 +87,11 @@ const nextConfig = {
           },
         ],
       },
+      // Preview routes: see STORYBLOK_PREVIEW_HEADERS at the top of this file.
+      { source: '/blog-preview/:path*', headers: STORYBLOK_PREVIEW_HEADERS },
+      { source: '/landing-preview', headers: STORYBLOK_PREVIEW_HEADERS },
+      { source: '/feature-preview/:path*', headers: STORYBLOK_PREVIEW_HEADERS },
+      { source: '/pricing-preview', headers: STORYBLOK_PREVIEW_HEADERS },
     ]
   },
 }
