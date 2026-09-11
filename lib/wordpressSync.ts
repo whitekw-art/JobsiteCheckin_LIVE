@@ -308,7 +308,7 @@ function buildContent(
   // in schema. The WP post_author field is just plumbing (see spec §3).
   parts.push(
     `<p><em>Documented by ${escapeHtml(org.name)} — publishing powered by ` +
-      `<a href="https://projectcheckin.com" rel="nofollow">ProjectCheckin</a>.</em></p>`
+      `<a href="https://projectcheckin.com">ProjectCheckin</a>.</em></p>`
   )
 
   parts.push(
