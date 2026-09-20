@@ -140,7 +140,7 @@ export default function HelpPage() {
 
         <HelpSection title="Billing & Plans" sub="Subscriptions, cancellations, and refunds" defaultOpen>
           <p style={p}>
-            ProjectCheckin has four plans — Free, Pro, Elite, and Titan — priced from $0 to $299/month depending on features and monthly photo volume. See full plan details on the <Link href="/pricing" style={link}>Pricing page</Link>.
+            ProjectCheckin has four plans — Free, Pro, Elite, and Titan — priced from $0 to $598/month depending on features and monthly photo volume. See full plan details on the <Link href="/pricing" style={link}>Pricing page</Link>.
           </p>
 
           <HelpSubsection title="Updating your payment method or canceling">
