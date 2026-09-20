@@ -26,7 +26,7 @@
         state.jobs = data.jobs;
         state.total = data.total || data.jobs.length;
         render(mount, state);
-        openFromHash(state);
+        scrollToHash(state);
       })
       .catch(function () { /* fail silently */ });
   }
@@ -67,11 +67,6 @@
     return isNaN(d.getTime()) ? null : d;
   }
 
-  function shortDate(job) {
-    var d = jobDate(job);
-    return d ? MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getFullYear() : '';
-  }
-
   function longDate(job) {
     var d = jobDate(job);
     return d ? MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear() : '';
@@ -91,7 +86,7 @@
     return (job.photoUrls && job.photoUrls[0]) || job.beforePhotoUrl || null;
   }
 
-  function modalPhotos(job) {
+  function jobPhotos(job) {
     if (job.photoUrls && job.photoUrls.length) return job.photoUrls;
     return [job.beforePhotoUrl, job.afterPhotoUrl].filter(Boolean);
   }
@@ -120,16 +115,19 @@
     '#pc-widget .pcw-h2{font-size:16px;font-weight:700;margin-bottom:22px;display:flex;align-items:center;gap:14px}' +
     '.pcw-h2:after{content:"";flex:1;height:1px;background:#E2E8F0}' +
     '#pc-widget .pcw-count{font-size:11.5px;font-weight:600;color:#94A3B8;background:#F1F5F9;padding:3px 10px;border-radius:20px;flex-shrink:0}' +
-    '#pc-widget .pcw-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}' +
-    '@media(max-width:768px){#pc-widget .pcw-grid{grid-template-columns:1fr}}' +
-    '.pcw-card{border-radius:10px;overflow:hidden;border:1px solid #E2E8F0;cursor:pointer;background:#fff;transition:box-shadow .15s,transform .15s}' +
-    '.pcw-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.1);transform:translateY(-1px)}' +
-    '.pcw-photo{height:180px;width:100%;object-fit:cover;display:block;background:#F1F5F9}' +
-    '.pcw-nophoto{height:180px;width:100%;background:#F1F5F9}' +
-    '#pc-widget .pcw-cbody{padding:18px 20px 22px}' +
-    '#pc-widget .pcw-h3{font-size:14px;font-weight:700;margin-bottom:7px;line-height:1.35}' +
-    '#pc-widget .pcw-meta{font-size:12px;color:#94A3B8;margin-bottom:11px}' +
-    '.pcw-snip{font-size:12.5px;color:#64748B;line-height:1.65}' +
+    // Each job renders inline, in the page, so its full text is present in the DOM
+    // without any interaction — a modal kept the description out of the rendered page.
+    '#pc-widget .pcw-job{padding-bottom:34px;margin-bottom:34px;border-bottom:1px solid #F1F5F9}' +
+    '#pc-widget .pcw-job:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}' +
+    '#pc-widget .pcw-h3{font-size:19px;font-weight:800;margin-bottom:6px;line-height:1.3;letter-spacing:-.01em}' +
+    '#pc-widget .pcw-meta{font-size:12.5px;color:#94A3B8;margin-bottom:16px}' +
+    '#pc-widget .pcw-photos{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}' +
+    '.pcw-photo{width:210px;height:150px;object-fit:cover;border-radius:6px;border:1px solid #E2E8F0;display:block;background:#F1F5F9}' +
+    '@media(max-width:700px){.pcw-photo{width:100%;height:190px}}' +
+    '#pc-widget .pcw-desc{font-size:13.5px;color:#374151;line-height:1.8;margin-bottom:14px;max-width:760px;white-space:pre-wrap;padding-left:14px;border-left:3px solid #e8a83a}' +
+    '#pc-widget .pcw-jlinks{display:flex;gap:18px;align-items:center;flex-wrap:wrap}' +
+    '.pcw-pck{font-size:12px;color:#94A3B8;text-decoration:none}' +
+    '.pcw-share{font-size:12px;color:#0284C7;text-decoration:none;font-weight:600}' +
     '#pc-widget .pcw-morewrap{text-align:center;margin:28px 0 32px}' +
     '.pcw-more{display:inline-flex;align-items:center;gap:6px;padding:9px 24px;border-radius:8px;font-size:13px;font-weight:600;border:1.5px solid #E2E8F0;color:#475569;background:#fff;cursor:pointer;font-family:inherit}' +
     '#pc-widget .pcw-jsonld{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#64748B;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:5px 10px;margin-bottom:20px}' +
@@ -137,34 +135,8 @@
     '#pc-widget .pcw-foot{text-align:center;padding-top:24px;border-top:1px solid #F1F5F9}' +
     '.pcw-foot a{font-size:11.5px;font-weight:600;color:#94A3B8;text-decoration:none}' +
     '.pcw-foot b{color:#F97316;font-weight:700}' +
-    '.pcw-overlay{position:fixed;inset:0;background:rgba(15,23,42,.62);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px}' +
-    // Modal width/photo-height are orientation-aware: JS toggles .pcw-landscape /
-    // .pcw-portrait on the modal once the photo's natural dimensions are known, so a
-    // portrait job gets a narrower-but-taller modal and a landscape job gets a
-    // wider-but-shorter one. object-fit:contain means the whole photo always shows —
-    // nothing gets cropped the way a fixed-height + cover box used to.
-    '.pcw-modal{background:#fff;border-radius:14px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative;transition:max-width .15s ease}' +
-    '.pcw-modal.pcw-landscape{max-width:640px}' +
-    '.pcw-modal.pcw-portrait{max-width:420px}' +
-    '.pcw-mphotowrap{position:relative;background:#0F172A;display:flex;align-items:center;justify-content:center;overflow:hidden}' +
-    '.pcw-modal.pcw-landscape .pcw-mphotowrap{max-height:420px}' +
-    '.pcw-modal.pcw-portrait .pcw-mphotowrap{max-height:560px}' +
-    '.pcw-mphoto{width:100%;height:100%;object-fit:contain;display:block}' +
-    '.pcw-close{position:absolute;top:12px;right:12px;width:32px;height:32px;background:rgba(0,0,0,.4);border-radius:50%;border:none;color:#fff;cursor:pointer;font-size:18px;line-height:1}' +
-    '.pcw-arrow{position:absolute;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;border:none;background:rgba(0,0,0,.4);color:#fff;cursor:pointer;font-size:16px;line-height:1}' +
-    // The modal is appended to document.body (not inside #pc-widget — see openModal()),
-    // so the #pc-widget * reset never reaches it; these are never in specificity
-    // conflict and stay as plain classes.
-    '.pcw-mbody{padding:22px 24px 0}' +
-    '.pcw-mlabel{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94A3B8;margin-bottom:5px}' +
-    '.pcw-mh2{font-size:21px;font-weight:800;margin-bottom:8px;line-height:1.25}' +
-    '.pcw-mloc{font-size:13px;color:#64748B;margin-bottom:18px}' +
-    '.pcw-mdesc{font-size:13.5px;color:#374151;line-height:1.75;margin-bottom:20px;max-height:220px;overflow-y:auto;white-space:pre-wrap;padding-left:14px;border-left:3px solid #e8a83a}' +
-    '.pcw-mfoot{padding:16px 24px;border-top:1px solid #F1F5F9;display:flex;align-items:center;justify-content:space-between;gap:12px}' +
-    '.pcw-mlinks{display:flex;flex-direction:column;gap:5px;min-width:0}' +
-    '.pcw-share{font-size:12px;color:#0284C7;text-decoration:none;font-weight:600}' +
-    '.pcw-pck{font-size:11px;color:#94A3B8;text-decoration:none}' +
-    '.pcw-est{background:#0F172A;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;text-decoration:none;flex-shrink:0;font-family:inherit}';
+    '#pc-widget .pcw-estwrap{text-align:center;margin:0 0 30px}' +
+    '.pcw-est{background:#0F172A;color:#fff;padding:11px 22px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;text-decoration:none;display:inline-block;font-family:inherit}';
 
   // ── JSON-LD ──────────────────────────────────────────────────────────
 
@@ -270,6 +242,17 @@
     moreWrap.appendChild(moreBtn);
     mount.appendChild(moreWrap);
 
+    // One estimate CTA for the whole page. Repeating it under every job read as
+    // spam once job detail moved inline.
+    var estHref = state.org.portfolioPageUrl ? safeHref(state.org.portfolioPageUrl) : null;
+    if (estHref) {
+      var estWrap = el('div', 'pcw-estwrap');
+      var est = el('a', 'pcw-est', 'Get a free estimate');
+      est.href = estHref;
+      estWrap.appendChild(est);
+      mount.appendChild(estWrap);
+    }
+
     var badge = el('div', 'pcw-jsonld');
     badge.appendChild(el('span', 'pcw-dot'));
     badge.appendChild(document.createTextNode('JSON-LD schema active'));
@@ -334,11 +317,9 @@
         h2.appendChild(el('span', 'pcw-count', n + (n === 1 ? ' job' : ' jobs')));
         group.appendChild(h2);
 
-        var grid = el('div', 'pcw-grid');
         groups[key].forEach(function (job) {
-          grid.appendChild(buildCard(job, state));
+          group.appendChild(buildJob(job, state));
         });
-        group.appendChild(grid);
         groupsWrap.appendChild(group);
       });
     }
@@ -366,138 +347,67 @@
     moreWrap.style.display = state.jobs.length < state.total ? '' : 'none';
   }
 
-  function buildCard(job, state) {
-    var card = el('div', 'pcw-card');
-    var photo = cardPhoto(job);
-    if (photo) {
-      var img = el('img', 'pcw-photo');
-      img.src = photo;
-      img.alt = job.jobType + ' in ' + cityLabel(job);
-      img.loading = 'lazy';
-      card.appendChild(img);
-    } else {
-      card.appendChild(el('div', 'pcw-nophoto'));
-    }
-    var body = el('div', 'pcw-cbody');
-    body.appendChild(el('h3', 'pcw-h3', job.jobType));
-    var meta = [cityLabel(job), shortDate(job)].filter(Boolean).join(' · ');
-    if (meta) body.appendChild(el('div', 'pcw-meta', meta));
-    if (job.description) body.appendChild(el('div', 'pcw-snip', job.description.slice(0, 120)));
-    card.appendChild(body);
-    card.onclick = function () { openModal(job, state); };
-    return card;
-  }
-
-  // ── job modal ────────────────────────────────────────────────────────
-
-  function openModal(job, state) {
+  // Renders one job fully inline. Everything here — heading, full description and
+  // photos — is in the DOM as soon as the widget runs, with nothing behind a click,
+  // so the host page carries the whole job as its own content.
+  function buildJob(job, state) {
     var slug = hashSlug(job);
-    try { window.history.pushState(null, '', window.location.pathname + '#' + slug); } catch (e) {}
+    var wrap = el('div', 'pcw-job');
+    wrap.id = slug; // keeps shared #job links working, and matches the JSON-LD item url
 
-    var photos = modalPhotos(job);
-    var photoIdx = 0;
+    wrap.appendChild(el('h3', 'pcw-h3', job.jobType + (cityLabel(job) ? ' — ' + cityLabel(job) : '')));
 
-    var overlay = el('div', 'pcw-overlay');
-    var modal = el('div', 'pcw-modal');
-    overlay.appendChild(modal);
+    var meta = [cityLabel(job), longDate(job), job.jobType].filter(Boolean).join(' · ');
+    if (meta) wrap.appendChild(el('div', 'pcw-meta', meta));
 
-    function close() {
-      try { window.history.pushState(null, '', window.location.pathname); } catch (e) {}
-      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-      document.removeEventListener('keydown', onKey);
-    }
-    function onKey(e) { if (e.key === 'Escape') close(); }
-    document.addEventListener('keydown', onKey);
-    overlay.onclick = function (e) { if (e.target === overlay) close(); };
-
-    // Photo area — modal size adapts to each photo's orientation (checked on every
-    // load, since photos on the same job can mix portrait and landscape) so nothing
-    // gets cropped: a portrait photo gets a narrower/taller modal, landscape gets
-    // wider/shorter. Defaults to landscape sizing until the first photo's real
-    // dimensions are known.
+    var photos = jobPhotos(job).slice(0, 3);
     if (photos.length) {
-      modal.classList.add('pcw-landscape');
-      var wrap = el('div', 'pcw-mphotowrap');
-      var img = el('img', 'pcw-mphoto');
-      img.alt = job.jobType + ' in ' + cityLabel(job) + ' — ' + job.jobType + ' service';
-      img.onload = function () {
-        if (!img.naturalWidth || !img.naturalHeight) return;
-        var isPortrait = img.naturalHeight > img.naturalWidth;
-        modal.classList.toggle('pcw-portrait', isPortrait);
-        modal.classList.toggle('pcw-landscape', !isPortrait);
-      };
-      img.src = photos[0];
-      wrap.appendChild(img);
-      if (photos.length > 1) {
-        var prev = el('button', 'pcw-arrow', '‹');
-        prev.type = 'button';
-        prev.style.left = '12px';
-        var next = el('button', 'pcw-arrow', '›');
-        next.type = 'button';
-        next.style.right = '12px';
-        prev.onclick = function () { photoIdx = (photoIdx - 1 + photos.length) % photos.length; img.src = photos[photoIdx]; };
-        next.onclick = function () { photoIdx = (photoIdx + 1) % photos.length; img.src = photos[photoIdx]; };
-        wrap.appendChild(prev);
-        wrap.appendChild(next);
-      }
-      var closeBtn = el('button', 'pcw-close', '×');
-      closeBtn.type = 'button';
-      closeBtn.onclick = close;
-      wrap.appendChild(closeBtn);
-      modal.appendChild(wrap);
-    } else {
-      var bar = el('div', '');
-      bar.style.cssText = 'position:relative;height:48px';
-      var cb = el('button', 'pcw-close', '×');
-      cb.type = 'button';
-      cb.onclick = close;
-      bar.appendChild(cb);
-      modal.appendChild(bar);
+      var row = el('div', 'pcw-photos');
+      photos.forEach(function (src, i) {
+        var img = el('img', 'pcw-photo');
+        img.src = src;
+        img.alt = job.jobType + (cityLabel(job) ? ' in ' + cityLabel(job) : '') +
+          ' — ' + state.org.name + (i > 0 ? ' (photo ' + (i + 1) + ')' : '');
+        img.loading = 'lazy';
+        row.appendChild(img);
+      });
+      wrap.appendChild(row);
     }
 
-    // Body
-    var body = el('div', 'pcw-mbody');
-    body.appendChild(el('div', 'pcw-mlabel', 'Completed job'));
-    body.appendChild(el('h2', 'pcw-mh2', job.jobType + (cityLabel(job) ? ' — ' + cityLabel(job) : '')));
-    var loc = ['📍 ' + (cityLabel(job) || ''), longDate(job), job.jobType].filter(Boolean).join(' · ');
-    body.appendChild(el('div', 'pcw-mloc', loc));
-    if (job.description) body.appendChild(el('div', 'pcw-mdesc', job.description));
-    modal.appendChild(body);
+    if (job.description) wrap.appendChild(el('div', 'pcw-desc', job.description));
 
-    // Footer
-    var foot = el('div', 'pcw-mfoot');
-    var links = el('div', 'pcw-mlinks');
+    var links = el('div', 'pcw-jlinks');
     var share = el('a', 'pcw-share', 'Share this job →');
     share.href = window.location.pathname + '#' + slug;
     links.appendChild(share);
+
     var pckHref = safeHref(job.pckUrl);
     if (pckHref) {
       var pck = el('a', 'pcw-pck', 'Also on projectcheckin.com →');
       pck.href = pckHref;
       pck.target = '_blank';
-      pck.rel = 'noopener';
+      // Per-job links repeat across every customer site running this widget, which is
+      // the pattern Google's link-spam policy names. The single footer attribution
+      // link is deliberately followable; these are not.
+      pck.rel = 'noopener nofollow';
       links.appendChild(pck);
     }
-    foot.appendChild(links);
-    var estHref = state.org.portfolioPageUrl ? safeHref(state.org.portfolioPageUrl) : null;
-    if (estHref) {
-      var est = el('a', 'pcw-est', 'Get a free estimate');
-      est.href = estHref;
-      foot.appendChild(est);
-    }
-    modal.appendChild(foot);
+    wrap.appendChild(links);
 
-    document.body.appendChild(overlay);
+    return wrap;
   }
 
-  // Open a job modal directly when the page is loaded with a job hash (shared links)
-  function openFromHash(state) {
+  // A shared #job link lands on a job that is already in the page, so this only has
+  // to scroll to it — the content is present either way.
+  function scrollToHash(state) {
     var h = window.location.hash.replace(/^#/, '');
     if (!h) return;
-    for (var i = 0; i < state.jobs.length; i++) {
-      if (hashSlug(state.jobs[i]) === h) { openModal(state.jobs[i], state); return; }
+    var target = document.getElementById(h);
+    if (target && target.scrollIntoView) {
+      try { target.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { target.scrollIntoView(); }
     }
   }
+
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
