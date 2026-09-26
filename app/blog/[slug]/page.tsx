@@ -17,6 +17,9 @@ import GoogleReviews2026, {
 import GbpNotShowingUp2026, {
   FAQ_ITEMS as GBP_NOT_SHOWING_FAQ,
 } from '@/components/blog/GbpNotShowingUp2026'
+import BestFreeLocalSeoTools, {
+  FAQ_ITEMS as BEST_FREE_TOOLS_FAQ,
+} from '@/components/blog/BestFreeLocalSeoTools'
 import {
   BLOG_POSTS,
   getPostBySlug,
@@ -57,6 +60,10 @@ const POST_CONTENT: Record<
   'why-google-business-profile-not-showing-up-maps': {
     Body: GbpNotShowingUp2026,
     faq: GBP_NOT_SHOWING_FAQ,
+  },
+  'best-free-local-seo-tools': {
+    Body: BestFreeLocalSeoTools,
+    faq: BEST_FREE_TOOLS_FAQ,
   },
 }
 
