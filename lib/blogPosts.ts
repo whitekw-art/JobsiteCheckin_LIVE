@@ -39,6 +39,22 @@ export type BlogPost = {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: 'best-free-local-seo-tools',
+    title: 'Best Free Local SEO Tools (2026)',
+    excerpt:
+      'Twenty-one tools that cost nothing, grouped by whether they publish, measure, research or diagnose, and what each free tier stops short of.',
+    metaDescription:
+      'The local SEO tools that are genuinely free, grouped by what each one does: publishing your business, measuring performance, researching demand, and fixing the site. What each free tier includes, and where it stops.',
+    category: 'Local SEO',
+    publishedISO: '2026-09-26',
+    modifiedISO: '2026-09-26',
+    publishedLabel: 'September 2026',
+    readTimeMinutes: 12,
+    subhead:
+      'The tools that cost nothing, grouped by the job each one does, with the limit of every free tier stated.',
+    kicker: 'Local SEO Guide \u2014 2026',
+  },
+  {
     slug: 'why-google-business-profile-not-showing-up-maps',
     title: "Why Isn't My Google Business Profile Showing Up on Google Maps?",
     excerpt:
