@@ -139,6 +139,39 @@ function renderBlock(block: PageBlock, toc: { id: string; label: string }[]): Re
         </nav>
       )
 
+    case 'table_block': {
+      const head = block.table?.thead ?? []
+      const rows = block.table?.tbody ?? []
+      if (head.length === 0 && rows.length === 0) return null
+      return (
+        <div className="blog-table-wrap" key={block._uid} {...edit}>
+          <table className="blog-table">
+            {head.length > 0 && (
+              <thead>
+                <tr>
+                  {head.map((cell, i) => (
+                    <th key={`${block._uid}-th-${i}`} scope="col">
+                      {cell.value}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            )}
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={`${block._uid}-tr-${i}`}>
+                  {(row.body ?? []).map((cell, j) => (
+                    <td key={`${block._uid}-td-${i}-${j}`}>{cell.value}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {block.caption && <p className="blog-table-caption">{block.caption}</p>}
+        </div>
+      )
+    }
+
     case 'text_section':
       return (
         <Fragment key={block._uid}>

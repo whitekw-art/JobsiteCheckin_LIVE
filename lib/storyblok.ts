@@ -113,6 +113,23 @@ export type FactorBlock = BlockBase &
     divider_after?: boolean
   }
 
+/**
+ * Storyblok's native Table field. Authored in the editor as a real table, so
+ * rows and columns are editable without a custom row component per table.
+ */
+export type StoryblokTableCell = { _uid?: string; value?: string }
+export type StoryblokTable = {
+  fieldtype?: 'table'
+  thead?: StoryblokTableCell[]
+  tbody?: { _uid?: string; body?: StoryblokTableCell[] }[]
+}
+
+export type TableBlock = BlockBase & {
+  component: 'table_block'
+  caption?: string
+  table?: StoryblokTable
+}
+
 export type PageBlock =
   | IntroBlock
   | TocBlock
@@ -121,6 +138,7 @@ export type PageBlock =
   | FigureBarChart
   | FactorBlock
   | ImageBlock
+  | TableBlock
   | FaqSection
   | SourcesSection
   | CtaSection
