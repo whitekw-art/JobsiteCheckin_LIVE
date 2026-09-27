@@ -43,6 +43,10 @@ export async function GET() {
         email: true,
         trade: true,
         productOptions: true,
+        // Read back so the Interactive Tutorial can round-trip it unchanged. The
+        // onboarding PATCH writes null for any field it is not given, so a replay
+        // that omitted this would erase the original answer.
+        howHeardAbout: true,
         gbpReviewLink: true,
         portfolioPageUrl: true,
         portfolioIntro: true,

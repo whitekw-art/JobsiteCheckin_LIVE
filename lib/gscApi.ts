@@ -1,5 +1,6 @@
 import { google } from 'googleapis'
 import { encryptCredential, decryptCredential, encryptionConfigured } from '@/lib/wpCredentials'
+import { isInvalidGrant } from '@/lib/googleOAuthErrors'
 
 // Google Search Console client for the Reporting tab (Elite + Titan).
 //
@@ -318,9 +319,18 @@ function round1(n: number): number {
  * gone. Since `needsReconnect` now persists to the database and flips the
  * customer's connection card, a false positive is worse than a retryable
  * error, so 403 falls through to the generic path.
+ *
+ * WIDENED to also cover `invalid_grant`, 2026-09-26. A refresh token Google
+ * has rejected never reaches this API at all — it fails earlier, at the token
+ * endpoint, with a 400 that the status check below cannot recognize. See
+ * `isInvalidGrant` for the full account of the bug that produced.
  */
 function classify(err: unknown, fallback: string): { error: string; needsReconnect?: boolean } {
   const status = (err as { code?: number; status?: number })?.code ?? (err as { status?: number })?.status
+  if (isInvalidGrant(err)) {
+    console.warn('GSC: refresh token rejected by Google (invalid_grant)')
+    return { error: 'Your Google connection is no longer active. Please connect again.', needsReconnect: true }
+  }
   if (status === 401) {
     console.warn('GSC: authorization rejected', status)
     return { error: 'Your Google connection is no longer active. Please connect again.', needsReconnect: true }

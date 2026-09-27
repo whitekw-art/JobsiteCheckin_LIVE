@@ -227,6 +227,13 @@ function IcoHelp() {
     </svg>
   )
 }
+function IcoNavChevron() {
+  return (
+    <svg className="db-nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  )
+}
 function IcoPlus() {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -547,6 +554,10 @@ export default function Dashboard() {
   // UI state
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  // This page carries its own copy of the sidebar, predating DashboardShell.
+  // The group always starts collapsed here, because no route under /help can
+  // ever be the current page while this sidebar is the one being rendered.
+  const [supportOpen, setSupportOpen] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [activeFilter, setActiveFilter] = useState<'all' | 'live' | 'draft'>('all')
   const [installerFilter, setInstallerFilter] = useState('all')
@@ -1510,10 +1521,30 @@ export default function Dashboard() {
               </Link>
             )}
 
-            <Link className="db-nav-item" href="/help" onClick={() => setSidebarOpen(false)}>
+            <button
+              type="button"
+              className="db-nav-item"
+              aria-expanded={supportOpen}
+              aria-controls="db-nav-support-jobs"
+              onClick={() => setSupportOpen((o) => !o)}
+            >
               <IcoHelp />
-              Help
-            </Link>
+              Support Center
+              <IcoNavChevron />
+            </button>
+
+            {supportOpen && (
+              <div className="db-nav-children" id="db-nav-support-jobs">
+                <Link className="db-nav-child" href="/help" onClick={() => setSidebarOpen(false)}>
+                  <span className="db-nav-child-dot" />
+                  Guides
+                </Link>
+                <Link className="db-nav-child" href="/help/tutorial" onClick={() => setSidebarOpen(false)}>
+                  <span className="db-nav-child-dot" />
+                  Interactive Tutorial
+                </Link>
+              </div>
+            )}
 
             <button className="db-nav-item" onClick={() => { setSidebarOpen(false); localStorage.removeItem('gbp_connected'); localStorage.removeItem('gbp_post_mode'); signOut() }}>
               <IcoSignOut />
