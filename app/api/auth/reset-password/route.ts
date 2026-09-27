@@ -13,6 +13,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 })
     }
 
+    // Enforced HERE, not only on the page. This route was the one password
+    // write path with no server-side length check, so a request posted
+    // directly with a valid token could set a one-character password while
+    // registration, invite acceptance and the in-app change all required 8.
+    if (password.length < 8) {
+      return NextResponse.json(
+        { success: false, error: 'Password must be at least 8 characters.' },
+        { status: 400 }
+      )
+    }
+
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
 
     const resetToken = await prisma.passwordResetToken.findFirst({

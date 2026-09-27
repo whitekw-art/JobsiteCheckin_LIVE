@@ -179,6 +179,80 @@
 .db-nav-item.active .db-nav-ico,
 .db-nav-item:hover  .db-nav-ico { opacity: 1; }
 
+/* ── Expandable nav group (Support Center) ──────────────────────────────────
+   One parent row that only toggles, plus its child links. The parent reuses
+   .db-nav-item wholesale so its height, padding and hover match every other
+   row; the rules here add just the chevron and the child list. */
+.db-nav-chev {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  margin-left: auto;
+  opacity: .5;
+  transition: transform .15s;
+}
+.db-nav-item[aria-expanded="true"] .db-nav-chev { transform: rotate(90deg); }
+
+/* Collapsed, the parent is the only clue that your page lives in this group,
+   so it darkens rather than taking the full active treatment. Using `active`
+   here would claim a second page is open. */
+.db-nav-item.has-active-child {
+  color: var(--t1);
+  font-weight: 600;
+}
+.db-nav-item.has-active-child .db-nav-ico { opacity: 1; }
+
+.db-nav-children {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 1px 0 2px;
+}
+
+/* 33px of left padding lines the child text up with the PARENT'S LABEL rather
+   than its icon, which is what makes the group read as a hierarchy. */
+.db-nav-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px 33px;
+  border-radius: 6px;
+  color: var(--t2);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: background .12s, color .12s;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.db-nav-child:hover {
+  background: var(--surface-3);
+  color: var(--t1);
+}
+.db-nav-child.active {
+  background: var(--sky-dim);
+  color: var(--sky-text);
+  border-left-color: var(--sky);
+  padding-left: 31px;
+  font-weight: 600;
+}
+.db-nav-child-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: .4;
+  flex-shrink: 0;
+}
+.db-nav-child.active .db-nav-child-dot { opacity: 1; }
+
+/* Touch targets. At the desktop 7px padding these rows land at 34px, which is
+   awkward on a phone, so the drawer gets 11px for a measured 42px row. Same
+   correction already applied to the blog table-of-contents links. */
+@media (max-width: 768px) {
+  .db-nav-child { padding-top: 11px; padding-bottom: 11px; }
+}
+
 .db-sidebar-footer {
   border-top: 1px solid var(--border);
   padding: 12px 14px;
@@ -1169,11 +1243,58 @@
   padding: 20px 24px;
   margin-bottom: 16px;
 }
+/* ── Heading scale ──────────────────────────────────────────────────────────
+   These three tiers used to sit within 2px of each other at the same weight,
+   which read as one flat list rather than a hierarchy: a section title at 14px
+   bold barely outranked the field labels at 12px bold directly beneath it.
+   The gaps below are what make a header look like a header.
+
+     card title      17px   tight tracking, --t1   section of a page
+     subsection      15px   tight tracking, --t1   a block inside a section
+     field label     12px   uppercase, --t2        (see .db-shell-label)
+
+   Case and tracking already separate the field label, so size and colour do
+   the work at the top of the scale. */
 .db-shell-card-title {
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--t1);
-  margin-bottom: 16px;
+  letter-spacing: -.2px;
+  line-height: 1.3;
+  margin-bottom: 18px;
+}
+
+/* ── Account → General two-column layout ────────────────────────────────────
+   Business Profile is long and Sign-In & Security is short, so side by side
+   fills the dead space the single 520px column used to leave.
+
+   Source order is security-first so that the stacked layout leads with it, as
+   asked. `order` corrects the desktop arrangement, which keeps one copy of the
+   markup rather than rendering the card twice at different breakpoints. */
+.acct-general-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 520px) minmax(0, 380px);
+  gap: 16px;
+  align-items: start;
+}
+.acct-col-business { order: 1; }
+.acct-col-security { order: 2; }
+
+@media (max-width: 980px) {
+  .acct-general-grid { grid-template-columns: minmax(0, 520px); }
+  /* Stacked, security comes first. */
+  .acct-col-security { order: 0; }
+}
+
+/* A titled block nested inside a card — "AI Business Profile" under Business
+   Profile. Outranks the labels it introduces without competing with the card
+   title above it. */
+.db-shell-subsection-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -.15px;
+  line-height: 1.3;
 }
 
 /* Shell table */

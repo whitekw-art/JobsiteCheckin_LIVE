@@ -14,10 +14,22 @@ export async function POST(request: Request) {
 
     const normalizedEmail = email.toLowerCase().trim()
 
-    const user = await prisma.user.findUnique({
+    // Resolved against backup addresses as well as the primary. That is the
+    // entire point of a backup: losing access to one inbox must not lock the
+    // account out. Sign-in itself stays primary-only, so this widens recovery
+    // without widening the credential surface.
+    let user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
       select: { id: true, email: true },
     })
+
+    if (!user) {
+      const backup = await prisma.userEmail.findUnique({
+        where: { email: normalizedEmail },
+        select: { user: { select: { id: true, email: true } } },
+      })
+      user = backup?.user ?? null
+    }
 
     if (user) {
       const token = crypto.randomBytes(32).toString('hex')
@@ -51,7 +63,11 @@ export async function POST(request: Request) {
           },
           body: JSON.stringify({
             from,
-            to: user.email,
+            // Sent to the address that was ENTERED, not the account's primary.
+            // Both are verified and belong to this user, and someone reaching
+            // for a backup has usually lost access to the primary inbox —
+            // delivering there would defeat the point of having a backup.
+            to: normalizedEmail,
             subject: 'Reset your ProjectCheckin password',
             html: `
               <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">

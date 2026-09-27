@@ -38,11 +38,24 @@ const PLAN_FEATURES: Record<string, string[]> = {
 interface Props {
   planTier?: string | null
   orgSlug?: string | null
+  /**
+   * Replay mode, used by the Interactive Tutorial in the Support Center.
+   *
+   * First-run onboarding is deliberately a one-way trip: it is forced, it has
+   * no exit, and finishing it marks the account complete. A customer coming
+   * back to refresh their memory needs the opposite on all three counts, so
+   * replay starts from step 1 rather than resuming a stale saved position,
+   * offers a way out at any point, and never touches the completion flag,
+   * which is already set and must not be rewritten.
+   */
+  replay?: boolean
+  /** Called when a replay is closed or finished. Ignored during first run. */
+  onExit?: () => void
 }
 
 const ONBOARDING_STEP_KEY = 'pc_onboarding_step'
 
-export default function OnboardingModal({ planTier, orgSlug }: Props) {
+export default function OnboardingModal({ planTier, orgSlug, replay = false, onExit }: Props) {
   const isTitan = (planTier ?? 'free').toLowerCase() === 'titan'
   // Widget setup step (step 6) — Titan only, gated by the website_integration feature
   const hasWidgetStep = tierHasFeature(planTier, 'website_integration')
@@ -50,13 +63,19 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
 
   const [step, setStepState] = useState<number>(() => {
     if (typeof window === 'undefined') return 1
+    // A replay always opens at the beginning. Resuming here would drop someone
+    // into the middle of a walkthrough they chose to restart.
+    if (replay) return 1
     const saved = parseInt(localStorage.getItem(ONBOARDING_STEP_KEY) || '1', 10)
     const max = tierHasFeature(planTier, 'website_integration') ? 6 : 5
     return (saved >= 1 && saved <= max) ? saved : 1
   })
 
   const setStep = (n: number) => {
-    localStorage.setItem(ONBOARDING_STEP_KEY, String(n))
+    // Replay leaves the saved position alone. Writing to it would let a browse
+    // through the tutorial overwrite a genuine first run left half-finished in
+    // another tab.
+    if (!replay) localStorage.setItem(ONBOARDING_STEP_KEY, String(n))
     setStepState(n)
   }
 
@@ -147,14 +166,75 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
     }
   }, [aiServices, aiProducts, aiServiceArea, aiAbout])
 
-  // Suppress ESC key while modal is mounted
+  // ESC is swallowed during first run, which is forced and has no way out.
+  // A replay is something the customer opened on purpose, so there ESC closes
+  // it like any other dismissible dialog.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') e.preventDefault()
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      if (replay) onExit?.()
     }
     document.addEventListener('keydown', handler, true)
     return () => document.removeEventListener('keydown', handler, true)
-  }, [])
+  }, [replay, onExit])
+
+  // ── Replay prefill ────────────────────────────────────────────────────────
+  // First run starts blank because there is genuinely nothing saved yet. A
+  // replay runs against an established account, so opening it blank is not
+  // merely inconvenient: `/api/organization/onboarding` writes null for every
+  // field it is not given, so advancing past step 2 with empty boxes would
+  // erase the phone, website, trade and how-heard answers outright.
+  //
+  // Seeding from the same endpoint the Account page reads means the customer
+  // sees what they already have and saves it back unchanged.
+  const [prefillLoaded, setPrefillLoaded] = useState(!replay)
+  const [heardAboutSaved, setHeardAboutSaved] = useState('')
+
+  useEffect(() => {
+    if (!replay) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/organization/profile')
+        if (!res.ok) return
+        const { organization: org } = await res.json()
+        if (cancelled || !org) return
+
+        setBizName(org.name ?? '')
+        setBizPhone(org.phone ?? '')
+        setBizWebsite(org.website ?? '')
+        setTrade(org.trade ?? '')
+        setGbpReviewLink(org.gbpReviewLink ?? '')
+        setWUrl(org.portfolioPageUrl ?? '')
+        if (org.slug) setSavedSlug(org.slug)
+        // Held separately and posted back verbatim. The field itself stays
+        // hidden on replay, since asking again how someone found us a year on
+        // is noise, but omitting it would null the original answer.
+        setHeardAboutSaved(org.howHeardAbout ?? '')
+
+        if (org.businessContext) {
+          try {
+            const ctx = JSON.parse(org.businessContext)
+            setAiServices(ctx.services ?? '')
+            setAiProducts(ctx.products ?? '')
+            setAiServiceArea(ctx.serviceArea ?? '')
+            setAiAbout(ctx.businessDescription ?? '')
+            setAiScraped(true)
+          } catch { /* malformed context is not worth failing the replay over */ }
+        }
+      } catch { /* leave the form empty rather than blocking the tutorial */ }
+      finally {
+        if (!cancelled) setPrefillLoaded(true)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [replay])
+
+  // "Skip for now" is right on a first run, where the step is genuinely
+  // deferred. On a replay nothing is pending, so the label says what the
+  // button actually does: move on without writing anything.
+  const skipLabel = replay ? 'Skip — no changes' : 'Skip for now'
 
   const formatPhone = (v: string) => {
     const d = v.replace(/\D/g, '').slice(0, 10)
@@ -178,7 +258,11 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
           phone:         bizPhone.trim() || undefined,
           website:       bizWebsite.trim() || undefined,
           trade:         trade || undefined,
-          howHeardAbout: heardAbout === 'Other' ? heardOther.trim() : heardAbout || undefined,
+          // On replay the question is hidden, so the stored answer is sent
+          // straight back. Letting it fall through as undefined would null it.
+          howHeardAbout: replay
+            ? (heardAboutSaved || undefined)
+            : (heardAbout === 'Other' ? heardOther.trim() : heardAbout || undefined),
         }),
       })
       const data = await res.json().catch(() => null)
@@ -229,6 +313,13 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
   }
 
   const handleFinish = async () => {
+    // A replay hands control back to the page that opened it. The completion
+    // flag is already set, the saved step belongs to first run, and a hard
+    // redirect to the dashboard would throw away where the customer was.
+    if (replay) {
+      onExit?.()
+      return
+    }
     await fetch('/api/organization/complete-onboarding', { method: 'POST' })
     await fetch('/api/auth/session')
     localStorage.removeItem(ONBOARDING_STEP_KEY)
@@ -286,8 +377,28 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
   const features = PLAN_FEATURES[tier] || PLAN_FEATURES.free
 
   return (
-    <div style={styles.backdrop} aria-modal="true" role="dialog" aria-label="Account setup">
+    <div style={styles.backdrop} aria-modal="true" role="dialog" aria-label={replay ? 'Interactive tutorial' : 'Account setup'}>
       <div style={styles.modal}>
+
+        {/* Replay only. First run has no close button by design — it is the
+            one flow a new account must complete before reaching the app. */}
+        {replay && (
+          <button
+            type="button"
+            onClick={() => onExit?.()}
+            aria-label="Close tutorial"
+            style={{
+              position: 'absolute', top: 14, right: 14, width: 30, height: 30,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 8, border: '1px solid #E2E8F0', background: '#fff',
+              color: '#64748B', cursor: 'pointer', padding: 0, lineHeight: 0,
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        )}
 
         {/* Progress dots — 5 base, +1 for Titan AI step, +1 for Titan widget step */}
         {(() => {
@@ -400,12 +511,23 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                     </>
                   )}
                 </button>
+
+                {replay && (
+                  <button
+                    type="button"
+                    style={styles.btnSkip}
+                    disabled={aiSaving}
+                    onClick={() => { setShowAiResearch(false); setStep(3) }}
+                  >
+                    Skip — no changes
+                  </button>
+                )}
               </div>
             )}
 
             {!aiScraped && (
               <button onClick={() => { setShowAiResearch(false); setStep(3) }} style={styles.btnSkip}>
-                Skip for now
+                {skipLabel}
               </button>
             )}
           </div>
@@ -521,34 +643,40 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                 </span>
               </div>
 
-              <div style={styles.field}>
-                <label style={styles.label} htmlFor="ob-heard">How did you hear about us?</label>
-                <select
-                  id="ob-heard"
-                  style={styles.select}
-                  value={heardAbout}
-                  onChange={e => setHeardAbout(e.target.value)}
-                >
-                  <option value="">Select one</option>
-                  {HEARD_ABOUT.map(h => <option key={h} value={h}>{h}</option>)}
-                </select>
-                {heardAbout === 'Other' && (
-                  <input
-                    type="text"
-                    style={{ ...styles.input, marginTop: '8px' }}
-                    placeholder="Tell us more…"
-                    value={heardOther}
-                    onChange={e => setHeardOther(e.target.value)}
-                  />
-                )}
-              </div>
+              {/* Asked once, at signup. A replay keeps the original answer and
+                  posts it back untouched rather than asking again. */}
+              {!replay && (
+                <div style={styles.field}>
+                  <label style={styles.label} htmlFor="ob-heard">How did you hear about us?</label>
+                  <select
+                    id="ob-heard"
+                    style={styles.select}
+                    value={heardAbout}
+                    onChange={e => setHeardAbout(e.target.value)}
+                  >
+                    <option value="">Select one</option>
+                    {HEARD_ABOUT.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                  {heardAbout === 'Other' && (
+                    <input
+                      type="text"
+                      style={{ ...styles.input, marginTop: '8px' }}
+                      placeholder="Tell us more…"
+                      value={heardOther}
+                      onChange={e => setHeardOther(e.target.value)}
+                    />
+                  )}
+                </div>
+              )}
 
               {error && <div style={styles.errorBox}>{error}</div>}
 
+              {/* Held until the prefill lands, so a replay can never save a
+                  form that merely has not been filled in yet. */}
               <button
-                style={{ ...styles.btnPrimary, ...(submitting ? styles.btnDisabled : {}) }}
+                style={{ ...styles.btnPrimary, ...(submitting || !prefillLoaded ? styles.btnDisabled : {}) }}
                 onClick={handleStep2Submit}
-                disabled={submitting}
+                disabled={submitting || !prefillLoaded}
               >
                 {submitting ? (
                   <>
@@ -568,6 +696,20 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                   </>
                 )}
               </button>
+
+              {/* Replay only. Advancing without calling the save endpoint is
+                  the one path that cannot alter anything, so someone reading
+                  back through the walkthrough never risks their own record. */}
+              {replay && (
+                <button
+                  type="button"
+                  style={styles.btnSkip}
+                  disabled={submitting}
+                  onClick={() => { setError(null); isTitan ? setShowAiResearch(true) : setStep(3) }}
+                >
+                  Skip — no changes
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -640,7 +782,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                 stroke="white" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/>
                 <polyline points="12 5 19 12 12 19"/></svg>
             </button>
-            <button onClick={() => setStep(4)} style={styles.btnSkip}>Skip for now</button>
+            <button onClick={() => setStep(4)} style={styles.btnSkip}>{skipLabel}</button>
           </div>
         )}
 
@@ -699,7 +841,7 @@ export default function OnboardingModal({ planTier, orgSlug }: Props) {
                 </>
               )}
             </button>
-            <button onClick={() => setStep(5)} style={styles.btnSkip}>Skip for now</button>
+            <button onClick={() => setStep(5)} style={styles.btnSkip}>{skipLabel}</button>
           </div>
         )}
 

@@ -138,7 +138,7 @@ export default function HelpPage() {
           <p style={pLast}><strong style={strongC}>Billing</strong> — view your plan, update your payment method, or cancel.</p>
         </HelpSection>
 
-        <HelpSection title="Billing & Plans" sub="Subscriptions, cancellations, and refunds" defaultOpen>
+        <HelpSection title="Billing & Plans" sub="Subscriptions and cancellations" defaultOpen>
           <p style={p}>
             ProjectCheckin has four plans — Free, Pro, Elite, and Titan — priced from $0 to $598/month depending on features and monthly photo volume. See full plan details on the <Link href="/pricing" style={link}>Pricing page</Link>.
           </p>
@@ -161,12 +161,6 @@ export default function HelpPage() {
           <HelpSubsection title="Re-enrolling after canceling">
             <p style={pLast}>
               Resubscribing restores everything instantly — unpublished pages and features come back right away. If you had a discounted rate (a founding-member rate or a promotional offer), re-enrolling is priced at whatever&apos;s being offered at that time — the same discount isn&apos;t guaranteed to still be available. You&apos;ll always see a clear warning about this before you confirm a cancellation.
-            </p>
-          </HelpSubsection>
-
-          <HelpSubsection title="Refunds">
-            <p style={pLast}>
-              We don&apos;t offer refunds for unused time. The one exception is our <strong style={strongC}>90-Day Results Guarantee</strong>: if you complete at least 3 job check-ins per week for 90 consecutive days and your dashboard shows no measurable traffic activity, email <a href="mailto:support@projectcheckin.com" style={link}>support@projectcheckin.com</a> within 30 days of finishing that period and we&apos;ll refund your last 2 months of subscription fees. Full terms are in our <Link href="/terms" style={link}>Terms of Service</Link>.
             </p>
           </HelpSubsection>
 
