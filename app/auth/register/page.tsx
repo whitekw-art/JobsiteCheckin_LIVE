@@ -25,8 +25,16 @@ const SCORE_CONFIG = [
   { cls: 'reg-bar--strong', label: 'Strong',                         color: '#059669' },
 ]
 
+// Kept deliberately in step with normalizeEmail in lib/emailValidation.ts.
+// The server is the control that matters; this exists so the form rejects a
+// bad address inline instead of letting it round-trip and come back as an
+// error. If the server rule changes, change this one with it.
 function isValidEmail(v: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+  if (v.length > 254) return false
+  if (/[<>"'&`\\]/.test(v)) return false
+  // eslint-disable-next-line no-control-regex
+  if (/[^\x20-\x7E]/.test(v)) return false
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)
 }
 
 function normalizeWebsite(v: string): string {
@@ -75,6 +83,7 @@ function RegisterForm() {
   const [lastName,    setLastName]    = useState('')
   const [email,       setEmail]       = useState('')
   const [password,    setPassword]    = useState('')
+  const [confirmPw,   setConfirmPw]   = useState('')
   const [phone,       setPhone]       = useState('')
   const [showPw,      setShowPw]      = useState(false)
   const [pwScore,     setPwScore]     = useState(0)
@@ -128,6 +137,10 @@ function RegisterForm() {
     }
     if (trimPw.length < 8) {
       setError('Password must be at least 8 characters.')
+      return
+    }
+    if (trimPw !== confirmPw.trim()) {
+      setError('The two passwords do not match.')
       return
     }
 
@@ -378,6 +391,28 @@ function RegisterForm() {
                     <span className="reg-strength-label" style={{ color: scoreInfo.color }}>{scoreInfo.label}</span>
                   )}
                 </div>
+              )}
+            </div>
+
+            {/* Confirm password — a typo here would otherwise create an
+                account whose password nobody knows, recoverable only through
+                the forgot-password flow. */}
+            <div className="reg-field">
+              <label className="reg-label" htmlFor="reg-pw-confirm">Confirm password</label>
+              <div className="reg-input-wrap">
+                <input
+                  id="reg-pw-confirm"
+                  type={showPw ? 'text' : 'password'}
+                  className="reg-input reg-input-pw"
+                  placeholder="Re-enter your password"
+                  autoComplete="new-password"
+                  value={confirmPw}
+                  onChange={e => setConfirmPw(e.target.value)}
+                  required
+                />
+              </div>
+              {confirmPw.length > 0 && confirmPw !== password && (
+                <span className="reg-strength-label" style={{ color: '#DC2626' }}>Passwords do not match</span>
               )}
             </div>
 

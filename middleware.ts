@@ -54,6 +54,10 @@ export default withAuth(
       '/auth/invite',
       '/auth/forgot-password',
       '/auth/reset-password',
+      // Confirmation links are opened from an inbox, often on a device that is
+      // not signed in. The token is the proof of ownership, so gating this on a
+      // session would block the ordinary case.
+      '/auth/verify-email',
       '/payments/checkout',
     ]
     const isPublicAssetPath = pathname.startsWith('/temp-photos/') ||

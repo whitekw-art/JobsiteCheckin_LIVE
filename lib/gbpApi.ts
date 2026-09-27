@@ -1,5 +1,6 @@
 import { google } from 'googleapis'
 import { encryptCredential, decryptCredential, encryptionConfigured } from '@/lib/wpCredentials'
+import { isInvalidGrant } from '@/lib/googleOAuthErrors'
 
 // Google Business Profile client — connect a customer's listing and publish
 // completed jobs to it as Local Posts.
@@ -483,9 +484,20 @@ function truncate(text: string, max: number): string {
  * of a transient quota blip is worse than showing a retryable error, so 403
  * falls through to the generic path until there is real evidence a revoked
  * grant returns 403 on these endpoints.
+ *
+ * WIDENED to also cover `invalid_grant`, 2026-09-26. A refresh token Google
+ * has rejected never reaches this API at all — it fails earlier, at the token
+ * endpoint, with a 400 that the status check below cannot recognize. Found on
+ * the Search Console side, fixed here in the same pass because both
+ * integrations share one OAuth client and one failure mode. See
+ * `isInvalidGrant` for the full account.
  */
 function classify(err: unknown, fallback: string): { error: string; needsReconnect?: boolean } {
   const status = (err as { code?: number; status?: number })?.code ?? (err as { status?: number })?.status
+  if (isInvalidGrant(err)) {
+    console.warn('GBP: refresh token rejected by Google (invalid_grant)')
+    return { error: 'Your Google connection is no longer active. Please connect again.', needsReconnect: true }
+  }
   if (status === 401) {
     console.warn('GBP: authorization rejected', status)
     return { error: 'Your Google connection is no longer active. Please connect again.', needsReconnect: true }

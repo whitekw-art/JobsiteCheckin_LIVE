@@ -67,6 +67,13 @@ function IcoHelp() {
     </svg>
   )
 }
+function IcoChevron() {
+  return (
+    <svg className="db-nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  )
+}
 function IcoMoon() {
   return (
     <svg className="db-icon-moon" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -142,6 +149,22 @@ export default function DashboardShell({ title, children, action }: Props) {
   const navItem = (href: string) =>
     `db-nav-item${pathname === href || pathname?.startsWith(href + '/') ? ' active' : ''}`
 
+  // ── Support Center group ──────────────────────────────────────────────────
+  // Open state is DERIVED from the route rather than stored. The Jobs page
+  // keeps its own copy of this sidebar, and deriving from the path is what
+  // keeps the two in agreement without a shared store between them. It also
+  // means arriving on a guide from an external link never lands you inside a
+  // collapsed group that hides where you are.
+  const inSupport = pathname === '/help' || Boolean(pathname?.startsWith('/help/'))
+  const [supportOpen, setSupportOpen] = useState(inSupport)
+  useEffect(() => { if (inSupport) setSupportOpen(true) }, [inSupport])
+
+  // Guides owns bare /help, so it is active anywhere under /help EXCEPT the
+  // tutorial. Matching on the prefix alone would light both children at once
+  // on the tutorial route.
+  const onTutorial = pathname === '/help/tutorial'
+  const guidesActive = inSupport && !onTutorial
+
   return (
     <div className="db-root">
       {/* ── Mobile sidebar overlay ─────────────────────────────────────────── */}
@@ -210,10 +233,38 @@ export default function DashboardShell({ title, children, action }: Props) {
             </Link>
           )}
 
-          <Link className={navItem('/help')} href="/help" onClick={() => setSidebarOpen(false)}>
+          <button
+            type="button"
+            className={`db-nav-item${inSupport && !supportOpen ? ' has-active-child' : ''}`}
+            aria-expanded={supportOpen}
+            aria-controls="db-nav-support"
+            onClick={() => setSupportOpen((o) => !o)}
+          >
             <IcoHelp />
-            Help
-          </Link>
+            Support Center
+            <IcoChevron />
+          </button>
+
+          {supportOpen && (
+            <div className="db-nav-children" id="db-nav-support">
+              <Link
+                className={`db-nav-child${guidesActive ? ' active' : ''}`}
+                href="/help"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <span className="db-nav-child-dot" />
+                Guides
+              </Link>
+              <Link
+                className={`db-nav-child${onTutorial ? ' active' : ''}`}
+                href="/help/tutorial"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <span className="db-nav-child-dot" />
+                Interactive Tutorial
+              </Link>
+            </div>
+          )}
 
           <button className="db-nav-item" onClick={() => { setSidebarOpen(false); signOut() }}>
             <IcoSignOut />

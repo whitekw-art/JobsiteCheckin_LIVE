@@ -37,15 +37,29 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Business name is required.' }, { status: 400 })
     }
 
-    // Generate a unique slug from the real business name
-    let baseSlug = slugify(name.trim())
-    let slug = baseSlug
-    let suffix = 2
-    while (true) {
-      const existing = await prisma.organization.findUnique({ where: { slug } })
-      if (!existing || existing.id === user.organizationId) break
-      slug = `${baseSlug}-${suffix}`
-      suffix++
+    // The slug is part of every published job page and portfolio URL, so it is
+    // regenerated ONLY when the business name actually changes. The Interactive
+    // Tutorial replays this same flow against an established account, and
+    // rebuilding the slug from a name the customer merely retyped would move
+    // pages that are already linked from their own site and indexed by Google.
+    const current = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      select: { name: true, slug: true },
+    })
+
+    let slug = current?.slug ?? ''
+    const nameUnchanged = current?.name?.trim() === name.trim()
+
+    if (!slug || !nameUnchanged) {
+      const baseSlug = slugify(name.trim())
+      slug = baseSlug
+      let suffix = 2
+      while (true) {
+        const existing = await prisma.organization.findUnique({ where: { slug } })
+        if (!existing || existing.id === user.organizationId) break
+        slug = `${baseSlug}-${suffix}`
+        suffix++
+      }
     }
 
     const normalizeWebsite = (v?: string) => {

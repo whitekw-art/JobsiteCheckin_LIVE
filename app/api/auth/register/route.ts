@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcrypt'
 import { prisma } from '@/lib/prisma'
 import { slugify } from '@/lib/slugify'
+import { normalizeEmail } from '@/lib/emailValidation'
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,7 +23,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const normalizedEmail = email.trim().toLowerCase()
+    // Registration previously accepted any string here, trimmed and lowercased
+    // but never checked for shape. That let junk — and markup — become an
+    // account's permanent address. Validated at the point of creation so a bad
+    // value can never enter the table in the first place.
+    const normalizedEmail = normalizeEmail(email)
+
+    if (!normalizedEmail) {
+      return NextResponse.json(
+        { error: 'Enter a valid email address.' },
+        { status: 400 }
+      )
+    }
 
     const existingUser = await prisma.user.findUnique({
       where: { email: normalizedEmail },
