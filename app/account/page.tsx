@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback, FormEvent } from 'react'
+import { Suspense, useEffect, useState, useCallback, FormEvent } from 'react'
 import { useSession, signOut } from 'next-auth/react'
+import { useSearchParams } from 'next/navigation'
 import DashboardShell from '@/components/DashboardShell'
+import BusinessNameWarning from '@/components/BusinessNameWarning'
 import { tierHasFeature } from '@/lib/planVersions'
 import {
   TRADES,
@@ -188,7 +190,7 @@ function ActiveTag() {
 // Collapsible connections card. Header (icon + title + sub + status) toggles the body.
 function ConnCard({
   icon, iconBg = 'var(--surface-3)', title, titleExtra, sub, status, open, onToggle,
-  locked = false, accent = false, cardStyle, children,
+  locked = false, accent = false, cardStyle, tour, children,
 }: {
   icon: React.ReactNode
   iconBg?: string
@@ -201,11 +203,13 @@ function ConnCard({
   locked?: boolean
   accent?: boolean
   cardStyle?: React.CSSProperties
+  tour?: string
   children: React.ReactNode
 }) {
   return (
     <div
       className="db-shell-card"
+      {...(tour ? { 'data-tour': tour } : {})}
       style={{
         padding: 0, overflow: 'hidden', opacity: locked ? 0.72 : 1,
         ...(accent ? { borderColor: 'var(--sky)', boxShadow: '0 0 0 1px var(--sky)' } : {}),
@@ -734,7 +738,9 @@ function SecurityCard() {
 }
 
 
-export default function AccountPage() {
+function AccountPageContent() {
+  const deepLinkParams = useSearchParams()
+  const [nameChange, setNameChange] = useState<{ from: string; to: string } | null>(null)
   const { data: session } = useSession()
   const planTier = (session?.user as any)?.planTier as string | null | undefined
 
@@ -1497,6 +1503,21 @@ export default function AccountPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasGbp])
 
+  // Deep link to a tab and, optionally, an already-expanded card:
+  // /account?tab=connections&card=cname. The onboarding walkthrough explains
+  // the website-integration options but sends people here to set them up.
+  useEffect(() => {
+    const tab = deepLinkParams.get('tab')
+    const card = deepLinkParams.get('card')
+    if (!tab && !card) return
+    const tabs: Tab[] = ['general', 'team', 'billing', 'connections']
+    if (tab && tabs.includes(tab as Tab)) setActiveTab(tab as Tab)
+    if (card) setOpenCards((prev) => ({ ...prev, [card]: true }))
+    // The query stays in the URL on purpose. The tutorial moves between tabs
+    // by changing it, and stripping it here would undo that and put the
+    // walkthrough into a navigation loop.
+  }, [deepLinkParams])
+
   async function reloadGbpStatus() {
     try {
       const res = await fetch('/api/organization/gbp')
@@ -1713,8 +1734,24 @@ export default function AccountPage() {
     setProductList([...productList, ...defaults.filter((d) => !existing.has(d.toLowerCase()))])
   }
 
+  /**
+   * Renaming the business is the one field on this form that reaches well
+   * beyond the form, so it is gated behind an explicit confirmation rather
+   * than saved with everything else. See the modal for what it touches.
+   */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    if (!profile) return
+    const nextName = orgName.trim()
+    const priorName = (profile.name || '').trim()
+    if (priorName && nextName && nextName !== priorName) {
+      setNameChange({ from: priorName, to: nextName })
+      return
+    }
+    await saveProfile()
+  }
+
+  const saveProfile = async () => {
     if (!profile) return
     setSaving(true)
     setMessage(null)
@@ -1760,7 +1797,7 @@ export default function AccountPage() {
     <DashboardShell title="Account">
 
       {/* Sub-tab navigation */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
+      <div data-tour="acct-tabs" style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
         {(['general', 'team', 'billing', 'connections'] as Tab[]).map((tab) => (
           <button key={tab} style={subTabStyle(activeTab === tab)} onClick={() => setActiveTab(tab)}>
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -1774,11 +1811,11 @@ export default function AccountPage() {
           desktop order is corrected in CSS rather than by duplicating markup. */}
       {activeTab === 'general' && (
         <div className="acct-general-grid">
-          <div className="db-shell-card acct-col-security">
+          <div className="db-shell-card acct-col-security" data-tour="acct-security">
             <SecurityCard />
           </div>
 
-          <div className="db-shell-card acct-col-business">
+          <div className="db-shell-card acct-col-business" data-tour="acct-business">
           <div className="db-shell-card-title">Business Profile</div>
 
           {loading ? (
@@ -1842,7 +1879,7 @@ export default function AccountPage() {
                 />
               </div>
 
-              <div>
+              <div data-tour="acct-trade">
                 <label htmlFor="business-trade" className="db-shell-label">Trade / Industry</label>
                 <select
                   id="business-trade"
@@ -1859,7 +1896,7 @@ export default function AccountPage() {
                 </div>
               </div>
 
-              <div>
+              <div data-tour="acct-products">
                 <label className="db-shell-label">Products / Services</label>
                 <div style={{ fontSize: 11.5, color: 'var(--t3)', marginBottom: 10, lineHeight: 1.5 }}>
                   These are the options your team sees on the Check-In form. Add, remove, or rename them anytime.
@@ -1943,7 +1980,7 @@ export default function AccountPage() {
               {/* \u2500\u2500 AI Business Profile (Titan only) \u2500\u2500 */}
               {isTitan && (
                 <>
-                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 18, marginTop: 4 }}>
+                  <div data-tour="acct-ai" style={{ borderTop: '1px solid var(--border)', paddingTop: 18, marginTop: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <span className="db-shell-subsection-title">AI Business Profile</span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 10.5, fontWeight: 700, background: '#FFF7ED', color: '#C2410C', border: '1px solid #FED7AA' }}>Titan</span>
@@ -1966,7 +2003,7 @@ export default function AccountPage() {
                       </div>
                       <div>
                         <label htmlFor="ai-about" className="db-shell-label">About your business</label>
-                        <textarea id="ai-about" className="db-shell-input" style={{ width: '100%', minWidth: 0, height: 'auto', padding: '9px 13px', resize: 'vertical' }} rows={3} value={aiAbout} onChange={(e) => setAiAbout(e.target.value)} placeholder="1\u20132 sentences about what you do and who you serve." />
+                        <textarea id="ai-about" className="db-shell-input" style={{ width: '100%', minWidth: 0, height: 'auto', padding: '9px 13px', resize: 'vertical' }} rows={3} value={aiAbout} onChange={(e) => setAiAbout(e.target.value)} placeholder="1 to 2 sentences about what you do and who you serve." />
                       </div>
                     </div>
 
@@ -2058,7 +2095,7 @@ export default function AccountPage() {
 
       {/* ── BILLING TAB ── */}
       {activeTab === 'billing' && (
-        <div className="db-shell-card" style={{ maxWidth: 520 }}>
+        <div className="db-shell-card" data-tour="acct-billing" style={{ maxWidth: 520 }}>
           <div className="db-shell-card-title">Subscription</div>
 
           {planTier ? (
@@ -2119,6 +2156,7 @@ export default function AccountPage() {
               : gbpStatus === 'select_location' || gbpStatus === 'no_locations' ? <StatusDot state="disabled" label="Action needed" />
               : <StatusDot state="disabled" label="Not connected" />
             }
+            tour="conn-gbp"
             open={!!openCards['gbp']}
             onToggle={() => toggleCard('gbp')}
             locked={!hasGbp}
@@ -2314,6 +2352,7 @@ export default function AccountPage() {
             title="Enable Google Business Review Requests"
             sub="Send customers directly to your Google Business Review page"
             status={profile?.gbpReviewLink ? <StatusDot state="active" label="Active" /> : <StatusDot state="disabled" label="Disabled" />}
+            tour="conn-review"
             open={!!openCards['review']}
             onToggle={() => toggleCard('review')}
           >
@@ -2399,7 +2438,7 @@ export default function AccountPage() {
 
           {/* ── Website Integration for Local SEO — family: mutually exclusive, Good/Better/Best ── */}
           {hasWebsiteIntegration && (
-          <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface)', padding: '16px 16px 4px', marginBottom: 16, boxShadow: 'var(--shadow-card)' }}>
+          <div data-tour="conn-website" style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface)', padding: '16px 16px 4px', marginBottom: 16, boxShadow: 'var(--shadow-card)' }}>
             <div style={{ padding: '2px 4px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                 <div>
@@ -3163,6 +3202,7 @@ export default function AccountPage() {
             title="Share Your Project Check-In Portfolio"
             sub="Share your work and track visits from any source"
             status={<StatusDot state="active" label="Active" />}
+            tour="conn-share"
             open={!!openCards['share']}
             onToggle={() => toggleCard('share')}
           >
@@ -3249,6 +3289,7 @@ export default function AccountPage() {
               : gscStatus === 'no_properties' ? <StatusDot state="disabled" label="Action needed" />
               : <StatusDot state="disabled" label="Not connected" />
             }
+            tour="conn-gsc"
             open={!!openCards['gsc']}
             onToggle={() => toggleCard('gsc')}
             locked={!hasGsc}
@@ -3389,6 +3430,17 @@ export default function AccountPage() {
       )}
 
       {/* Downgrade warning modal — rendered outside tabs so it always overlays */}
+      {nameChange && (
+        <BusinessNameWarning
+          from={nameChange.from}
+          to={nameChange.to}
+          // This route updates the name only; the slug is left as it is.
+          slugWillChange={false}
+          onCancel={() => { setOrgName(nameChange.from); setNameChange(null) }}
+          onConfirm={() => { setNameChange(null); saveProfile() }}
+        />
+      )}
+
       {showDowngradeWarning && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)',
@@ -3507,5 +3559,15 @@ export default function AccountPage() {
       )}
 
     </DashboardShell>
+  )
+}
+
+// useSearchParams (for the ?tab= deep link) needs a Suspense boundary, or the
+// production build fails to prerender this page. Same pattern as Check-In.
+export default function AccountPage() {
+  return (
+    <Suspense>
+      <AccountPageContent />
+    </Suspense>
   )
 }

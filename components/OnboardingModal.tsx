@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { tierHasFeature } from '@/lib/planVersions'
+import { startCoachMarks } from '@/components/CoachMarks'
+import BusinessNameWarning from '@/components/BusinessNameWarning'
+import { hasCoachSteps, NAV_TIP_CHAPTER } from '@/lib/coachMarks'
+import { revealSupportNav } from '@/lib/navReveal'
 import { TRADES } from '@/lib/tradeProducts'
 
 const WIDGET_PLATFORM_INSTRUCTIONS: Record<string, string> = {
@@ -51,11 +55,125 @@ interface Props {
   replay?: boolean
   /** Called when a replay is closed or finished. Ignored during first run. */
   onExit?: () => void
+  /** Chapter to open at. The tutorial index uses this to jump straight to one. */
+  startChapter?: number
 }
 
 const ONBOARDING_STEP_KEY = 'pc_onboarding_step'
+const ONBOARDING_CHAPTER_KEY = 'pc_onboarding_chapter'
 
-export default function OnboardingModal({ planTier, orgSlug, replay = false, onExit }: Props) {
+/**
+ * Onboarding is chaptered. Chapter 1 keeps the original flat step numbers
+ * exactly as they were, so every existing handler and render branch in that
+ * chapter is untouched — the chapter layer sits on top rather than renumbering
+ * a flow that already ships.
+ *
+ * `kind` decides the container: 'modal' renders inside this dialog, 'coach'
+ * hands off to the coach-mark overlay, which dims the real page and points at
+ * real controls. Chapters 2-7 carry no steps yet; their content is specified
+ * separately and lands in CHAPTER_STEPS.
+ */
+export const FINISH_CHAPTER = 8
+
+export const CHAPTERS: { id: number; name: string; short: string; kind: 'modal' | 'coach'; intro: string }[] = [
+  // `intro` describes the area of the app being reviewed and why it matters to
+  // the business. It is deliberately not about how the tutorial works — the
+  // customer already knows they are in a tutorial.
+  {
+    id: 1, name: 'Account Setup', short: 'Setup', kind: 'modal',
+    intro: 'This chapter covers your business details, your Google listing, and where your finished work gets published.',
+  },
+  {
+    id: 2, name: 'Create / Modify your Team', short: 'Team', kind: 'coach',
+    intro: 'This chapter walks you through the process of adding new team members and assigning access roles. Your field workers need access to submit real jobs.',
+  },
+  {
+    id: 3, name: 'Submit a Checkin', short: 'Check-In', kind: 'coach',
+    intro: 'A check-in is how a finished job becomes a page on your website. This chapter walks through capturing the work on site: photos, location, and what was done.',
+  },
+  {
+    id: 4, name: 'Using your Job Dashboard', short: 'Dashboard', kind: 'coach',
+    intro: 'Every job your crew submits lands here for you to review before it goes public. This chapter walks through approving, editing, and publishing that work.',
+  },
+  {
+    id: 5, name: 'Understanding Reporting', short: 'Reporting', kind: 'coach',
+    intro: 'This chapter walks through each number on your Reporting page, what it says about how people are finding you, and what tends to move it.',
+  },
+  {
+    id: 6, name: 'Account Center', short: 'Account', kind: 'coach',
+    intro: 'This chapter walks through what each Account tab controls: your business profile, billing, sign-in details, and the connections that publish your work.',
+  },
+]
+
+
+/**
+ * Collapsible option card for the website-integration step. Deliberately
+ * mirrors the ConnCard layout on Account -> Connections: these are the same
+ * three options, and a customer who meets them here then goes looking for
+ * them there should recognise the same rows.
+ */
+function OnbIntegrationCard({
+  icon, iconBg = '#F0F9FF', title, tier, sub, open, onToggle, children,
+}: {
+  icon: React.ReactNode
+  iconBg?: string
+  title: string
+  tier: string
+  sub: string
+  open: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div style={{ border: '1px solid #BAE6FD', borderRadius: 10, background: '#fff', overflow: 'hidden', marginBottom: 10 }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif", padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}
+      >
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: iconBg, display: 'grid', placeItems: 'center', flexShrink: 0 }}>{icon}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Block, not flex: these titles are long enough to wrap, and a flex
+              tier chip would drop onto a line of its own instead of trailing
+              the last word the way it does on Connections. */}
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#0C4A6E', letterSpacing: '-.1px', lineHeight: 1.35 }}>
+            {title}
+            <span style={{ marginLeft: 7, fontSize: 9.5, fontWeight: 700, letterSpacing: '.09em', textTransform: 'uppercase' as const, color: '#94A3B8', whiteSpace: 'nowrap' as const }}>{tier}</span>
+          </div>
+          <div style={{ fontSize: 11.5, color: '#4B7A94', marginTop: 3, lineHeight: 1.5 }}>{sub}</div>
+        </div>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9" /></svg>
+      </button>
+      <div style={{ display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', transition: 'grid-template-rows .26s ease' }}>
+        <div style={{ minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ borderTop: '1px solid #E0F2FE', padding: 14 }}>{children}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Shared footer for the two options that are explained here but completed in
+ * Account -> Connections. Opens in a new tab on purpose: onboarding is a
+ * blocking modal, and navigating away in place would abandon the run.
+ */
+function OnbSetupLink({ card, children }: { card: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={`/account?tab=connections&card=${card}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12, padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", background: '#F0F9FF', color: '#0284C7', border: '1px solid #BAE6FD', textDecoration: 'none' }}
+    >
+      {children}
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    </a>
+  )
+}
+
+export default function OnboardingModal({ planTier, orgSlug, replay = false, onExit, startChapter = 1 }: Props) {
   const isTitan = (planTier ?? 'free').toLowerCase() === 'titan'
   // Widget setup step (step 6) — Titan only, gated by the website_integration feature
   const hasWidgetStep = tierHasFeature(planTier, 'website_integration')
@@ -78,6 +196,32 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
     if (!replay) localStorage.setItem(ONBOARDING_STEP_KEY, String(n))
     setStepState(n)
   }
+
+  const [chapter, setChapterState] = useState<number>(() => {
+    if (typeof window === 'undefined') return startChapter
+    if (replay) return startChapter
+    const saved = parseInt(localStorage.getItem(ONBOARDING_CHAPTER_KEY) || '1', 10)
+    return (saved >= 1 && saved <= FINISH_CHAPTER) ? saved : 1
+  })
+
+  const setChapter = (n: number) => {
+    if (!replay) localStorage.setItem(ONBOARDING_CHAPTER_KEY, String(n))
+    setChapterState(n)
+  }
+
+  // Chapters 2+ are entered at their own first step. Chapter 1 is the legacy
+  // flow and owns its step numbers, so it is never re-seeded here.
+  const goToChapter = (n: number) => {
+    setChapter(n)
+    if (n !== 1) setStep(1)
+  }
+
+  const nextChapter = () => goToChapter(chapter >= CHAPTERS.length ? FINISH_CHAPTER : chapter + 1)
+
+  // Account Setup is a forced flow: there is nothing saved yet, so letting
+  // someone leave halfway would strand a half-built account. Once it is behind
+  // them the remaining chapters are explanatory, and leaving is safe.
+  const canExit = replay || chapter > 1
 
   // Step 4 — GBP review link
   const [gbpReviewLink,  setGbpReviewLink]  = useState('')
@@ -104,6 +248,7 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
   const [wShowInfo,       setWShowInfo]       = useState(false)
   const [wShowUrlInstr,   setWShowUrlInstr]   = useState(false)
   const [wShowEmbedInstr, setWShowEmbedInstr] = useState(false)
+  const [wOpenCards,      setWOpenCards]      = useState<Record<string, boolean>>({})
 
   // AI research step state (Titan only — shown between step 2 and step 3)
   const [showAiResearch,  setShowAiResearch]  = useState(false)
@@ -190,6 +335,27 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
   // sees what they already have and saves it back unchanged.
   const [prefillLoaded, setPrefillLoaded] = useState(!replay)
   const [heardAboutSaved, setHeardAboutSaved] = useState('')
+  // The name the account already had when a replay opened. Renaming here is
+  // the one edit in this flow that rebuilds the org slug, so it is confirmed
+  // before it is sent.
+  const [savedBizName, setSavedBizName] = useState('')
+  const [nameChange, setNameChange] = useState<{ from: string; to: string } | null>(null)
+  // The tip between the welcome screen and the business details form points at
+  // the sidebar, so the modal has to step aside while it is on screen.
+  const [navTipOpen, setNavTipOpen] = useState(false)
+
+  useEffect(() => {
+    if (!navTipOpen) return
+    const check = () => {
+      let active = false
+      try { active = !!sessionStorage.getItem('pc_coach_session') } catch { active = false }
+      if (!active) { setNavTipOpen(false); setStep(2) }
+    }
+    window.addEventListener('pc-coach-change', check)
+    return () => window.removeEventListener('pc-coach-change', check)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navTipOpen])
+
 
   useEffect(() => {
     if (!replay) return
@@ -202,6 +368,7 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
         if (cancelled || !org) return
 
         setBizName(org.name ?? '')
+        setSavedBizName(org.name ?? '')
         setBizPhone(org.phone ?? '')
         setBizWebsite(org.website ?? '')
         setTrade(org.trade ?? '')
@@ -248,6 +415,17 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
     setError(null)
     if (!bizName.trim()) { setError('Business name is required.'); return }
 
+    // Only on a replay: a first run has nothing published to disturb, and the
+    // name typed here is the first real one the account has had.
+    const prior = savedBizName.trim()
+    if (replay && prior && bizName.trim() !== prior) {
+      setNameChange({ from: prior, to: bizName.trim() })
+      return
+    }
+    await submitStep2()
+  }
+
+  const submitStep2 = async () => {
     setSubmitting(true)
     try {
       const res = await fetch('/api/organization/onboarding', {
@@ -280,9 +458,25 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
     }
   }
 
+  // Website integration only exists on Titan, so for everyone else the
+  // review link is the last step of Account Setup.
+  const handleSaveAndExit = async () => {
+    if (replay) { onExit?.(); return }
+    // Account Setup is finished by this point, so the account is usable. The
+    // remaining chapters are a walkthrough, and abandoning them must not leave
+    // the account flagged incomplete and bounced back here on next sign-in.
+    await fetch('/api/organization/complete-onboarding', { method: 'POST' })
+    await fetch('/api/auth/session')
+    localStorage.removeItem(ONBOARDING_STEP_KEY)
+    localStorage.removeItem(ONBOARDING_CHAPTER_KEY)
+    window.location.href = '/dashboard'
+  }
+
+  const afterReviewLink = () => { if (hasWidgetStep) setStep(5); else goToChapter(2) }
+
   const handleGbpLinkSave = async () => {
     const link = gbpReviewLink.trim()
-    if (!link) { setStep(5); return }
+    if (!link) { afterReviewLink(); return }
 
     const isValid =
       link.startsWith('https://g.page/r/') ||
@@ -304,7 +498,7 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
         const data = await res.json().catch(() => null)
         throw new Error(data?.error || 'Failed to save. Please try again.')
       }
-      setStep(5)
+      afterReviewLink()
     } catch (err: any) {
       setGbpLinkError(err.message)
     } finally {
@@ -323,11 +517,25 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
     await fetch('/api/organization/complete-onboarding', { method: 'POST' })
     await fetch('/api/auth/session')
     localStorage.removeItem(ONBOARDING_STEP_KEY)
+    localStorage.removeItem(ONBOARDING_CHAPTER_KEY)
     window.location.href = '/dashboard'
   }
 
   const widgetSlug = savedSlug || orgSlug || 'your-business'
   const widgetBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://projectcheckin.com').replace(/\/$/, '')
+
+  // Host shown in the CNAME example. This step can run before a website has
+  // been entered, so it falls back to a placeholder rather than an empty gap.
+  const cnameApex = (() => {
+    const raw = bizWebsite.trim()
+    if (!raw) return 'yourdomain.com'
+    try {
+      const host = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname
+      return host.replace(/^www\./, '') || 'yourdomain.com'
+    } catch {
+      return 'yourdomain.com'
+    }
+  })()
 
   const handleWidgetCopy = () => {
     const snippet = `<!-- ProjectCheckin: Website Integration for Local SEO -->\n<div id="pc-widget" data-org="${widgetSlug}"></div>\n<script src="${widgetBaseUrl}/widget.v1.js" defer></script>`
@@ -369,7 +577,7 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
       }
       setWSaving(false)
     }
-    setStep(6)
+    goToChapter(2)
   }
 
   const tier = planTier || 'free'
@@ -377,15 +585,29 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
   const features = PLAN_FEATURES[tier] || PLAN_FEATURES.free
 
   return (
+    <>
+    {navTipOpen ? null : (
+    <>
+    {nameChange && (
+      <BusinessNameWarning
+        from={nameChange.from}
+        to={nameChange.to}
+        // This route rebuilds the slug from the new name.
+        slugWillChange
+        onCancel={() => { setBizName(nameChange.from); setNameChange(null) }}
+        onConfirm={() => { setNameChange(null); submitStep2() }}
+      />
+    )}
     <div style={styles.backdrop} aria-modal="true" role="dialog" aria-label={replay ? 'Interactive tutorial' : 'Account setup'}>
       <div style={styles.modal}>
 
-        {/* Replay only. First run has no close button by design — it is the
-            one flow a new account must complete before reaching the app. */}
-        {replay && (
+        {/* Account Setup has no way out by design — it is the one chapter a new
+            account must finish before reaching the app. Everything after it is
+            explanatory, so from chapter 2 on there is an exit. */}
+        {canExit && (
           <button
             type="button"
-            onClick={() => onExit?.()}
+            onClick={handleSaveAndExit}
             aria-label="Close tutorial"
             style={{
               position: 'absolute', top: 14, right: 14, width: 30, height: 30,
@@ -400,22 +622,49 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
           </button>
         )}
 
-        {/* Progress dots — 5 base, +1 for Titan AI step, +1 for Titan widget step */}
-        {(() => {
-          const totalDots = (isTitan ? 6 : 5) + (hasWidgetStep ? 1 : 0)
-          // For Titan: AI step = dot 3, GBP steps shift to 4 and 5, done = 6
-          const activeDot = showAiResearch ? 3 : (isTitan && step >= 3 ? step + 1 : step)
+        {/* Chapter bar — one segment per chapter, filling by progress within it.
+            Replaces the old per-step dot row, which stopped being countable
+            once onboarding grew past a single chapter. */}
+        {chapter !== FINISH_CHAPTER && (() => {
+          const current = CHAPTERS.find(c => c.id === chapter) ?? CHAPTERS[0]
+          // Chapter 1 still measures itself in legacy step numbers, and the
+          // Titan AI interstitial is a step the customer sees even though it
+          // has no number of its own.
+          const stepsHere = chapter === 1 ? (isTitan ? 6 : 5) : 1
+          const posHere = chapter === 1
+            ? (showAiResearch ? 3 : (isTitan && step >= 3 ? step + 1 : step))
+            : 1
           return (
-            <div style={styles.dots}>
-              {Array.from({ length: totalDots }, (_, i) => i + 1).map(n => (
-                <div key={n} style={{ ...styles.dot, ...(n === activeDot ? styles.dotActive : n < activeDot ? styles.dotDone : {}) }} />
-              ))}
+            <div style={{ marginBottom: 22 }}>
+              {/* Leaves room for the close button, which is absolutely
+                  positioned over this row's right edge when it is shown. */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 9, paddingRight: canExit ? 34 : 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, letterSpacing: '-.015em', color: '#0C4A6E', minWidth: 0 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase' as const, color: '#94A3B8', marginRight: 8 }}>
+                    Chapter {chapter} of {CHAPTERS.length}
+                  </span>
+                  {current.name}
+                </div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: '#94A3B8', whiteSpace: 'nowrap' as const }}>
+                  Step {Math.min(posHere, stepsHere)} of {stepsHere}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {CHAPTERS.map(c => {
+                  const fill = c.id < chapter ? 100 : c.id > chapter ? 0 : (posHere / stepsHere) * 100
+                  return (
+                    <div key={c.id} style={{ flex: 1, height: 5, borderRadius: 99, background: '#E0F2FE', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', borderRadius: 99, width: `${fill}%`, background: c.id < chapter ? '#059669' : '#0EA5E9', transition: 'width .3s ease' }} />
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )
         })()}
 
         {/* ── TITAN ONLY: AI Agent Research step (shown after step 2) ── */}
-        {showAiResearch && isTitan && (
+        {chapter === 1 && showAiResearch && isTitan && (
           <div style={styles.body}>
             <div style={{ ...styles.welcomeIcon, background: '#FFF7ED', borderColor: '#FED7AA' }}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -534,7 +783,7 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
         )}
 
         {/* ── STEP 1: Welcome ── */}
-        {!showAiResearch && step === 1 && (
+        {chapter === 1 && !showAiResearch && step === 1 && (
           <div style={styles.body}>
             <div style={styles.welcomeIcon}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
@@ -562,7 +811,14 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
             <p style={styles.stepNote}>
               Next, we&rsquo;ll set up your business profile. It only takes 60 seconds and makes everything work properly.
             </p>
-            <button style={styles.btnPrimary} onClick={() => setStep(2)}>
+            <button
+              style={styles.btnPrimary}
+              onClick={() => {
+                revealSupportNav()
+                setNavTipOpen(true)
+                startCoachMarks(NAV_TIP_CHAPTER)
+              }}
+            >
               Set up my business profile
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
                 stroke="white" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/>
@@ -572,7 +828,7 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
         )}
 
         {/* ── STEP 2: Business details ── */}
-        {!showAiResearch && step === 2 && (
+        {chapter === 1 && !showAiResearch && step === 2 && (
           <div style={styles.body}>
             <h2 style={styles.stepTitle}>Tell us about your business</h2>
             <p style={styles.stepSub}>
@@ -715,7 +971,7 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
         )}
 
         {/* ── STEP 3: Get your Google review link (guide) ── */}
-        {!showAiResearch && step === 3 && (
+        {chapter === 1 && !showAiResearch && step === 3 && (
           <div style={styles.body}>
             <h2 style={styles.stepTitle}>Get your Google review link</h2>
 
@@ -787,7 +1043,7 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
         )}
 
         {/* ── STEP 4: Paste your review link ── */}
-        {!showAiResearch && step === 4 && (
+        {chapter === 1 && !showAiResearch && step === 4 && (
           <div style={styles.body}>
             <div style={{ ...styles.welcomeIcon, background: '#F0F9FF', borderColor: '#BAE6FD' }}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0EA5E9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -841,12 +1097,57 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
                 </>
               )}
             </button>
-            <button onClick={() => setStep(5)} style={styles.btnSkip}>{skipLabel}</button>
+            <button onClick={afterReviewLink} style={styles.btnSkip}>{skipLabel}</button>
           </div>
         )}
 
         {/* ── FINAL STEP: First steps / You're all set (step 5 of 5, or step 6 of 6 for Titan widget users) ── */}
-        {!showAiResearch && (hasWidgetStep ? step === 6 : step === 5) && (
+        {/* ── CHAPTERS 2-7 ──
+            Each chapter's steps are specified separately and are not written
+            yet. Until they land, the chapter announces itself and hands off:
+            'coach' chapters will open the coach-mark overlay on the real page,
+            'modal' chapters will render their steps here. */}
+        {chapter > 1 && chapter !== FINISH_CHAPTER && (() => {
+          const current = CHAPTERS.find(c => c.id === chapter)
+          if (!current) return null
+          const ready = current.kind === 'coach' && hasCoachSteps(chapter)
+          return (
+            <div style={styles.body}>
+              <h2 style={styles.stepTitle}>{current.name}</h2>
+              <p style={styles.stepSub}>{current.intro}</p>
+
+              {!ready && (
+                <div style={{ border: '1px dashed #BAE6FD', background: '#F0F9FF', borderRadius: 10, padding: '18px 16px', textAlign: 'center' as const, fontSize: 12.5, color: '#4B7A94', lineHeight: 1.6 }}>
+                  Steps for this chapter are not written yet.
+                </div>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 20, paddingTop: 14, borderTop: '1px solid #E0F2FE' }}>
+                <button onClick={() => goToChapter(chapter - 1)} style={{ ...styles.btnSkip, marginTop: 0, alignSelf: 'auto', padding: 0 }}>
+                  Back
+                </button>
+                <button
+                  style={{ ...styles.btnPrimary, width: 'auto', height: 44, padding: '0 20px', marginTop: 0, flexShrink: 0 }}
+                  onClick={() => {
+                    if (!ready) { nextChapter(); return }
+                    // The overlay owns the screen from here, so the modal has
+                    // to get out of the way before it opens.
+                    onExit?.()
+                    startCoachMarks(chapter)
+                  }}
+                >
+                  {ready ? 'Show me' : chapter >= CHAPTERS.length ? 'Finish' : 'Continue'}
+                </button>
+              </div>
+
+              <button onClick={handleSaveAndExit} style={{ ...styles.btnSkip, alignSelf: 'center' }}>
+                Save &amp; exit
+              </button>
+            </div>
+          )
+        })()}
+
+        {chapter === FINISH_CHAPTER && (
           <div style={styles.body}>
             <div style={{ ...styles.welcomeIcon, background: '#F0FDF4', borderColor: '#A7F3D0' }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
@@ -914,7 +1215,7 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
         )}
 
         {/* ── STEP 5: Website Integration for Local SEO (Titan only, optional) ── */}
-        {!showAiResearch && step === 5 && hasWidgetStep && (
+        {chapter === 1 && !showAiResearch && step === 5 && hasWidgetStep && (
           <div style={styles.body}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' as const, color: '#F97316', marginBottom: 5 }}>
               Step 5 of {maxStep} — Optional
@@ -937,73 +1238,149 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
             )}
             <div style={{ height: 8 }} />
 
-            {/* Section 1: portfolio URL */}
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0C4A6E', marginBottom: 6 }}>Paste your portfolio page URL here</div>
-            <button
-              onClick={() => setWShowUrlInstr(!wShowUrlInstr)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: '#0EA5E9', cursor: 'pointer', background: 'none', border: 'none', padding: 0, marginBottom: 8, fontFamily: "'Plus Jakarta Sans', sans-serif", alignSelf: 'flex-start' }}
-            >
-              Instructions
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform .2s', transform: wShowUrlInstr ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-            {wShowUrlInstr && (
-              <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: '#0C4A6E', lineHeight: 1.65, marginBottom: 10 }}>
-                Create a page on your website (e.g. yourwebsite.com/our-work) and paste its URL here. This is where your new portfolio of work will show up on your website and will automatically start generating local SEO for your page. You can always opt out at any time if you&rsquo;d like, and remove the page.
-              </div>
-            )}
-            <input
-              type="url"
-              style={{ ...styles.input, fontFamily: 'monospace', fontSize: 13, marginBottom: 14 }}
-              placeholder="https://yourwebsite.com/our-work"
-              value={wUrl}
-              onChange={e => { setWUrl(e.target.value); setWError(null) }}
-            />
+            <div style={{ fontSize: 12, color: '#4B7A94', lineHeight: 1.6, marginBottom: 5 }}>
+              Three ways to put your published jobs on your own site. You only need <strong style={{ color: '#0C4A6E', fontWeight: 700 }}>one</strong> — pick whichever your website supports, and you can switch whenever you like.
+            </div>
+            <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 12 }}>Listed weakest to strongest for SEO: Good, Better, Best.</div>
 
-            {/* Section 2: embed code */}
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0C4A6E', marginBottom: 6 }}>Add the widget to your website</div>
-            <button
-              onClick={() => setWShowEmbedInstr(!wShowEmbedInstr)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: '#0EA5E9', cursor: 'pointer', background: 'none', border: 'none', padding: 0, marginBottom: 8, fontFamily: "'Plus Jakarta Sans', sans-serif", alignSelf: 'flex-start' }}
+            {/* 1 · Widget — the only option that can be finished without leaving onboarding */}
+            <OnbIntegrationCard
+              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>}
+              iconBg="#ECFDF5"
+              title="1. Widget - Add a Jobs Gallery to Any Website"
+              tier="Good"
+              sub="Paste one snippet — your published jobs appear automatically in a gallery on your site. Works anywhere."
+              open={!!wOpenCards['widget']}
+              onToggle={() => setWOpenCards(prev => ({ ...prev, widget: !prev.widget }))}
             >
-              Instructions
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform .2s', transform: wShowEmbedInstr ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-            {wShowEmbedInstr && (
-              <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: '#0C4A6E', lineHeight: 1.65, marginBottom: 10 }}>
-                After you create a new page on your website (e.g., yourwebsite.com/our-work), select the website builder by clicking one of the options below. Then, paste the code below into that new page you created. Your published jobs will appear automatically — no updates needed.
+              {/* Section 1: portfolio URL */}
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0C4A6E', marginBottom: 6 }}>Paste your portfolio page URL here</div>
+              <button
+                onClick={() => setWShowUrlInstr(!wShowUrlInstr)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: '#0EA5E9', cursor: 'pointer', background: 'none', border: 'none', padding: 0, marginBottom: 8, fontFamily: "'Plus Jakarta Sans', sans-serif", alignSelf: 'flex-start' }}
+              >
+                Instructions
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform .2s', transform: wShowUrlInstr ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {wShowUrlInstr && (
+                <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: '#0C4A6E', lineHeight: 1.65, marginBottom: 10 }}>
+                  Create a page on your website (e.g. yourwebsite.com/our-work) and paste its URL here. This is where your new portfolio of work will show up on your website and will automatically start generating local SEO for your page. You can always opt out at any time if you&rsquo;d like, and remove the page.
+                </div>
+              )}
+              <input
+                type="url"
+                style={{ ...styles.input, fontFamily: 'monospace', fontSize: 13, marginBottom: 14 }}
+                placeholder="https://yourwebsite.com/our-work"
+                value={wUrl}
+                onChange={e => { setWUrl(e.target.value); setWError(null) }}
+              />
+
+              {/* Section 2: embed code */}
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0C4A6E', marginBottom: 6 }}>Add the widget to your website</div>
+              <button
+                onClick={() => setWShowEmbedInstr(!wShowEmbedInstr)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: '#0EA5E9', cursor: 'pointer', background: 'none', border: 'none', padding: 0, marginBottom: 8, fontFamily: "'Plus Jakarta Sans', sans-serif", alignSelf: 'flex-start' }}
+              >
+                Instructions
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform .2s', transform: wShowEmbedInstr ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {wShowEmbedInstr && (
+                <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: '#0C4A6E', lineHeight: 1.65, marginBottom: 10 }}>
+                  After you create a new page on your website (e.g., yourwebsite.com/our-work), select the website builder by clicking one of the options below. Then, paste the code below into that new page you created. Your published jobs will appear automatically — no updates needed.
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' as const }}>
+                {Object.keys(WIDGET_PLATFORM_INSTRUCTIONS).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setWPlatform(p)}
+                    style={{ padding: '5px 12px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif", border: wPlatform === p ? '1px solid rgba(14,165,233,.4)' : '1.5px solid #BAE6FD', color: wPlatform === p ? '#0284C7' : '#4B7A94', background: wPlatform === p ? '#F0F9FF' : '#fff' }}
+                  >
+                    {p}
+                  </button>
+                ))}
               </div>
-            )}
-            <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' as const }}>
-              {Object.keys(WIDGET_PLATFORM_INSTRUCTIONS).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setWPlatform(p)}
-                  style={{ padding: '5px 12px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif", border: wPlatform === p ? '1px solid rgba(14,165,233,.4)' : '1.5px solid #BAE6FD', color: wPlatform === p ? '#0284C7' : '#4B7A94', background: wPlatform === p ? '#F0F9FF' : '#fff' }}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-            <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: '#0C4A6E', lineHeight: 1.65, marginBottom: 10, whiteSpace: 'pre-line' as const }}>
-              {WIDGET_PLATFORM_INSTRUCTIONS[wPlatform]}
-            </div>
-            <div style={{ background: '#0F172A', color: '#7DD3FC', borderRadius: 8, padding: '12px 14px', fontFamily: "'Courier New', monospace", fontSize: 11, lineHeight: 1.6, marginBottom: 10, overflowX: 'auto' as const, whiteSpace: 'pre' as const }}>
-              <span style={{ color: '#86EFAC' }}>&lt;div</span> <span style={{ color: '#FCA5A5' }}>id</span>=<span style={{ color: '#FDE68A' }}>&quot;pc-widget&quot;</span> <span style={{ color: '#FCA5A5' }}>data-org</span>=<span style={{ color: '#FDE68A' }}>&quot;{widgetSlug}&quot;</span><span style={{ color: '#86EFAC' }}>&gt;&lt;/div&gt;</span>{'\n'}
-              <span style={{ color: '#86EFAC' }}>&lt;script</span> <span style={{ color: '#FCA5A5' }}>src</span>=<span style={{ color: '#FDE68A' }}>&quot;{widgetBaseUrl}/widget.v1.js&quot;</span> <span style={{ color: '#FCA5A5' }}>defer</span><span style={{ color: '#86EFAC' }}>&gt;&lt;/script&gt;</span>
-            </div>
-            <button
-              onClick={handleWidgetCopy}
-              style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: '#F0F9FF', color: wCopied ? '#059669' : '#4B7A94', border: '1px solid #BAE6FD' }}
+              <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '11px 13px', fontSize: 12, color: '#0C4A6E', lineHeight: 1.65, marginBottom: 10, whiteSpace: 'pre-line' as const }}>
+                {WIDGET_PLATFORM_INSTRUCTIONS[wPlatform]}
+              </div>
+              <div style={{ background: '#0F172A', color: '#7DD3FC', borderRadius: 8, padding: '12px 14px', fontFamily: "'Courier New', monospace", fontSize: 11, lineHeight: 1.6, marginBottom: 10, overflowX: 'auto' as const, whiteSpace: 'pre' as const }}>
+                <span style={{ color: '#86EFAC' }}>&lt;div</span> <span style={{ color: '#FCA5A5' }}>id</span>=<span style={{ color: '#FDE68A' }}>&quot;pc-widget&quot;</span> <span style={{ color: '#FCA5A5' }}>data-org</span>=<span style={{ color: '#FDE68A' }}>&quot;{widgetSlug}&quot;</span><span style={{ color: '#86EFAC' }}>&gt;&lt;/div&gt;</span>{'\n'}
+                <span style={{ color: '#86EFAC' }}>&lt;script</span> <span style={{ color: '#FCA5A5' }}>src</span>=<span style={{ color: '#FDE68A' }}>&quot;{widgetBaseUrl}/widget.v1.js&quot;</span> <span style={{ color: '#FCA5A5' }}>defer</span><span style={{ color: '#86EFAC' }}>&gt;&lt;/script&gt;</span>
+              </div>
+              <button
+                onClick={handleWidgetCopy}
+                style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', background: '#F0F9FF', color: wCopied ? '#059669' : '#4B7A94', border: '1px solid #BAE6FD' }}
+              >
+                {wCopied ? 'Copied!' : 'Copy code'}
+              </button>
+            </OnbIntegrationCard>
+
+            {/* 2 · CNAME */}
+            <OnbIntegrationCard
+              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="6" rx="1"/><rect x="2" y="15" width="20" height="6" rx="1"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>}
+              iconBg="#F5F3FF"
+              title="2. CNAME - Host a Branded Page on Your Domain"
+              tier="Better"
+              sub="Add one CNAME record and we serve your jobs on your own domain, with no code to paste and no plugin to install."
+              open={!!wOpenCards['cname']}
+              onToggle={() => setWOpenCards(prev => ({ ...prev, cname: !prev.cname }))}
             >
-              {wCopied ? 'Copied!' : 'Copy code'}
-            </button>
+              <p style={{ fontSize: 12.5, color: '#4B7A94', lineHeight: 1.65, margin: '0 0 12px' }}>
+                This gives your job pages their own address on your domain — like <span style={{ fontFamily: 'monospace', color: '#0C4A6E' }}>our-work.{cnameApex}</span> — with no code to paste and no plugin to install. Just one setting at your domain provider.
+              </p>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#0C4A6E', textTransform: 'uppercase' as const, letterSpacing: '.04em', marginBottom: 9 }}>What&rsquo;s involved</div>
+              {[
+                'Log in to whoever you bought your domain from (GoDaddy, Namecheap, Cloudflare, etc.) — not your website builder.',
+                'Find DNS Settings or Manage DNS for your domain.',
+                'Add the one record we give you, using the exact Type, Host, and Value shown, and save.',
+              ].map((txt, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#4B7A94', lineHeight: 1.55, marginBottom: 8 }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#F0F9FF', color: '#0284C7', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                  <div>{txt}</div>
+                </div>
+              ))}
+              <div style={{ fontSize: 11.5, color: '#94A3B8', lineHeight: 1.5, marginTop: 10, paddingTop: 10, borderTop: '1px solid #E0F2FE' }}>
+                Don&rsquo;t see DNS settings at all? Some website builder plans don&rsquo;t allow this — if that&rsquo;s you, use the widget above instead. No action needed on your end.
+              </div>
+              <OnbSetupLink card="cname">Set this up in Account &rarr; Connections</OnbSetupLink>
+            </OnbIntegrationCard>
+
+            {/* 3 · WordPress */}
+            <OnbIntegrationCard
+              icon={<svg width="17" height="17" viewBox="0 0 24 24" fill="#21759B" stroke="none"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 1.4a8.6 8.6 0 0 1 4.86 1.49h-.1a1.2 1.2 0 0 0-1.16 1.23c0 .57.33 1.05.68 1.62.27.45.58 1.03.58 1.87 0 .58-.22 1.26-.52 2.2l-.68 2.26-2.45-7.3c.41-.02.78-.06.78-.06.36-.05.32-.58-.05-.56 0 0-1.1.09-1.82.09-.67 0-1.8-.09-1.8-.09-.36-.02-.4.54-.05.56 0 0 .35.04.72.06l1.06 2.9-1.49 4.46-2.48-7.36c.41-.02.78-.06.78-.06.36-.05.32-.58-.05-.56 0 0-1.1.09-1.82.09-.13 0-.28 0-.44-.01A8.6 8.6 0 0 1 12 3.4zM4.3 8.9l3.77 10.32A8.6 8.6 0 0 1 4.3 8.9zm8.2 3.62l2.28 6.24a.7.7 0 0 0 .06.1 8.6 8.6 0 0 1-5.1.06l1.9-5.5.86-.9zm5.9-2.05a8.6 8.6 0 0 1-2.42 8.5l2.35-6.8c.3-.9.44-1.62.44-2.27 0-.24-.02-.46-.05-.68.28.52.44 1.13.44 1.79z"/></svg>}
+              iconBg="#EFF6FF"
+              title="3. WordPress Integration - Publish Into Your WordPress Site"
+              tier="Best"
+              sub="Real posts in your own theme — the deepest local-SEO integration we offer."
+              open={!!wOpenCards['wordpress']}
+              onToggle={() => setWOpenCards(prev => ({ ...prev, wordpress: !prev.wordpress }))}
+            >
+              <p style={{ fontSize: 12.5, color: '#4B7A94', lineHeight: 1.65, margin: '0 0 12px' }}>
+                Connect your WordPress site and every job you publish from now on becomes a real post on your own site — in your own theme, at your own address. Nothing to install.
+              </p>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#0C4A6E', textTransform: 'uppercase' as const, letterSpacing: '.04em', marginBottom: 9 }}>What you&rsquo;ll need</div>
+              {[
+                'Your WordPress site address and username.',
+                'An Application Password. In your WordPress admin, go to Users → Profile, scroll to Application Passwords, and add one named "ProjectCheckin".',
+                'Copy that password once it appears — WordPress only shows it a single time.',
+              ].map((txt, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#4B7A94', lineHeight: 1.55, marginBottom: 8 }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#F0F9FF', color: '#0284C7', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                  <div>{txt}</div>
+                </div>
+              ))}
+              <div style={{ fontSize: 11.5, color: '#94A3B8', lineHeight: 1.5, marginTop: 10, paddingTop: 10, borderTop: '1px solid #E0F2FE' }}>
+                Only works on sites running WordPress. On Wix, Squarespace, or Webflow, use the widget above instead.
+              </div>
+              <OnbSetupLink card="wordpress">Set this up in Account &rarr; Connections</OnbSetupLink>
+            </OnbIntegrationCard>
 
             {wError && <div style={{ ...styles.errorBox, marginTop: 14 }}>{wError}</div>}
 
             {/* Footer: skip left, save & finish right */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 20, paddingTop: 14, borderTop: '1px solid #E0F2FE' }}>
               <div>
-                <button onClick={() => setStep(6)} style={{ ...styles.btnSkip, marginTop: 0, alignSelf: 'flex-start', textAlign: 'left' as const, padding: 0 }}>
+                <button onClick={() => goToChapter(2)} style={{ ...styles.btnSkip, marginTop: 0, alignSelf: 'flex-start', textAlign: 'left' as const, padding: 0 }}>
                   Skip — set up later in Account → Connections
                 </button>
                 <div style={{ fontSize: 11.5, color: '#4B7A94', lineHeight: 1.5, marginTop: 6 }}>
@@ -1023,6 +1400,9 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
 
       </div>
     </div>
+    </>
+    )}
+    </>
   )
 }
 
