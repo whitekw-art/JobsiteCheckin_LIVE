@@ -442,7 +442,7 @@ function CheckInContent() {
           <form className="ci-form" onSubmit={handleSubmit}>
 
             {/* Installer */}
-            <div className="ci-field">
+            <div className="ci-field" data-tour="ci-installer">
               <label className="ci-label" htmlFor="installer">Employee Name</label>
               <input
                 id="installer"
@@ -455,7 +455,7 @@ function CheckInContent() {
             </div>
 
             {/* Street */}
-            <div className="ci-field">
+            <div className="ci-field" data-tour="ci-address">
               <label className="ci-label" htmlFor="street">Street</label>
               <input
                 id="street"
@@ -509,7 +509,7 @@ function CheckInContent() {
             </div>
 
             {/* Product / service — options come from Account → General */}
-            <div className="ci-field">
+            <div className="ci-field" data-tour="ci-product">
               <label className="ci-label" htmlFor="doorType">Product</label>
               <select
                 id="doorType"
@@ -548,7 +548,7 @@ function CheckInContent() {
             )}
 
             {/* Notes */}
-            <div className="ci-field">
+            <div className="ci-field" data-tour="ci-notes">
               <label className="ci-label" htmlFor="notes">Notes</label>
               <textarea
                 id="notes"
@@ -563,7 +563,7 @@ function CheckInContent() {
             <div className="ci-divider" />
 
             {/* Customer Info */}
-            <div className="ci-field">
+            <div className="ci-field" data-tour="ci-customer">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <label className="ci-label" style={{ marginBottom: 0 }}>Customer Info <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: '0.78rem' }}>(optional)</span></label>
                 {contactsSupported && (
@@ -612,7 +612,7 @@ function CheckInContent() {
             <div className="ci-divider" />
 
             {/* Photos */}
-            <div className="ci-photo-section">
+            <div className="ci-photo-section" data-tour="ci-photos">
               <span className="ci-label">Photos</span>
 
               {/* Existing photos in edit mode */}
@@ -651,7 +651,7 @@ function CheckInContent() {
                 </div>
               )}
 
-              <div className="ci-photo-buttons">
+              <div className="ci-photo-buttons" data-tour="ci-photo-buttons">
                 {/* Take Photo — opens live camera, appends */}
                 <button
                   type="button"
@@ -775,7 +775,7 @@ function CheckInContent() {
             <div className="ci-divider" />
 
             {/* Submit */}
-            <button type="submit" className="ci-btn-submit" disabled={isSubmitting}>
+            <button type="submit" className="ci-btn-submit" data-tour="ci-submit" disabled={isSubmitting}>
               {isSubmitting
                 ? (editId ? 'Saving\u2026' : 'Submitting\u2026')
                 : (editId ? 'Save Changes' : 'Submit Check-In')}
