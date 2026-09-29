@@ -5,6 +5,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcrypt'
 import { loginRatelimit } from '@/lib/rate-limit'
+import { normalizeEmail } from '@/lib/emailValidation'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -55,8 +56,14 @@ export const authOptions: NextAuthOptions = {
           if (process.env.REGISTRATION_OPEN !== 'true') return null
           if (credentials.password.length < 8) return null
 
+          // The second signup path. Validating only the /api/auth/register
+          // route would leave this one open and make that fix cosmetic, since
+          // both end at prisma.user.create with a caller-supplied address.
+          const signUpEmail = normalizeEmail(credentials.email)
+          if (!signUpEmail) return null
+
           const existingUser = await prisma.user.findUnique({
-            where: { email: credentials.email.toLowerCase() },
+            where: { email: signUpEmail },
           })
           if (existingUser) return null
 
@@ -71,7 +78,7 @@ export const authOptions: NextAuthOptions = {
 
           const user = await prisma.user.create({
             data: {
-              email: credentials.email.toLowerCase(),
+              email: signUpEmail,
               name: credentials.name,
               password: hashedPassword,
               role: organization ? 'OWNER' : 'USER',

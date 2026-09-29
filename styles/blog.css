@@ -247,6 +247,59 @@
 }
 .blog-section p { font-size: 16.5px; }
 
+/* Content lists inside a prose section or lead-in note. Real indentation per
+   nesting level, and a distinct marker per level so a nested list reads as
+   nested rather than relying on the indent alone. */
+.blog-section ul,
+.blog-section ol,
+.blog-leadin ul,
+.blog-leadin ol {
+  margin: 0 0 18px;
+  padding-left: 26px;
+  font-size: 16.5px;
+  color: #1F2937;
+}
+.blog-section li,
+.blog-leadin li { margin-bottom: 8px; line-height: 1.6; }
+.blog-section li > ul,
+.blog-section li > ol,
+.blog-leadin li > ul,
+.blog-leadin li > ol { margin-top: 8px; margin-bottom: 0; }
+
+.blog-section ul, .blog-leadin ul { list-style-type: disc; }
+.blog-section ul ul, .blog-leadin ul ul { list-style-type: circle; }
+.blog-section ul ul ul, .blog-leadin ul ul ul { list-style-type: square; }
+.blog-section ol, .blog-leadin ol { list-style-type: decimal; }
+.blog-section ol ol, .blog-leadin ol ol { list-style-type: lower-alpha; }
+.blog-section ol ol ol, .blog-leadin ol ol ol { list-style-type: lower-roman; }
+
+/* Comparison table. Editorial minimalism: hairline rules, no fills, no zebra
+   striping. Scrolls horizontally on narrow screens instead of shrinking type. */
+.blog-table-wrap { margin: 32px 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.blog-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.blog-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--blog-navy, #0C3D5C);
+  border-bottom: 2px solid var(--blog-navy, #0C3D5C);
+  padding: 10px 14px 10px 0;
+  white-space: nowrap;
+}
+.blog-table td {
+  border-bottom: 1px solid rgba(13, 27, 42, 0.12);
+  padding: 10px 14px 10px 0;
+  vertical-align: top;
+  color: var(--blog-ink, #0D1B2A);
+}
+.blog-table tr:last-child td { border-bottom: none; }
+.blog-table-caption { margin-top: 10px; font-size: 0.85rem; color: var(--blog-muted); }
+
 /* Framing note before a numbered run — signals the list is selective,
    not exhaustive. Left rule only; no filled or gradient panel. */
 .blog-leadin {

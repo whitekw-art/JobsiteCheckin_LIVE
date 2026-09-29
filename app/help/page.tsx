@@ -87,41 +87,47 @@ export default function HelpPage() {
         </p>
 
         <HelpSection title="Guides" sub="Step-by-step setup instructions" defaultOpen>
-          <Link href="/help/guides/wordpress-publish" style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none', marginBottom: 2 }}>
+          <Link href="/help/guides/wordpress-publish" style={{ display: 'block', minHeight: 0, padding: '3px 0', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none' }}>
             WordPress Publishing Guide
           </Link>
-          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '0 0 16px', lineHeight: 1.6 }}>
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '6px 0 20px', lineHeight: 1.6 }}>
             Publish jobs straight into your WordPress site — as new posts, or fed into pages you already have. Includes how to get the most SEO value.
           </p>
-          <Link href="/help/guides/widget-install" style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none', marginBottom: 2 }}>
+          <Link href="/help/guides/widget-install" style={{ display: 'block', minHeight: 0, padding: '3px 0', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none' }}>
             Widget Installation Guide
           </Link>
-          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '0 0 16px', lineHeight: 1.6 }}>
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '6px 0 20px', lineHeight: 1.6 }}>
             Add your jobs gallery to WordPress, Squarespace, Webflow, Wix, or a plain HTML site.
           </p>
-          <Link href="/help/guides/cname-hosting" style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none', marginBottom: 2 }}>
+          <Link href="/help/guides/cname-hosting" style={{ display: 'block', minHeight: 0, padding: '3px 0', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none' }}>
             CNAME Subdomain Hosting Guide
           </Link>
-          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '0 0 16px', lineHeight: 1.6 }}>
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '6px 0 20px', lineHeight: 1.6 }}>
             Give your job pages an address on your own domain, with DNS setup steps per registrar.
           </p>
-          <Link href="/help/guides/gsc-setup" style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none', marginBottom: 2 }}>
+          <Link href="/help/guides/gsc-setup" style={{ display: 'block', minHeight: 0, padding: '3px 0', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none' }}>
             Set Up Google Search Console
           </Link>
-          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '0 0 16px', lineHeight: 1.6 }}>
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '6px 0 20px', lineHeight: 1.6 }}>
             Don&apos;t have Search Console yet? Create it and verify your website, with step-by-step instructions for WordPress, Squarespace, Wix, GoDaddy, and more.
           </p>
-          <Link href="/help/guides/gsc-connect" style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none', marginBottom: 2 }}>
+          <Link href="/help/guides/gsc-connect" style={{ display: 'block', minHeight: 0, padding: '3px 0', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none' }}>
             Connect Google Search Console
           </Link>
-          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '0 0 16px', lineHeight: 1.6 }}>
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '6px 0 20px', lineHeight: 1.6 }}>
             Link your Search Console to ProjectCheckin so your real search clicks and impressions show on your Reporting page.
           </p>
-          <Link href="/help/guides/gbp-connect" style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none', marginBottom: 2 }}>
+          <Link href="/help/guides/gbp-connect" style={{ display: 'block', minHeight: 0, padding: '3px 0', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none' }}>
             Connect Your Google Business Profile
           </Link>
-          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: 0, lineHeight: 1.6 }}>
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '6px 0 20px', lineHeight: 1.6 }}>
             Send finished jobs straight to your Google listing. Covers picking the right Google account, claiming a profile you don&apos;t have yet, and getting one back from whoever set it up.
+          </p>
+          <Link href="/help/guides/team-roles" style={{ display: 'block', minHeight: 0, padding: '3px 0', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none' }}>
+            Team Roles and Access
+          </Link>
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '6px 0 0', lineHeight: 1.6 }}>
+            What a User, an Admin, and an Owner can each see and change — and which one to give your field crew.
           </p>
         </HelpSection>
 
@@ -138,7 +144,7 @@ export default function HelpPage() {
           <p style={pLast}><strong style={strongC}>Billing</strong> — view your plan, update your payment method, or cancel.</p>
         </HelpSection>
 
-        <HelpSection title="Billing & Plans" sub="Subscriptions, cancellations, and refunds" defaultOpen>
+        <HelpSection title="Billing & Plans" sub="Subscriptions and cancellations" defaultOpen>
           <p style={p}>
             ProjectCheckin has four plans — Free, Pro, Elite, and Titan — priced from $0 to $598/month depending on features and monthly photo volume. See full plan details on the <Link href="/pricing" style={link}>Pricing page</Link>.
           </p>
@@ -161,12 +167,6 @@ export default function HelpPage() {
           <HelpSubsection title="Re-enrolling after canceling">
             <p style={pLast}>
               Resubscribing restores everything instantly — unpublished pages and features come back right away. If you had a discounted rate (a founding-member rate or a promotional offer), re-enrolling is priced at whatever&apos;s being offered at that time — the same discount isn&apos;t guaranteed to still be available. You&apos;ll always see a clear warning about this before you confirm a cancellation.
-            </p>
-          </HelpSubsection>
-
-          <HelpSubsection title="Refunds">
-            <p style={pLast}>
-              We don&apos;t offer refunds for unused time. The one exception is our <strong style={strongC}>90-Day Results Guarantee</strong>: if you complete at least 3 job check-ins per week for 90 consecutive days and your dashboard shows no measurable traffic activity, email <a href="mailto:support@projectcheckin.com" style={link}>support@projectcheckin.com</a> within 30 days of finishing that period and we&apos;ll refund your last 2 months of subscription fees. Full terms are in our <Link href="/terms" style={link}>Terms of Service</Link>.
             </p>
           </HelpSubsection>
 

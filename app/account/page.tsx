@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState, FormEvent } from 'react'
-import { useSession } from 'next-auth/react'
+import { Suspense, useEffect, useState, useCallback, FormEvent } from 'react'
+import { useSession, signOut } from 'next-auth/react'
+import { useSearchParams } from 'next/navigation'
 import DashboardShell from '@/components/DashboardShell'
+import BusinessNameWarning from '@/components/BusinessNameWarning'
 import { tierHasFeature } from '@/lib/planVersions'
 import {
   TRADES,
@@ -188,7 +190,7 @@ function ActiveTag() {
 // Collapsible connections card. Header (icon + title + sub + status) toggles the body.
 function ConnCard({
   icon, iconBg = 'var(--surface-3)', title, titleExtra, sub, status, open, onToggle,
-  locked = false, accent = false, cardStyle, children,
+  locked = false, accent = false, cardStyle, tour, children,
 }: {
   icon: React.ReactNode
   iconBg?: string
@@ -201,11 +203,13 @@ function ConnCard({
   locked?: boolean
   accent?: boolean
   cardStyle?: React.CSSProperties
+  tour?: string
   children: React.ReactNode
 }) {
   return (
     <div
       className="db-shell-card"
+      {...(tour ? { 'data-tour': tour } : {})}
       style={{
         padding: 0, overflow: 'hidden', opacity: locked ? 0.72 : 1,
         ...(accent ? { borderColor: 'var(--sky)', boxShadow: '0 0 0 1px var(--sky)' } : {}),
@@ -220,7 +224,10 @@ function ConnCard({
       >
         <div style={{ width: 38, height: 38, borderRadius: 9, background: iconBg, display: 'grid', placeItems: 'center', flexShrink: 0 }}>{icon}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{title}{titleExtra}</div>
+          {/* One step below .db-shell-subsection-title: these are rows in a
+              list of connections, so they must out-read their own sub-text
+              without competing with the tab's section headings. */}
+          <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--t1)', letterSpacing: '-.1px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{title}{titleExtra}</div>
           <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{sub}</div>
         </div>
         {status}
@@ -235,7 +242,505 @@ function ConnCard({
   )
 }
 
-export default function AccountPage() {
+/**
+ * A centered dialog used for every credential change on the Sign-In & Security
+ * card. These edits are deliberately NOT inline: each one needs the current
+ * password, and a form that expands in place next to the value it is about to
+ * replace invites typing a password into the wrong box. A dialog also gives
+ * room to say what will happen before it happens, which matters most for the
+ * email change, where the result is an email rather than an immediate switch.
+ */
+function SecurityModal({
+  title, intro, onClose, children, footer,
+}: {
+  title: string
+  intro?: React.ReactNode
+  onClose: () => void
+  children: React.ReactNode
+  footer: React.ReactNode
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    // The page behind must not scroll while a dialog is open.
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [onClose])
+
+  return (
+    <div
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+      style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, width: '100%', maxWidth: 420, maxHeight: '90vh', overflowY: 'auto', padding: '22px 22px 20px', boxShadow: '0 24px 60px rgba(15,23,42,.28)' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+          <div className="db-shell-subsection-title">{title}</div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--t3)', lineHeight: 0, flexShrink: 0 }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        {intro}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>{children}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>{footer}</div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Sign-In & Security — Account → General.
+ *
+ * Shown to EVERY role. The rest of that tab manages the organization and is
+ * the owner's business; these are the credentials of whoever is signed in, so
+ * a crew member must be able to change their own password.
+ *
+ * The password renders as a fixed run of dots and never reveals. It is stored
+ * as a bcrypt hash, so no plaintext exists to show — a reveal control here
+ * would be advertising a vulnerability rather than offering a feature.
+ */
+function SecurityCard() {
+  type Backup = { id: string; email: string; verifiedAt: string }
+  type Pending = { newEmail: string; purpose: string; expiresAt: string }
+  type Dialog =
+    | null
+    | { kind: 'email' }
+    | { kind: 'password' }
+    | { kind: 'backup' }
+    | { kind: 'promote'; id: string; email: string }
+    | { kind: 'remove'; id: string; email: string }
+
+  const [loading, setLoading] = useState(true)
+  const [email, setEmail] = useState('')
+  const [backups, setBackups] = useState<Backup[]>([])
+  const [pending, setPending] = useState<Pending[]>([])
+
+  const [dialog, setDialog] = useState<Dialog>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [ok, setOk] = useState<string | null>(null)
+
+  const [emailInput, setEmailInput] = useState('')
+  const [pw, setPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  // Second step of the change-email flow, stating plainly that this REPLACES
+  // rather than adds. Held separately so cancelling it returns to the form
+  // with everything still typed.
+  const [confirmSend, setConfirmSend] = useState(false)
+  // Gates the readOnly-until-focus guard on the new-email field. Reset with
+  // every dialog so the guard is armed again the next time it opens.
+  const [newEmailFocused, setNewEmailFocused] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/account/security')
+      if (!res.ok) return
+      const data = await res.json()
+      setEmail(data.email ?? '')
+      setBackups(data.backupEmails ?? [])
+      setPending(data.pending ?? [])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const close = useCallback(() => {
+    setDialog(null); setErr(null); setConfirmSend(false); setNewEmailFocused(false)
+    setEmailInput(''); setPw(''); setNewPw(''); setConfirmPw('')
+  }, [])
+
+  const open = (d: Dialog) => {
+    setErr(null); setOk(null); setConfirmSend(false); setNewEmailFocused(false)
+    setEmailInput(''); setPw(''); setNewPw(''); setConfirmPw('')
+    setDialog(d)
+  }
+
+  async function submitEmail(purpose: 'primary' | 'backup') {
+    setBusy(true); setErr(null)
+    try {
+      const res = await fetch('/api/account/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailInput, currentPassword: pw, purpose }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        // Back to the form rather than leaving the customer stranded on the
+        // confirmation step, where a wrong password or a taken address is not
+        // something they can correct.
+        setConfirmSend(false)
+        setErr(data?.error || 'Could not send the confirmation email.')
+        return
+      }
+      setOk(`Confirmation sent to ${data.pendingEmail}. The link expires in 10 minutes.`)
+      close(); load()
+    } finally { setBusy(false) }
+  }
+
+  async function submitPassword() {
+    if (newPw !== confirmPw) { setErr('The two new passwords do not match.'); return }
+    setBusy(true); setErr(null)
+    try {
+      const res = await fetch('/api/account/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: pw, newPassword: newPw }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) { setErr(data?.error || 'Could not change your password.'); return }
+      setOk('Password changed.'); close()
+    } finally { setBusy(false) }
+  }
+
+  async function promote(id: string) {
+    setBusy(true); setErr(null)
+    try {
+      const res = await fetch('/api/account/email', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, currentPassword: pw }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) { setErr(data?.error || 'Could not update your sign-in email.'); return }
+      // The session still carries the old address and is resolved by it on
+      // every request, so it cannot survive this change.
+      await signOut({ callbackUrl: '/auth/signin' })
+    } finally { setBusy(false) }
+  }
+
+  async function removeBackup(id: string) {
+    setBusy(true); setErr(null)
+    try {
+      const res = await fetch('/api/account/email', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, currentPassword: pw }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) { setErr(data?.error || 'Could not remove that address.'); return }
+      setOk('Backup address removed.'); close(); load()
+    } finally { setBusy(false) }
+  }
+
+  const rowLabel: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--t3)', marginBottom: 3 }
+  const rowValue: React.CSSProperties = { fontSize: 13.5, color: 'var(--t1)', wordBreak: 'break-all' }
+  const linkBtn: React.CSSProperties = { background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: 'var(--sky-text)', cursor: 'pointer', flexShrink: 0 }
+  const row: React.CSSProperties = { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 0', borderTop: '1px solid var(--border)' }
+  const input: React.CSSProperties = { width: '100%', minWidth: 0 }
+  const note: React.CSSProperties = { fontSize: 12.5, color: 'var(--t2)', lineHeight: 1.6, margin: 0 }
+  const fieldLabel: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--t2)', marginBottom: 4 }
+
+  if (loading) {
+    return (
+      <>
+        <div className="db-shell-card-title">Sign-In &amp; Security</div>
+        <p style={{ fontSize: 13, color: 'var(--t3)', margin: 0 }}>Loading…</p>
+      </>
+    )
+  }
+
+  const pendingBackups = pending.filter((p) => p.purpose === 'backup')
+  const noBackups = backups.length === 0 && pendingBackups.length === 0
+
+  return (
+    <>
+      <div className="db-shell-card-title">Sign-In &amp; Security</div>
+
+      {ok && <div className="db-shell-alert-success" style={{ marginBottom: 12 }}>{ok}</div>}
+
+      {/* ── Sign-in email ── */}
+      <div style={{ ...row, borderTop: 'none', paddingTop: 0 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={rowLabel}>Sign-in email</div>
+          <div style={rowValue}>{email}</div>
+        </div>
+        <button style={linkBtn} onClick={() => open({ kind: 'email' })}>Edit</button>
+      </div>
+      {pending.filter((p) => p.purpose === 'primary').map((p) => (
+        <p key={p.newEmail} style={{ fontSize: 12, color: 'var(--amber)', margin: '0 0 6px', lineHeight: 1.55 }}>
+          Waiting on confirmation for {p.newEmail}. Your current address keeps working until then.
+        </p>
+      ))}
+
+      {/* ── Backup emails — placed directly beneath the address they protect,
+             so the prompt to add one reads as part of the same decision. ── */}
+      <div style={{ ...row, display: 'block' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+          <div style={{ ...rowLabel, marginBottom: 0 }}>Backup email{backups.length === 1 ? '' : 's'}</div>
+          {noBackups && (
+            <span
+              aria-hidden="true"
+              style={{ flexShrink: 0, width: 14, height: 14, borderRadius: '50%', background: 'var(--amber)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+            >
+              !
+            </span>
+          )}
+        </div>
+
+        {backups.length === 0 ? (
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', lineHeight: 1.6, margin: '2px 0 0' }}>None yet.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+            {backups.map((b) => (
+              <div key={b.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                <span style={rowValue}>{b.email}</span>
+                <span style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
+                  <button style={linkBtn} onClick={() => open({ kind: 'promote', id: b.id, email: b.email })}>Make default</button>
+                  <button style={{ ...linkBtn, color: 'var(--red)' }} onClick={() => open({ kind: 'remove', id: b.id, email: b.email })}>Remove</button>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {pendingBackups.map((p) => (
+          <p key={p.newEmail} style={{ fontSize: 12, color: 'var(--amber)', margin: '8px 0 0', lineHeight: 1.55 }}>
+            Waiting on confirmation for {p.newEmail}.
+          </p>
+        ))}
+
+        {noBackups && (
+          <div style={{ background: 'var(--amber-bg)', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', fontSize: 12, color: 'var(--amber)', lineHeight: 1.55, margin: '10px 0 0' }}>
+            Add a second address so you are never locked out. If you lose access to your main inbox, a backup can still
+            receive a password reset link.
+          </div>
+        )}
+
+        <button style={{ ...linkBtn, marginTop: 10 }} onClick={() => open({ kind: 'backup' })}>
+          Add a backup email
+        </button>
+      </div>
+
+      {/* ── Password ── */}
+      <div style={row}>
+        <div style={{ minWidth: 0 }}>
+          <div style={rowLabel}>Password</div>
+          {/* Fixed length on purpose. Matching the real length would leak it. */}
+          <div style={{ ...rowValue, letterSpacing: '2px' }}>••••••••••</div>
+        </div>
+        <button style={linkBtn} onClick={() => open({ kind: 'password' })}>Edit</button>
+      </div>
+
+      {/* ── Dialogs ── */}
+      {dialog?.kind === 'email' && (
+        <SecurityModal
+          title="Change sign-in email"
+          onClose={close}
+          intro={
+            <p style={note}>
+              We will email a confirmation link to the new address. <strong style={{ color: 'var(--t1)' }}>Nothing changes
+              until you click it</strong> — your current address keeps working, and the link expires after 10 minutes.
+            </p>
+          }
+          footer={
+            <>
+              {/* Opens the confirmation step rather than sending. Replacing an
+                  address and adding one are one click apart on this card, and
+                  the two are easy to confuse, so the send is held behind an
+                  explicit statement of which one is about to happen. */}
+              <button className="db-shell-btn" disabled={busy || !emailInput || !pw} onClick={() => { setErr(null); setConfirmSend(true) }}>
+                Send confirmation
+              </button>
+              <button style={linkBtn} onClick={close}>Cancel</button>
+            </>
+          }
+        >
+          <div>
+            <div style={fieldLabel}>Old email</div>
+            {/* Rendered as text rather than a disabled input. It is a fact
+                being stated, not a field, and an input here caused a real bug:
+                the browser skips disabled inputs when autofilling saved
+                credentials, so it left this one empty and put the saved
+                address into the NEW email box below instead. */}
+            <div
+              style={{
+                background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 7,
+                padding: '9px 12px', fontSize: 13.5, color: 'var(--t2)', wordBreak: 'break-all',
+              }}
+            >
+              {email || <span style={{ color: 'var(--t3)' }}>Loading…</span>}
+            </div>
+          </div>
+          <div>
+            <label style={fieldLabel} htmlFor="sec-new-email">New email address</label>
+            {/* `autoComplete="off"` alone does not stop Chrome filling saved
+                credentials into an email field that sits above a password
+                field. Staying readOnly until focus does, because the browser
+                will not autofill a readOnly input. */}
+            <input
+              id="sec-new-email"
+              name="pck-new-email"
+              className="db-shell-input"
+              style={input}
+              type="email"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              placeholder="new@email.com"
+              autoComplete="off"
+              readOnly={!newEmailFocused}
+              onFocus={() => setNewEmailFocused(true)}
+            />
+          </div>
+          <div>
+            <label style={fieldLabel} htmlFor="sec-email-pw">Current password</label>
+            <input id="sec-email-pw" className="db-shell-input" style={input} type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Your current password" autoComplete="current-password" />
+          </div>
+          {err && <div className="db-shell-alert-error">{err}</div>}
+        </SecurityModal>
+      )}
+
+      {/* Change-versus-add confirmation. Stacked above the form so cancelling
+          returns to it with everything still typed. */}
+      {dialog?.kind === 'email' && confirmSend && (
+        <SecurityModal
+          title="Change your email address?"
+          onClose={() => setConfirmSend(false)}
+          intro={
+            <div style={{ background: 'var(--amber-bg)', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '11px 13px', fontSize: 12.5, color: 'var(--amber)', lineHeight: 1.6 }}>
+              This will <strong>CHANGE</strong> your email address once you follow the verification steps in the email we
+              will send. If you want to <strong>ADD</strong> another email, click cancel and then add a backup email in
+              Sign-In &amp; Security.
+            </div>
+          }
+          footer={
+            <>
+              <button className="db-shell-btn" disabled={busy} onClick={() => submitEmail('primary')}>
+                {busy ? 'Sending…' : 'Yes'}
+              </button>
+              <button style={linkBtn} onClick={() => setConfirmSend(false)}>Cancel</button>
+            </>
+          }
+        >
+          {err && <div className="db-shell-alert-error">{err}</div>}
+        </SecurityModal>
+      )}
+
+      {dialog?.kind === 'backup' && (
+        <SecurityModal
+          title="Add a backup email"
+          onClose={close}
+          intro={
+            <p style={note}>
+              A backup address can receive a password reset link, so losing access to your main inbox will not lock you
+              out. We will email a confirmation link that expires after 10 minutes.
+            </p>
+          }
+          footer={
+            <>
+              <button className="db-shell-btn" disabled={busy || !emailInput || !pw} onClick={() => submitEmail('backup')}>
+                {busy ? 'Sending…' : 'Send confirmation'}
+              </button>
+              <button style={linkBtn} onClick={close}>Cancel</button>
+            </>
+          }
+        >
+          <input className="db-shell-input" style={input} type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} placeholder="backup@email.com" autoComplete="off" autoFocus />
+          <input className="db-shell-input" style={input} type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Your current password" autoComplete="current-password" />
+          {err && <div className="db-shell-alert-error">{err}</div>}
+        </SecurityModal>
+      )}
+
+      {dialog?.kind === 'password' && (
+        <SecurityModal
+          title="Change password"
+          onClose={close}
+          footer={
+            <>
+              <button className="db-shell-btn" disabled={busy || !pw || newPw.length < 8} onClick={submitPassword}>
+                {busy ? 'Saving…' : 'Change password'}
+              </button>
+              <button style={linkBtn} onClick={close}>Cancel</button>
+            </>
+          }
+        >
+          <input className="db-shell-input" style={input} type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Current password" autoComplete="current-password" autoFocus />
+          <input className="db-shell-input" style={input} type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="New password (8+ characters)" autoComplete="new-password" />
+          <input className="db-shell-input" style={input} type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="Confirm new password" autoComplete="new-password" />
+          {err && <div className="db-shell-alert-error">{err}</div>}
+        </SecurityModal>
+      )}
+
+      {dialog?.kind === 'promote' && (
+        <SecurityModal
+          title="Make this your sign-in email"
+          onClose={close}
+          intro={
+            <>
+              <p style={note}>
+                <strong style={{ color: 'var(--t1)' }}>{dialog.email}</strong> will become the address you sign in with.
+              </p>
+              <div style={{ background: 'var(--amber-bg)', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', fontSize: 12, color: 'var(--amber)', lineHeight: 1.55, marginTop: 10 }}>
+                From now on you must sign in with <strong>{dialog.email}</strong>. Your current address,{' '}
+                <strong>{email}</strong>, will become a backup and will no longer sign you in. You will be signed out so
+                you can sign back in with the new address.
+              </div>
+              {/* No confirmation link: this address already proved its inbox
+                  when it was added, so the control that matters here is the
+                  password plus a notice to every address on the account. */}
+            </>
+          }
+          footer={
+            <>
+              <button className="db-shell-btn" disabled={busy || !pw} onClick={() => promote(dialog.id)}>
+                {busy ? 'Updating…' : 'Make default'}
+              </button>
+              <button style={linkBtn} onClick={close}>Cancel</button>
+            </>
+          }
+        >
+          <input className="db-shell-input" style={input} type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Your current password" autoComplete="current-password" autoFocus />
+          {err && <div className="db-shell-alert-error">{err}</div>}
+        </SecurityModal>
+      )}
+
+      {dialog?.kind === 'remove' && (
+        <SecurityModal
+          title="Remove backup email"
+          onClose={close}
+          intro={
+            <p style={note}>
+              <strong style={{ color: 'var(--t1)' }}>{dialog.email}</strong> will no longer be able to receive a password
+              reset link for this account.
+            </p>
+          }
+          footer={
+            <>
+              <button className="db-shell-btn" disabled={busy || !pw} onClick={() => removeBackup(dialog.id)} style={{ background: 'var(--red)' }}>
+                {busy ? 'Removing…' : 'Remove address'}
+              </button>
+              <button style={linkBtn} onClick={close}>Cancel</button>
+            </>
+          }
+        >
+          <input className="db-shell-input" style={input} type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Your current password" autoComplete="current-password" autoFocus />
+          {err && <div className="db-shell-alert-error">{err}</div>}
+        </SecurityModal>
+      )}
+    </>
+  )
+}
+
+
+function AccountPageContent() {
+  const deepLinkParams = useSearchParams()
+  const [nameChange, setNameChange] = useState<{ from: string; to: string } | null>(null)
   const { data: session } = useSession()
   const planTier = (session?.user as any)?.planTier as string | null | undefined
 
@@ -793,7 +1298,12 @@ export default function AccountPage() {
   const [gbpBusy, setGbpBusy] = useState(false)
   const [gbpError, setGbpError] = useState<string | null>(null)
   const [showServicesTip, setShowServicesTip] = useState(false)
-  const gbpConnected = gbpStatus === 'connected'
+  // Tracks whether a stored refresh token actually backs the status column.
+  // The route already answers this; reading the status string alone is what
+  // let a credential-less "connected" row keep rendering a green card. See
+  // the comment on the Search Console status dot below.
+  const [gbpHasCredential, setGbpHasCredential] = useState(false)
+  const gbpConnected = gbpStatus === 'connected' && gbpHasCredential
 
   // ── Google Search Console (Elite + Titan) ──
   // Status mirrors Organization.gscConnectionStatus:
@@ -807,6 +1317,10 @@ export default function AccountPage() {
   const [gscChoice, setGscChoice] = useState('')
   const [gscBusy, setGscBusy] = useState(false)
   const [gscError, setGscError] = useState<string | null>(null)
+  // See the note on `gbpHasCredential` above — same reasoning, same route
+  // field, kept as its own flag because the two connections die separately.
+  const [gscHasCredential, setGscHasCredential] = useState(false)
+  const gscConnected = gscStatus === 'connected' && gscHasCredential
 
   async function reloadGscStatus() {
     try {
@@ -814,6 +1328,7 @@ export default function AccountPage() {
       if (!res.ok) return
       const data = await res.json()
       setGscStatus(data.status ?? null)
+      setGscHasCredential(Boolean(data.connected))
       setGscPropertyUrl(data.propertyUrl ?? null)
       // The picker is only meaningful mid-handshake, so the property list is
       // fetched on demand rather than on every Account page load.
@@ -861,7 +1376,10 @@ export default function AccountPage() {
       if (!res.ok) {
         setGscError(data?.error || 'Could not save your selection.')
       } else {
+        // PATCH is refused without a stored refresh token, so reaching a
+        // successful response proves the credential is there.
         setGscStatus('connected')
+        setGscHasCredential(true)
         setGscPropertyUrl(data.propertyUrl)
       }
     } catch {
@@ -879,6 +1397,7 @@ export default function AccountPage() {
       const res = await fetch('/api/organization/gsc', { method: 'DELETE' })
       if (res.ok) {
         setGscStatus(null)
+        setGscHasCredential(false)
         setGscPropertyUrl(null)
         setGscProperties([])
       } else {
@@ -984,12 +1503,28 @@ export default function AccountPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasGbp])
 
+  // Deep link to a tab and, optionally, an already-expanded card:
+  // /account?tab=connections&card=cname. The onboarding walkthrough explains
+  // the website-integration options but sends people here to set them up.
+  useEffect(() => {
+    const tab = deepLinkParams.get('tab')
+    const card = deepLinkParams.get('card')
+    if (!tab && !card) return
+    const tabs: Tab[] = ['general', 'team', 'billing', 'connections']
+    if (tab && tabs.includes(tab as Tab)) setActiveTab(tab as Tab)
+    if (card) setOpenCards((prev) => ({ ...prev, [card]: true }))
+    // The query stays in the URL on purpose. The tutorial moves between tabs
+    // by changing it, and stripping it here would undo that and put the
+    // walkthrough into a navigation loop.
+  }, [deepLinkParams])
+
   async function reloadGbpStatus() {
     try {
       const res = await fetch('/api/organization/gbp')
       if (!res.ok) return
       const data = await res.json()
       setGbpStatus(data.status ?? null)
+      setGbpHasCredential(Boolean(data.connected))
       setGbpLocationName(data.locationName ?? null)
       setGbpAutoPost(Boolean(data.autoPost))
       // The picker is only meaningful mid-handshake, so the location list is
@@ -1043,7 +1578,10 @@ export default function AccountPage() {
       if (!res.ok) {
         setGbpError(data?.error || 'Could not save your selection.')
       } else {
+        // As with Search Console, a successful PATCH proves the stored
+        // credential exists — the route rejects the call without one.
         setGbpStatus('connected')
+        setGbpHasCredential(true)
         setGbpLocationName(data.gbpLocationName ?? null)
       }
     } catch {
@@ -1111,6 +1649,7 @@ export default function AccountPage() {
       const res = await fetch('/api/organization/gbp', { method: 'DELETE' })
       if (res.ok) {
         setGbpStatus(null)
+        setGbpHasCredential(false)
         setGbpLocationName(null)
         setGbpLocations([])
       } else {
@@ -1195,8 +1734,24 @@ export default function AccountPage() {
     setProductList([...productList, ...defaults.filter((d) => !existing.has(d.toLowerCase()))])
   }
 
+  /**
+   * Renaming the business is the one field on this form that reaches well
+   * beyond the form, so it is gated behind an explicit confirmation rather
+   * than saved with everything else. See the modal for what it touches.
+   */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    if (!profile) return
+    const nextName = orgName.trim()
+    const priorName = (profile.name || '').trim()
+    if (priorName && nextName && nextName !== priorName) {
+      setNameChange({ from: priorName, to: nextName })
+      return
+    }
+    await saveProfile()
+  }
+
+  const saveProfile = async () => {
     if (!profile) return
     setSaving(true)
     setMessage(null)
@@ -1242,7 +1797,7 @@ export default function AccountPage() {
     <DashboardShell title="Account">
 
       {/* Sub-tab navigation */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
+      <div data-tour="acct-tabs" style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
         {(['general', 'team', 'billing', 'connections'] as Tab[]).map((tab) => (
           <button key={tab} style={subTabStyle(activeTab === tab)} onClick={() => setActiveTab(tab)}>
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -1250,9 +1805,17 @@ export default function AccountPage() {
         ))}
       </div>
 
-      {/* ── GENERAL TAB ── */}
+      {/* ── GENERAL TAB ──
+          Two columns on wide screens, one below 980px. Source order puts
+          Sign-In & Security FIRST so the stacked layout leads with it, and the
+          desktop order is corrected in CSS rather than by duplicating markup. */}
       {activeTab === 'general' && (
-        <div className="db-shell-card" style={{ maxWidth: 520 }}>
+        <div className="acct-general-grid">
+          <div className="db-shell-card acct-col-security" data-tour="acct-security">
+            <SecurityCard />
+          </div>
+
+          <div className="db-shell-card acct-col-business" data-tour="acct-business">
           <div className="db-shell-card-title">Business Profile</div>
 
           {loading ? (
@@ -1316,7 +1879,7 @@ export default function AccountPage() {
                 />
               </div>
 
-              <div>
+              <div data-tour="acct-trade">
                 <label htmlFor="business-trade" className="db-shell-label">Trade / Industry</label>
                 <select
                   id="business-trade"
@@ -1333,7 +1896,7 @@ export default function AccountPage() {
                 </div>
               </div>
 
-              <div>
+              <div data-tour="acct-products">
                 <label className="db-shell-label">Products / Services</label>
                 <div style={{ fontSize: 11.5, color: 'var(--t3)', marginBottom: 10, lineHeight: 1.5 }}>
                   These are the options your team sees on the Check-In form. Add, remove, or rename them anytime.
@@ -1417,9 +1980,9 @@ export default function AccountPage() {
               {/* \u2500\u2500 AI Business Profile (Titan only) \u2500\u2500 */}
               {isTitan && (
                 <>
-                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 18, marginTop: 4 }}>
+                  <div data-tour="acct-ai" style={{ borderTop: '1px solid var(--border)', paddingTop: 18, marginTop: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>AI Business Profile</span>
+                      <span className="db-shell-subsection-title">AI Business Profile</span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 10.5, fontWeight: 700, background: '#FFF7ED', color: '#C2410C', border: '1px solid #FED7AA' }}>Titan</span>
                     </div>
                     <p style={{ fontSize: 12, color: 'var(--t3)', lineHeight: 1.55, marginBottom: 16 }}>
@@ -1440,7 +2003,7 @@ export default function AccountPage() {
                       </div>
                       <div>
                         <label htmlFor="ai-about" className="db-shell-label">About your business</label>
-                        <textarea id="ai-about" className="db-shell-input" style={{ width: '100%', minWidth: 0, height: 'auto', padding: '9px 13px', resize: 'vertical' }} rows={3} value={aiAbout} onChange={(e) => setAiAbout(e.target.value)} placeholder="1\u20132 sentences about what you do and who you serve." />
+                        <textarea id="ai-about" className="db-shell-input" style={{ width: '100%', minWidth: 0, height: 'auto', padding: '9px 13px', resize: 'vertical' }} rows={3} value={aiAbout} onChange={(e) => setAiAbout(e.target.value)} placeholder="1 to 2 sentences about what you do and who you serve." />
                       </div>
                     </div>
 
@@ -1508,6 +2071,7 @@ export default function AccountPage() {
               </button>
             </form>
           )}
+          </div>
         </div>
       )}
 
@@ -1531,7 +2095,7 @@ export default function AccountPage() {
 
       {/* ── BILLING TAB ── */}
       {activeTab === 'billing' && (
-        <div className="db-shell-card" style={{ maxWidth: 520 }}>
+        <div className="db-shell-card" data-tour="acct-billing" style={{ maxWidth: 520 }}>
           <div className="db-shell-card-title">Subscription</div>
 
           {planTier ? (
@@ -1586,11 +2150,13 @@ export default function AccountPage() {
             sub="Publish job updates to your Google listing"
             status={
               !hasGbp ? <StatusDot state="coming" label="Upgrade to Activate!" />
-              : gbpStatus === 'connected' ? <StatusDot state="active" label="Active" />
+              : gbpConnected ? <StatusDot state="active" label="Active" />
+              : gbpStatus === 'connected' ? <StatusDot state="disabled" label="Reconnect needed" />
               : gbpStatus === 'needs_reconnect' ? <StatusDot state="disabled" label="Reconnect needed" />
               : gbpStatus === 'select_location' || gbpStatus === 'no_locations' ? <StatusDot state="disabled" label="Action needed" />
               : <StatusDot state="disabled" label="Not connected" />
             }
+            tour="conn-gbp"
             open={!!openCards['gbp']}
             onToggle={() => toggleCard('gbp')}
             locked={!hasGbp}
@@ -1667,14 +2233,22 @@ export default function AccountPage() {
                     {gbpBusy ? 'Saving…' : 'Save selection'}
                   </button>
                 </>
-              ) : gbpStatus === 'needs_reconnect' ? (
+              ) : gbpStatus === 'needs_reconnect' || (gbpStatus === 'connected' && !gbpHasCredential) ? (
                 <>
                   {/* The grant died on Google's side. Without this branch the
                       card falls through to the plain "Connect" state below,
                       which is what made this failure invisible: a working
                       connection appeared to vanish with no reason given. The
                       most common cause is the customer revoking access from
-                      their own Google Account permissions page. */}
+                      their own Google Account permissions page.
+
+                      A status of 'connected' with no stored credential lands
+                      here too, since that row describes a connection that can
+                      no longer authenticate and needs the same reconnect. The
+                      credential test is explicit here because the healthy
+                      case is claimed further down the chain rather than
+                      above, so matching on the status alone would capture
+                      every working connection as well. */}
                   <div style={{ background: 'var(--amber-bg)', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', fontSize: 12, color: 'var(--amber)', lineHeight: 1.55 }}>
                     Google is no longer accepting our connection to your Business Profile, so your jobs have stopped posting. This usually means access was removed from your Google account. Reconnecting takes a few seconds and nothing already posted to Google is affected.
                   </div>
@@ -1778,6 +2352,7 @@ export default function AccountPage() {
             title="Enable Google Business Review Requests"
             sub="Send customers directly to your Google Business Review page"
             status={profile?.gbpReviewLink ? <StatusDot state="active" label="Active" /> : <StatusDot state="disabled" label="Disabled" />}
+            tour="conn-review"
             open={!!openCards['review']}
             onToggle={() => toggleCard('review')}
           >
@@ -1863,12 +2438,12 @@ export default function AccountPage() {
 
           {/* ── Website Integration for Local SEO — family: mutually exclusive, Good/Better/Best ── */}
           {hasWebsiteIntegration && (
-          <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface)', padding: '16px 16px 4px', marginBottom: 16, boxShadow: 'var(--shadow-card)' }}>
+          <div data-tour="conn-website" style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface)', padding: '16px 16px 4px', marginBottom: 16, boxShadow: 'var(--shadow-card)' }}>
             <div style={{ padding: '2px 4px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--t3)' }}>Website Integration for Local SEO</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--t1)', marginTop: 5 }}>Put your jobs on your own website</div>
+                  <div className="db-shell-subsection-title" style={{ marginTop: 5 }}>Put your jobs on your own website</div>
                 </div>
                 <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: 'var(--surface-3)', color: 'var(--t2)' }}>Titan</span>
               </div>
@@ -2627,6 +3202,7 @@ export default function AccountPage() {
             title="Share Your Project Check-In Portfolio"
             sub="Share your work and track visits from any source"
             status={<StatusDot state="active" label="Active" />}
+            tour="conn-share"
             open={!!openCards['share']}
             onToggle={() => toggleCard('share')}
           >
@@ -2702,13 +3278,18 @@ export default function AccountPage() {
             ) : undefined}
             sub="See your search impressions and clicks inside your Reporting tab"
             status={
+              // `gscConnected` requires a stored credential as well as the
+              // status column, so a row that says 'connected' with nothing
+              // behind it now reads "Reconnect needed" instead of green.
               !hasGsc ? <StatusDot state="coming" label="Elite & Titan only" />
-              : gscStatus === 'connected' ? <StatusDot state="active" label="Active" />
+              : gscConnected ? <StatusDot state="active" label="Active" />
+              : gscStatus === 'connected' ? <StatusDot state="disabled" label="Reconnect needed" />
               : gscStatus === 'select_property' ? <StatusDot state="disabled" label="Almost done" />
               : gscStatus === 'needs_reconnect' ? <StatusDot state="disabled" label="Reconnect needed" />
               : gscStatus === 'no_properties' ? <StatusDot state="disabled" label="Action needed" />
               : <StatusDot state="disabled" label="Not connected" />
             }
+            tour="conn-gsc"
             open={!!openCards['gsc']}
             onToggle={() => toggleCard('gsc')}
             locked={!hasGsc}
@@ -2724,7 +3305,7 @@ export default function AccountPage() {
                 <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, margin: 0 }}>
                   Upgrade to Elite or Titan to connect Google Search Console and see real search performance data for your business right inside ProjectCheckin.
                 </p>
-              ) : gscStatus === 'connected' ? (
+              ) : gscConnected ? (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 7 }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
@@ -2788,12 +3369,18 @@ export default function AccountPage() {
                     Check again
                   </button>
                 </>
-              ) : gscStatus === 'needs_reconnect' ? (
+              ) : gscStatus === 'needs_reconnect' || gscStatus === 'connected' ? (
                 <>
                   {/* Mirror of the GBP branch. Without it this falls through to
                       the plain "Connect" state below and the customer is given
                       no reason their working connection disappeared. Written
-                      when the Reporting page detects a 401 from Google. */}
+                      when the Reporting page detects a 401 from Google.
+
+                      A status of 'connected' also lands here, because the
+                      branch above already claimed every case where a real
+                      credential backs that status. Whatever reaches this point
+                      saying 'connected' has lost its stored token, which is
+                      the same problem with the same fix. */}
                   <div style={{ background: 'var(--amber-bg)', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', fontSize: 12, color: 'var(--amber)', lineHeight: 1.55 }}>
                     Google is no longer accepting our connection to your Search Console account, so your Reporting numbers have stopped updating. This usually means access was removed from your Google account. Reconnecting takes a few seconds.
                   </div>
@@ -2843,6 +3430,17 @@ export default function AccountPage() {
       )}
 
       {/* Downgrade warning modal — rendered outside tabs so it always overlays */}
+      {nameChange && (
+        <BusinessNameWarning
+          from={nameChange.from}
+          to={nameChange.to}
+          // This route updates the name only; the slug is left as it is.
+          slugWillChange={false}
+          onCancel={() => { setOrgName(nameChange.from); setNameChange(null) }}
+          onConfirm={() => { setNameChange(null); saveProfile() }}
+        />
+      )}
+
       {showDowngradeWarning && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)',
@@ -2961,5 +3559,15 @@ export default function AccountPage() {
       )}
 
     </DashboardShell>
+  )
+}
+
+// useSearchParams (for the ?tab= deep link) needs a Suspense boundary, or the
+// production build fails to prerender this page. Same pattern as Check-In.
+export default function AccountPage() {
+  return (
+    <Suspense>
+      <AccountPageContent />
+    </Suspense>
   )
 }

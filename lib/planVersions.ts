@@ -59,6 +59,25 @@ export function getMonthlyPhotoCap(planTier: string | null | undefined): number 
  * Tier-only check — use in client components where planVersion isn't in session.
  * Always uses CURRENT_PLAN_VERSION. Orgs with no planTier are treated as free.
  */
+/** Plans in ascending order of capability. */
+export const TIER_ORDER = ['free', 'pro', 'elite', 'titan'] as const
+
+/**
+ * The cheapest plan that includes a feature, derived from PLAN_FEATURES rather
+ * than written down again — a badge that names a tier by hand goes stale the
+ * moment a feature moves between plans.
+ */
+export function lowestTierWithFeature(feature: string): string | null {
+  for (const tier of TIER_ORDER) {
+    if (PLAN_FEATURES[tier]?.[CURRENT_PLAN_VERSION]?.includes(feature)) return tier
+  }
+  return null
+}
+
+export function tierLabel(tier: string): string {
+  return tier.charAt(0).toUpperCase() + tier.slice(1)
+}
+
 export function tierHasFeature(
   planTier: string | null | undefined,
   feature: string

@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import CoachMarks from '@/components/CoachMarks'
+import { REVEAL_SUPPORT_NAV } from '@/lib/navReveal'
 import '@/styles/dashboard.css'
 
 function IcoCheckin() {
@@ -64,6 +66,13 @@ function IcoHelp() {
       <circle cx="8" cy="8" r="6.5"/>
       <path d="M6 6.2a2 2 0 1 1 3.2 1.6c-.7.55-1.2 1-1.2 1.9" strokeLinecap="round"/>
       <circle cx="8" cy="11.4" r="0.6" fill="currentColor" stroke="none"/>
+    </svg>
+  )
+}
+function IcoChevron() {
+  return (
+    <svg className="db-nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6"/>
     </svg>
   )
 }
@@ -142,6 +151,27 @@ export default function DashboardShell({ title, children, action }: Props) {
   const navItem = (href: string) =>
     `db-nav-item${pathname === href || pathname?.startsWith(href + '/') ? ' active' : ''}`
 
+  // ── Support Center group ──────────────────────────────────────────────────
+  // Open state is DERIVED from the route rather than stored. The Jobs page
+  // keeps its own copy of this sidebar, and deriving from the path is what
+  // keeps the two in agreement without a shared store between them. It also
+  // means arriving on a guide from an external link never lands you inside a
+  // collapsed group that hides where you are.
+  const inSupport = pathname === '/help' || Boolean(pathname?.startsWith('/help/'))
+  const [supportOpen, setSupportOpen] = useState(inSupport)
+  useEffect(() => { if (inSupport) setSupportOpen(true) }, [inSupport])
+  useEffect(() => {
+    const open = () => setSupportOpen(true)
+    window.addEventListener(REVEAL_SUPPORT_NAV, open)
+    return () => window.removeEventListener(REVEAL_SUPPORT_NAV, open)
+  }, [])
+
+  // Guides owns bare /help, so it is active anywhere under /help EXCEPT the
+  // tutorial. Matching on the prefix alone would light both children at once
+  // on the tutorial route.
+  const onTutorial = pathname === '/help/tutorial'
+  const guidesActive = inSupport && !onTutorial
+
   return (
     <div className="db-root">
       {/* ── Mobile sidebar overlay ─────────────────────────────────────────── */}
@@ -210,10 +240,39 @@ export default function DashboardShell({ title, children, action }: Props) {
             </Link>
           )}
 
-          <Link className={navItem('/help')} href="/help" onClick={() => setSidebarOpen(false)}>
+          <button
+            type="button"
+            className={`db-nav-item${inSupport && !supportOpen ? ' has-active-child' : ''}`}
+            aria-expanded={supportOpen}
+            aria-controls="db-nav-support"
+            onClick={() => setSupportOpen((o) => !o)}
+          >
             <IcoHelp />
-            Help
-          </Link>
+            Support Center
+            <IcoChevron />
+          </button>
+
+          {supportOpen && (
+            <div className="db-nav-children" id="db-nav-support">
+              <Link
+                className={`db-nav-child${guidesActive ? ' active' : ''}`}
+                href="/help"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <span className="db-nav-child-dot" />
+                Guides
+              </Link>
+              <Link
+                data-tour="nav-tutorial"
+                className={`db-nav-child${onTutorial ? ' active' : ''}`}
+                href="/help/tutorial"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <span className="db-nav-child-dot" />
+                Interactive Tutorial
+              </Link>
+            </div>
+          )}
 
           <button className="db-nav-item" onClick={() => { setSidebarOpen(false); signOut() }}>
             <IcoSignOut />
@@ -255,6 +314,9 @@ export default function DashboardShell({ title, children, action }: Props) {
           {children}
         </div>
       </div>
+      {/* Mounted here, not per page: a coach-mark chapter walks the customer
+          across several routes and has to outlive each one. */}
+      <CoachMarks />
     </div>
   )
 }

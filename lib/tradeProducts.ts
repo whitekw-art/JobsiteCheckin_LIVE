@@ -12,8 +12,9 @@
 export const OTHER_OPTION = 'Other'
 
 export const TRADES = [
-  'Door Installation',
-  'Garage Door',
+  'Door Installation - General',
+  'Door Installation - Garage Doors',
+  'Door Installation - Barn Doors',
   'Fence Installation',
   'Pest Control',
   'Landscaping',
@@ -35,20 +36,38 @@ export type Trade = (typeof TRADES)[number]
 export const TRADE_PRODUCTS: Record<string, string[]> = {
   // Unchanged from the original hardcoded check-in list, so existing
   // door customers see exactly what they saw before.
-  'Door Installation': [
+  'Door Installation - General': [
     'Wood Door',
     'Iron Door',
     'Fiberglass Front Door',
     'Fiberglass Back / Patio Door',
     'Barn Door',
   ],
-  'Garage Door': [
+  'Door Installation - Garage Doors': [
     'Garage Door Installation',
     'Garage Door Repair',
     'Opener Installation',
     'Opener Repair',
     'Spring Replacement',
     'Panel Replacement',
+  ],
+  // Order is deliberate: the categories overlap (a glass door can also be
+  // bypass, a farmhouse door can be painted), so installers are told to pick
+  // the FIRST one that fits. Market and location first, then how the door
+  // moves, then how it looks, then collection. Names match Google search
+  // phrasing because each becomes a WordPress post title ("X in City, ST").
+  // Researched against Google Trends/autocomplete 2026-09-28.
+  'Door Installation - Barn Doors': [
+    'Commercial Barn Doors',
+    'Exterior Barn Doors',
+    'Hidden Track Barn Doors',
+    'Bypass Barn Doors',
+    'Swinging Barn Doors',
+    'Glass Barn Doors',
+    'Farmhouse Barn Doors',
+    'Painted Barn Doors',
+    'Designer Barn Doors',
+    'Custom Barn Doors',
   ],
   'Fence Installation': [
     'Wood Fence',
