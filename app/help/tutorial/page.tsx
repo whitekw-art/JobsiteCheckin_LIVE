@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import DashboardShell from '@/components/DashboardShell'
-import OnboardingModal, { CHAPTERS } from '@/components/OnboardingModal'
+import OnboardingModal, { CHAPTERS, FINISH_CHAPTER } from '@/components/OnboardingModal'
 import { tierHasFeature } from '@/lib/planVersions'
 
 /**
@@ -23,6 +23,16 @@ export default function TutorialPage() {
   const [startChapter, setStartChapter] = useState<number | null>(null)
   // Chapter the customer asked for, held until they acknowledge the caution.
   const [pendingChapter, setPendingChapter] = useState<number | null>(null)
+
+  // A chapter's coach-mark tour hands back here with ?chapter=N when it
+  // finishes, so the replay carries on to the next chapter instead of ending.
+  // The query is stripped straight away so a refresh doesn't reopen it.
+  useEffect(() => {
+    const n = parseInt(new URLSearchParams(window.location.search).get('chapter') || '', 10)
+    if (!Number.isFinite(n) || n < 2 || n > FINISH_CHAPTER) return
+    setStartChapter(n)
+    window.history.replaceState({}, '', '/help/tutorial')
+  }, [])
 
   const planTier = (session?.user as any)?.planTier as string | undefined
   const orgSlug = session?.user?.orgSlug ?? undefined
