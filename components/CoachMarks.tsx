@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { COACH_STEPS, type CoachStep } from '@/lib/coachMarks'
+import { ONBOARDING_CHAPTER_KEY } from '@/lib/onboardingProgress'
 import { useSession } from 'next-auth/react'
 import { lowestTierWithFeature, tierHasFeature, tierLabel } from '@/lib/planVersions'
 
@@ -17,7 +18,12 @@ import { lowestTierWithFeature, tierHasFeature, tierLabel } from '@/lib/planVers
 const SESSION_KEY = 'pc_coach_session'
 const EVENT = 'pc-coach-change'
 
-interface Session { chapter: number; index: number }
+// `resume` is set when the tour was started from a chapter of the walkthrough
+// (first-run onboarding or the Interactive Tutorial replay): finishing the
+// tour then hands back to the walkthrough at the next chapter instead of
+// simply closing.
+type ResumeTarget = { chapter: number; mode: 'onboarding' | 'tutorial' }
+interface Session { chapter: number; index: number; resume?: ResumeTarget }
 
 function readSession(): Session | null {
   try {
@@ -40,13 +46,22 @@ function writeSession(s: Session | null) {
   window.dispatchEvent(new Event(EVENT))
 }
 
-/** Begins a coach-mark chapter. Safe to call from any page. */
-export function startCoachMarks(chapter: number) {
-  writeSession({ chapter, index: 0 })
+/**
+ * Begins a coach-mark chapter. Safe to call from any page. Pass `resume`
+ * when the walkthrough should carry on at that chapter once the tour's last
+ * step is done.
+ */
+export function startCoachMarks(chapter: number, resume?: ResumeTarget) {
+  writeSession({ chapter, index: 0, resume })
 }
 
 export function stopCoachMarks() {
   writeSession(null)
+}
+
+/** Whether a tour is running in this tab (it survives a page refresh). */
+export function isCoachTourActive(): boolean {
+  return readSession() !== null
 }
 
 type Rect = { top: number; left: number; width: number; height: number }
@@ -99,8 +114,23 @@ export default function CoachMarks() {
     const list = COACH_STEPS[s.chapter] ?? []
     const next = s.index + delta
     if (next < 0) return
-    if (next >= list.length) { stopCoachMarks(); return }
-    writeSession({ chapter: s.chapter, index: next })
+    if (next >= list.length) {
+      stopCoachMarks()
+      // Mid-walkthrough, finishing a chapter's tour moves on to the next
+      // chapter rather than dropping the customer on whatever page the last
+      // step was on. First run: the modal lives on /dashboard and reads its
+      // chapter from storage on mount. Replay: the tutorial page opens the
+      // chapter named in its query. Either way a full navigation brings the
+      // modal back.
+      if (s.resume?.mode === 'onboarding') {
+        try { localStorage.setItem(ONBOARDING_CHAPTER_KEY, String(s.resume.chapter)) } catch { /* storage blocked */ }
+        window.location.assign('/dashboard')
+      } else if (s.resume?.mode === 'tutorial') {
+        window.location.assign(`/help/tutorial?chapter=${s.resume.chapter}`)
+      }
+      return
+    }
+    writeSession({ chapter: s.chapter, index: next, resume: s.resume })
   }, [])
 
   // Move to the page this step lives on before trying to find its anchor.

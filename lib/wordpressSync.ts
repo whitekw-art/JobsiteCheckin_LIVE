@@ -270,8 +270,9 @@ function buildJsonLd(job: JobRecord, org: OrgContext['org'], siteUrl: string): s
   return JSON.stringify(graph).replace(/</g, '\\u003c')
 }
 
-function photoHtml(p: SyncedMedia, alt: string): string {
-  return `<img src="${escapeHtml(p.url)}" alt="${escapeHtml(alt)}" class="wp-image-${p.id}" loading="lazy" />`
+function photoHtml(p: SyncedMedia, alt: string, style?: string): string {
+  const styleAttr = style ? ` style="${style}"` : ''
+  return `<img src="${escapeHtml(p.url)}" alt="${escapeHtml(alt)}" class="wp-image-${p.id}" loading="lazy"${styleAttr} />`
 }
 
 function buildContent(
@@ -741,12 +742,34 @@ export async function hasActiveWordPressConnection(orgId: string): Promise<boole
 
 // ── Phase 3b: existing-page injection ────────────────────────────────────────
 
+/** Showcase grid layout (mockup: docs/mockups/wordpress-job-grid-mockup.html).
+ *  Inline style attributes, not a <style> tag: on a site where the connecting
+ *  user lacks unfiltered_html (multisite, DISALLOW_UNFILTERED_HTML), WordPress
+ *  strips a <style> tag but leaves its CSS as visible text on the page. Inline
+ *  declarations are filtered one by one instead (safecss_filter_attr), and every
+ *  property and function used here is on its allowlist (repeat() since WP 6.3).
+ *  A dropped declaration degrades to the old stacked layout rather than breaking.
+ *  The column rule needs no media queries: each track is at least a third of the
+ *  showcase's own width (and never under 224px), so the grid shows 3 per row at
+ *  720px+, 2 per row at 472px+, and 1 below that — following the theme's content
+ *  width, not the screen's. Fonts and colors are inherited from the theme. */
+const SHOWCASE_STYLE = {
+  grid: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(max(224px,calc((100% - 48px) / 3)),1fr));gap:28px 24px',
+  card: 'display:flex;flex-direction:column;min-width:0',
+  photo: 'display:block;width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;margin:0 0 12px',
+  title: 'font-size:1.15em;line-height:1.3;margin:0 0 8px',
+  text: 'font-size:calc(1em - 2px);margin:0 0 8px',
+  // Pins "See this project" to the bottom so the links line up across a row.
+  link: 'font-size:calc(1em - 2px);margin:auto 0 0',
+  archive: 'margin-top:28px',
+}
+
 /** One compact showcase card for a mapped page: lead photo, heading, location,
  *  a short summary, and a link to the job's own WordPress post — where the full
  *  gallery + schema live (that post is the canonical page for the job). The
  *  card is an internal link that passes authority to the post; it deliberately
  *  does NOT repeat the full gallery/schema, to avoid duplicating the post. No
- *  injected JS/CSS — renders in any theme and stays crawlable. */
+ *  injected JS; layout is inline styles (SHOWCASE_STYLE). */
 function renderJobCard(job: JobRecord, media: SyncedMedia[]): string {
   const alt = jobTitle(job)
   const lead = media.find((m) => m.role === 'after') ?? media[0] ?? null
@@ -755,20 +778,23 @@ function renderJobCard(job: JobRecord, media: SyncedMedia[]): string {
   const summary = desc.length > 180 ? `${desc.slice(0, 177).trimEnd()}…` : desc
   const postUrl = job.wpPostUrl || ''
 
-  const parts: string[] = ['<div class="projectcheckin-job">']
+  const s = SHOWCASE_STYLE
+  const parts: string[] = [`<div class="projectcheckin-job" style="${s.card}">`]
   if (lead) {
     parts.push(
       postUrl
-        ? `<a href="${escapeHtml(postUrl)}">${photoHtml(lead, alt)}</a>`
-        : photoHtml(lead, alt)
+        ? `<a href="${escapeHtml(postUrl)}">${photoHtml(lead, alt, s.photo)}</a>`
+        : photoHtml(lead, alt, s.photo)
     )
   }
   parts.push(
-    postUrl ? `<h3><a href="${escapeHtml(postUrl)}">${escapeHtml(alt)}</a></h3>` : `<h3>${escapeHtml(alt)}</h3>`
+    postUrl
+      ? `<h3 style="${s.title}"><a href="${escapeHtml(postUrl)}">${escapeHtml(alt)}</a></h3>`
+      : `<h3 style="${s.title}">${escapeHtml(alt)}</h3>`
   )
-  if (place) parts.push(`<p><strong>Location:</strong> ${escapeHtml(place)}</p>`)
-  if (summary) parts.push(`<p>${escapeHtml(summary)}</p>`)
-  if (postUrl) parts.push(`<p><a href="${escapeHtml(postUrl)}">See this project →</a></p>`)
+  if (place) parts.push(`<p style="${s.text}"><strong>Location:</strong> ${escapeHtml(place)}</p>`)
+  if (summary) parts.push(`<p style="${s.text}">${escapeHtml(summary)}</p>`)
+  if (postUrl) parts.push(`<p style="${s.link}"><a href="${escapeHtml(postUrl)}">See this project →</a></p>`)
   parts.push('</div>')
   return parts.join('\n')
 }
@@ -832,7 +858,14 @@ export async function renderPageMapping(mappingId: string): Promise<{ rendered: 
       archiveUrl = await getArchiveLink(creds, 'tags', [mapping.matchCity, mapping.matchState].filter(Boolean).join(' '))
     if (!archiveUrl && !mapping.matchService && !mapping.matchCity) archiveUrl = creds.siteUrl
 
-    block = `<h2>Recent Projects</h2>\n${cards.join('\n')}${archiveUrl ? `\n<p><a href="${escapeHtml(archiveUrl)}">View Archive →</a></p>` : ''}`
+    // Cards are joined with no separator: under wpautop a newline between grid
+    // children can become a stray <br>, which would take up a grid cell.
+    block =
+      `<h2>Recent Projects</h2>\n` +
+      `<div class="projectcheckin-grid" style="${SHOWCASE_STYLE.grid}">${cards.join('')}</div>` +
+      (archiveUrl
+        ? `\n<p style="${SHOWCASE_STYLE.archive}"><a href="${escapeHtml(archiveUrl)}">View Archive →</a></p>`
+        : '')
   }
 
   const page = await getPageContent(creds, mapping.wpPageId, pageType)

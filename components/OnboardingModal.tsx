@@ -1,12 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { tierHasFeature } from '@/lib/planVersions'
+import { ONBOARDING_STEP_KEY, ONBOARDING_CHAPTER_KEY } from '@/lib/onboardingProgress'
 import { startCoachMarks } from '@/components/CoachMarks'
 import BusinessNameWarning from '@/components/BusinessNameWarning'
 import { hasCoachSteps, NAV_TIP_CHAPTER } from '@/lib/coachMarks'
 import { revealSupportNav } from '@/lib/navReveal'
 import { TRADES } from '@/lib/tradeProducts'
+import { GoogleGIcon, GoogleWordmark } from '@/components/GoogleIcons'
+import { GBP_PERMISSION_LABEL, GSC_PERMISSION_LABEL } from '@/lib/googlePermissions'
 
 const WIDGET_PLATFORM_INSTRUCTIONS: Record<string, string> = {
   WordPress: '1. Log into WordPress and open the page where you want your work to show up (or create a new page).\n2. Click the + button to add a new block.\n3. Type "Custom HTML" in the search box and select it.\n4. Paste the code below into that block.\n5. Click Update (or Publish) in the top right to save your page.',
@@ -53,14 +56,23 @@ interface Props {
    * which is already set and must not be rewritten.
    */
   replay?: boolean
-  /** Called when a replay is closed or finished. Ignored during first run. */
+  /**
+   * Called when a replay is closed or finished, and in both modes when a
+   * chapter hands the screen to the coach-mark overlay, so the host page can
+   * take the modal out of the way.
+   */
   onExit?: () => void
   /** Chapter to open at. The tutorial index uses this to jump straight to one. */
   startChapter?: number
+  /**
+   * First run only: whether Account Setup (chapter 1) is already finished for
+   * this account. A saved chapter past 1 is honoured only when it is, so a
+   * position left in storage by another account on the same browser can never
+   * skip a new account past Account Setup.
+   */
+  accountSetupDone?: boolean
 }
 
-const ONBOARDING_STEP_KEY = 'pc_onboarding_step'
-const ONBOARDING_CHAPTER_KEY = 'pc_onboarding_chapter'
 
 /**
  * Onboarding is chaptered. Chapter 1 keeps the original flat step numbers
@@ -74,6 +86,21 @@ const ONBOARDING_CHAPTER_KEY = 'pc_onboarding_chapter'
  * separately and lands in CHAPTER_STEPS.
  */
 export const FINISH_CHAPTER = 8
+
+/**
+ * The "Account setup is complete" screen that closes chapter 1 and introduces
+ * the walkthrough. Numbered past every real Account Setup step so it never
+ * collides with one, whichever plan adds or drops the website step.
+ */
+const SETUP_DONE_STEP = 7
+
+/**
+ * Connect Google Business Profile — Elite and Titan only, between the review
+ * link and website integration. Numbered out of sequence for the same reason
+ * as SETUP_DONE_STEP: inserting it as step 5 would renumber the steps after it
+ * and every saved position that points at them.
+ */
+const GBP_CONNECT_STEP = 8
 
 export const CHAPTERS: { id: number; name: string; short: string; kind: 'modal' | 'coach'; intro: string }[] = [
   // `intro` describes the area of the app being reviewed and why it matters to
@@ -173,11 +200,11 @@ function OnbSetupLink({ card, children }: { card: string; children: React.ReactN
   )
 }
 
-export default function OnboardingModal({ planTier, orgSlug, replay = false, onExit, startChapter = 1 }: Props) {
+export default function OnboardingModal({ planTier, orgSlug, replay = false, onExit, startChapter = 1, accountSetupDone = false }: Props) {
   const isTitan = (planTier ?? 'free').toLowerCase() === 'titan'
   // Widget setup step (step 6) — Titan only, gated by the website_integration feature
   const hasWidgetStep = tierHasFeature(planTier, 'website_integration')
-  const maxStep = hasWidgetStep ? 6 : 5
+  const hasGbpConnectStep = tierHasFeature(planTier, 'gbp_integration')
 
   const [step, setStepState] = useState<number>(() => {
     if (typeof window === 'undefined') return 1
@@ -186,7 +213,8 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
     if (replay) return 1
     const saved = parseInt(localStorage.getItem(ONBOARDING_STEP_KEY) || '1', 10)
     const max = tierHasFeature(planTier, 'website_integration') ? 6 : 5
-    return (saved >= 1 && saved <= max) ? saved : 1
+    const extra = saved === SETUP_DONE_STEP || (saved === GBP_CONNECT_STEP && tierHasFeature(planTier, 'gbp_integration'))
+    return (saved >= 1 && saved <= max) || extra ? saved : 1
   })
 
   const setStep = (n: number) => {
@@ -200,6 +228,7 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
   const [chapter, setChapterState] = useState<number>(() => {
     if (typeof window === 'undefined') return startChapter
     if (replay) return startChapter
+    if (!accountSetupDone) return 1
     const saved = parseInt(localStorage.getItem(ONBOARDING_CHAPTER_KEY) || '1', 10)
     return (saved >= 1 && saved <= FINISH_CHAPTER) ? saved : 1
   })
@@ -209,19 +238,169 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
     setChapterState(n)
   }
 
+  // Account Setup is finished the moment a first run leaves chapter 1, so the
+  // account is marked complete then rather than at the very end. Two reasons:
+  // the account is usable from this point (the same reasoning as Save & exit),
+  // and middleware keeps an incomplete account on /dashboard, which would
+  // bounce the coach-mark tours for Check-In, Reporting and Account off their
+  // pages. The session refresh re-issues the token middleware reads.
+  const accountSetupSaved = useRef<Promise<unknown> | null>(null)
+  const markAccountSetupDone = () => {
+    if (replay || accountSetupSaved.current) return accountSetupSaved.current
+    accountSetupSaved.current = fetch('/api/organization/complete-onboarding', { method: 'POST' })
+      .then(() => fetch('/api/auth/session'))
+      .catch(() => { accountSetupSaved.current = null })
+    return accountSetupSaved.current
+  }
+
   // Chapters 2+ are entered at their own first step. Chapter 1 is the legacy
   // flow and owns its step numbers, so it is never re-seeded here.
   const goToChapter = (n: number) => {
+    if (chapter === 1 && n > 1) void markAccountSetupDone()
     setChapter(n)
     if (n !== 1) setStep(1)
   }
 
-  const nextChapter = () => goToChapter(chapter >= CHAPTERS.length ? FINISH_CHAPTER : chapter + 1)
+  const chapterAfter = (c: number) => (c >= CHAPTERS.length ? FINISH_CHAPTER : c + 1)
+  const nextChapter = () => goToChapter(chapterAfter(chapter))
 
   // Account Setup is a forced flow: there is nothing saved yet, so letting
   // someone leave halfway would strand a half-built account. Once it is behind
   // them the remaining chapters are explanatory, and leaving is safe.
-  const canExit = replay || chapter > 1
+  const setupDone = chapter === 1 && step === SETUP_DONE_STEP
+  const canExit = replay || chapter > 1 || setupDone
+
+  // GBP connect step (Elite + Titan). Mirrors the Connect Your Google Business
+  // Profile card on Account -> Connections and uses the same routes, so the
+  // two can never disagree about the connection's state.
+  const [gbpStatus,       setGbpStatus]       = useState<string | null>(null)
+  const [gbpHasCred,      setGbpHasCred]      = useState(false)
+  const [gbpLocationName, setGbpLocationName] = useState<string | null>(null)
+  const [gbpLocations,    setGbpLocations]    = useState<{ name: string; title: string }[]>([])
+  const [gbpChoice,       setGbpChoice]       = useState('')
+  const [gbpAutoPost,     setGbpAutoPost]     = useState(false)
+  const [gbpBusy,         setGbpBusy]         = useState(false)
+  const [gbpError,        setGbpError]        = useState<string | null>(null)
+  const gbpConnected = gbpStatus === 'connected' && gbpHasCred
+
+  const reloadGbpStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/organization/gbp')
+      if (!res.ok) return
+      const data = await res.json()
+      setGbpStatus(data.status ?? null)
+      setGbpHasCred(Boolean(data.connected))
+      setGbpLocationName(data.locationName ?? null)
+      setGbpAutoPost(Boolean(data.autoPost))
+      if (data.status === 'select_location') {
+        const listRes = await fetch('/api/organization/gbp/locations')
+        if (listRes.ok) {
+          const list = await listRes.json()
+          setGbpLocations(list.locations ?? [])
+          setGbpChoice(list.locations?.[0]?.name ?? '')
+        }
+      }
+    } catch { /* leave the last known state on screen */ }
+  }, [])
+
+  // Load the connection whenever this step is on screen, including the return
+  // from Google: middleware carries the callback's ?gbp=<outcome> over to
+  // /dashboard, and it is stripped once read so a refresh doesn't replay it.
+  useEffect(() => {
+    if (chapter !== 1 || step !== GBP_CONNECT_STEP || !hasGbpConnectStep) return
+    const outcome = new URLSearchParams(window.location.search).get('gbp')
+    if (outcome === 'denied') setGbpError('You cancelled the Google connection. Nothing was changed.')
+    else if (outcome === 'failed') setGbpError('We could not finish connecting to Google. Please try again.')
+    if (outcome) window.history.replaceState({}, '', window.location.pathname)
+    reloadGbpStatus()
+  }, [chapter, step, hasGbpConnectStep, reloadGbpStatus])
+
+  const handleGbpConnect = async () => {
+    setGbpBusy(true)
+    setGbpError(null)
+    try {
+      const res = await fetch('/api/organization/gbp', { method: 'POST' })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.consentUrl) {
+        setGbpError(data?.error || 'Could not start the connection. Please try again.')
+        setGbpBusy(false)
+        return
+      }
+      // Leaves the app for Google. The saved step brings the customer back here.
+      window.location.assign(data.consentUrl)
+    } catch {
+      setGbpError('Could not start the connection. Please try again.')
+      setGbpBusy(false)
+    }
+  }
+
+  const handleGbpSelectLocation = async () => {
+    if (!gbpChoice) return
+    setGbpBusy(true)
+    setGbpError(null)
+    try {
+      const res = await fetch('/api/organization/gbp', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locationId: gbpChoice }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setGbpError(data?.error || 'Could not save your selection.')
+      } else {
+        setGbpStatus('connected')
+        setGbpHasCred(true)
+        setGbpLocationName(data.gbpLocationName ?? null)
+      }
+    } catch {
+      setGbpError('Could not save your selection.')
+    } finally {
+      setGbpBusy(false)
+    }
+  }
+
+  const handleGbpCheckAgain = async () => {
+    setGbpBusy(true)
+    setGbpError(null)
+    try {
+      const res = await fetch('/api/organization/gbp/locations')
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setGbpError(data?.error || 'Could not check your Google account. Please try again.')
+        return
+      }
+      if ((data.locations ?? []).length === 0) {
+        setGbpError('We still cannot find a business listing on that Google account.')
+        return
+      }
+      await reloadGbpStatus()
+    } catch {
+      setGbpError('Could not check your Google account. Please try again.')
+    } finally {
+      setGbpBusy(false)
+    }
+  }
+
+  const handleGbpAutoPostToggle = async () => {
+    const next = !gbpAutoPost
+    setGbpAutoPost(next) // optimistic, reverted if the server disagrees
+    setGbpError(null)
+    try {
+      const res = await fetch('/api/organization/gbp', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autoPost: next }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        setGbpError(data?.error || 'Could not save that setting.')
+        setGbpAutoPost(!next)
+      }
+    } catch {
+      setGbpError('Could not save that setting.')
+      setGbpAutoPost(!next)
+    }
+  }
 
   // Step 4 — GBP review link
   const [gbpReviewLink,  setGbpReviewLink]  = useState('')
@@ -472,7 +651,14 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
     window.location.href = '/dashboard'
   }
 
-  const afterReviewLink = () => { if (hasWidgetStep) setStep(5); else goToChapter(2) }
+  // Every way out of the last Account Setup step lands on the setup-complete
+  // screen, whose Continue then opens the Team chapter.
+  const finishAccountSetup = () => setStep(SETUP_DONE_STEP)
+
+  const afterGbpConnect = () => { if (hasWidgetStep) setStep(5); else finishAccountSetup() }
+  const afterReviewLink = () => { if (hasGbpConnectStep) setStep(GBP_CONNECT_STEP); else afterGbpConnect() }
+  // The last real Account Setup step, which Back on the setup-complete screen returns to.
+  const lastSetupStep = hasWidgetStep ? 5 : hasGbpConnectStep ? GBP_CONNECT_STEP : 4
 
   const handleGbpLinkSave = async () => {
     const link = gbpReviewLink.trim()
@@ -577,7 +763,7 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
       }
       setWSaving(false)
     }
-    goToChapter(2)
+    finishAccountSetup()
   }
 
   const tier = planTier || 'free'
@@ -630,10 +816,23 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
           // Chapter 1 still measures itself in legacy step numbers, and the
           // Titan AI interstitial is a step the customer sees even though it
           // has no number of its own.
-          const stepsHere = chapter === 1 ? (isTitan ? 6 : 5) : 1
-          const posHere = chapter === 1
-            ? (showAiResearch ? 3 : (isTitan && step >= 3 ? step + 1 : step))
-            : 1
+          // Account Setup in the order the customer meets it. Some steps are
+          // numbered out of sequence (see GBP_CONNECT_STEP), so the position is
+          // looked up in this list rather than read off the step number. The
+          // Titan AI interstitial has no step number of its own.
+          const setupOrder: (number | 'research')[] = [
+            1, 2,
+            ...(isTitan ? ['research' as const] : []),
+            3, 4,
+            ...(hasGbpConnectStep ? [GBP_CONNECT_STEP] : []),
+            ...(hasWidgetStep ? [5] : []),
+          ]
+          const stepsHere = chapter === 1 ? setupOrder.length : 1
+          const posHere = setupDone
+            ? stepsHere
+            : chapter === 1
+              ? Math.max(1, setupOrder.indexOf(showAiResearch ? 'research' : step) + 1)
+              : 1
           return (
             <div style={{ marginBottom: 22 }}>
               {/* Leaves room for the close button, which is absolutely
@@ -646,15 +845,16 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
                   {current.name}
                 </div>
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: '#94A3B8', whiteSpace: 'nowrap' as const }}>
-                  Step {Math.min(posHere, stepsHere)} of {stepsHere}
+                  {setupDone ? 'Complete' : `Step ${Math.min(posHere, stepsHere)} of ${stepsHere}`}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 4 }}>
                 {CHAPTERS.map(c => {
                   const fill = c.id < chapter ? 100 : c.id > chapter ? 0 : (posHere / stepsHere) * 100
+                  const finished = c.id < chapter || (setupDone && c.id === 1)
                   return (
                     <div key={c.id} style={{ flex: 1, height: 5, borderRadius: 99, background: '#E0F2FE', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', borderRadius: 99, width: `${fill}%`, background: c.id < chapter ? '#059669' : '#0EA5E9', transition: 'width .3s ease' }} />
+                      <div style={{ height: '100%', borderRadius: 99, width: `${fill}%`, background: finished ? '#059669' : '#0EA5E9', transition: 'width .3s ease' }} />
                     </div>
                   )
                 })}
@@ -1102,6 +1302,215 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
         )}
 
         {/* ── FINAL STEP: First steps / You're all set (step 5 of 5, or step 6 of 6 for Titan widget users) ── */}
+        {/* ── Connect Google Business Profile (Elite + Titan) ──
+            The same content and states as the card on Account -> Connections,
+            in this modal's palette. Guide links open in a new tab so the
+            onboarding run is never abandoned to read them. */}
+        {chapter === 1 && !showAiResearch && step === GBP_CONNECT_STEP && hasGbpConnectStep && (() => {
+          const googleBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 8, background: '#fff', color: '#3c4043', border: '1px solid #dadce0', boxShadow: '0 1px 2px rgba(0,0,0,.08)', fontSize: 13, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: gbpBusy ? 'wait' : 'pointer' }
+          const quietBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', padding: '8px 14px', borderRadius: 8, background: '#F0F9FF', color: '#0284C7', border: '1px solid #BAE6FD', fontSize: 12, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', textDecoration: 'none' }
+          const amberBox: React.CSSProperties = { background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', marginBottom: 14, fontSize: 12, color: '#92400E', lineHeight: 1.55 }
+          const permissionNote = (
+            <div style={{ marginTop: 12, fontSize: 12, color: '#4B7A94', lineHeight: 1.6 }}>
+              Google will ask you to allow one permission: <strong style={{ color: '#0C4A6E' }}>&ldquo;{GBP_PERMISSION_LABEL}.&rdquo;</strong> Allow it so ProjectCheckin can post your finished jobs to your listing. If you have already connected Search Console, Google will also list &ldquo;{GSC_PERMISSION_LABEL},&rdquo; which comes from that connection.
+            </div>
+          )
+          return (
+            <div style={styles.body}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 11, background: '#F8FAFC', border: '1px solid #E2E8F0', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                  <GoogleGIcon />
+                </div>
+                <div>
+                  <h2 style={{ ...styles.stepTitle, marginBottom: 2 }}>Connect Your Google Business Profile</h2>
+                  <div style={{ fontSize: 13, color: '#4B7A94' }}>Publish job updates to your Google listing</div>
+                </div>
+              </div>
+
+              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#4B7A94', lineHeight: 1.6 }}>
+                Businesses with photos on their Google listing get <strong style={{ color: '#0C4A6E' }}>42% more direction requests</strong> and <strong style={{ color: '#0C4A6E' }}>35% more website clicks</strong> than listings with none. — Google
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 18 }}>
+                {[
+                  'Post a finished job to Google in one click, photo and all',
+                  'Fill your Google listing with your own recent work',
+                  'Give Google real, specific job detail to describe your business with',
+                ].map((txt) => (
+                  <div key={txt} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: '#4B7A94', lineHeight: 1.5 }}>
+                    <div style={{ width: 20, height: 20, background: '#E0F2FE', color: '#0284C7', borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    {txt}
+                  </div>
+                ))}
+              </div>
+
+              {gbpError && <div style={{ ...styles.errorBox, marginBottom: 14 }}>{gbpError}</div>}
+
+              {gbpStatus === 'no_locations' ? (
+                <>
+                  <div style={amberBox}>
+                    The Google account you signed in with doesn&apos;t manage a Google Business Profile. The most common reason is signing in with a personal Gmail instead of the account your business listing is on.
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button onClick={handleGbpConnect} disabled={gbpBusy} style={googleBtn}>
+                      <GoogleWordmark />
+                      Try a different Google account
+                    </button>
+                    <button onClick={handleGbpCheckAgain} disabled={gbpBusy} style={quietBtn}>
+                      {gbpBusy ? 'Checking…' : 'Check again'}
+                    </button>
+                    <a href="/help/guides/gbp-connect" target="_blank" rel="noopener noreferrer" style={quietBtn}>
+                      Read the setup guide
+                    </a>
+                  </div>
+                </>
+              ) : gbpStatus === 'select_location' ? (
+                <>
+                  <div style={{ fontSize: 13, color: '#4B7A94', lineHeight: 1.6, marginBottom: 12 }}>
+                    Your Google account manages more than one business. Pick the one your jobs should be posted to.
+                  </div>
+                  <label htmlFor="onb-gbp-location" style={styles.label}>Business location</label>
+                  <select
+                    id="onb-gbp-location"
+                    value={gbpChoice}
+                    onChange={(e) => setGbpChoice(e.target.value)}
+                    style={{ ...styles.input, marginBottom: 14 }}
+                  >
+                    {gbpLocations.map((l) => (
+                      <option key={l.name} value={l.name}>{l.title}</option>
+                    ))}
+                  </select>
+                  <div>
+                    <button onClick={handleGbpSelectLocation} disabled={gbpBusy || !gbpChoice} style={quietBtn}>
+                      {gbpBusy ? 'Saving…' : 'Save selection'}
+                    </button>
+                  </div>
+                </>
+              ) : gbpStatus === 'needs_reconnect' || (gbpStatus === 'connected' && !gbpHasCred) ? (
+                <>
+                  <div style={amberBox}>
+                    Google is no longer accepting our connection to your Business Profile, so your jobs have stopped posting. This usually means access was removed from your Google account. Reconnecting takes a few seconds and nothing already posted to Google is affected.
+                  </div>
+                  <button onClick={handleGbpConnect} disabled={gbpBusy} style={googleBtn}>
+                    <GoogleWordmark />
+                    {gbpBusy ? 'Opening Google…' : 'Reconnect Google Business Profile'}
+                  </button>
+                  {permissionNote}
+                </>
+              ) : !gbpConnected ? (
+                <>
+                  <button onClick={handleGbpConnect} disabled={gbpBusy} style={googleBtn}>
+                    <GoogleWordmark />
+                    {gbpBusy ? 'Opening Google…' : 'Connect Google Business Profile'}
+                  </button>
+                  {permissionNote}
+                  <div style={{ marginTop: 12 }}>
+                    <a href="/help/guides/gbp-connect" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#0284C7', textDecoration: 'none', fontWeight: 600 }}>
+                      Not sure which Google account to use? Read the guide →
+                    </a>
+                  </div>
+                </>
+              ) : (
+                <div style={{ border: '1px solid #E0F2FE', borderRadius: 10, overflow: 'hidden' }}>
+                  <div style={{ padding: '12px 14px', borderBottom: '1px solid #E0F2FE' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#ECFDF5', color: '#059669', marginBottom: 6 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#059669' }} />
+                      Connected
+                    </span>
+                    <div style={{ fontSize: 12.5, color: '#4B7A94' }}>{gbpLocationName || 'Your Google business listing'}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px' }}>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#0C4A6E' }}>Post jobs automatically</span>
+                      <div style={{ fontSize: 12, color: '#64748B', marginTop: 3, lineHeight: 1.5 }}>
+                        {gbpAutoPost
+                          ? 'On — every job you publish goes straight to your Google listing. You can still post older jobs by hand any time.'
+                          : 'Off — nothing posts on its own. Use the Post to Google button on a job whenever you want it on your listing.'}
+                      </div>
+                    </div>
+                    <div
+                      role="switch"
+                      aria-checked={gbpAutoPost}
+                      aria-label="Post jobs automatically"
+                      tabIndex={0}
+                      onClick={handleGbpAutoPostToggle}
+                      onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); handleGbpAutoPostToggle() } }}
+                      style={{ position: 'relative', width: 36, height: 20, flexShrink: 0, background: gbpAutoPost ? '#0EA5E9' : '#CBD5E1', borderRadius: 10, cursor: 'pointer', transition: 'background .2s' }}
+                    >
+                      <div style={{ position: 'absolute', top: 2, left: gbpAutoPost ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.2)', transition: 'left .2s' }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Footer: skip left, continue right — the same layout as the
+                  website-integration step that follows. */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 20, paddingTop: 14, borderTop: '1px solid #E0F2FE' }}>
+                {gbpConnected ? (
+                  <button onClick={() => setStep(4)} style={{ ...styles.btnSkip, marginTop: 0, alignSelf: 'auto', padding: 0 }}>
+                    Back
+                  </button>
+                ) : (
+                  <button onClick={afterGbpConnect} style={{ ...styles.btnSkip, marginTop: 0, alignSelf: 'flex-start', textAlign: 'left' as const, padding: 0 }}>
+                    Skip — set up later in Account → Connections
+                  </button>
+                )}
+                <button
+                  style={{ ...styles.btnPrimary, width: 'auto', height: 44, padding: '0 20px', marginTop: 0, flexShrink: 0 }}
+                  onClick={afterGbpConnect}
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* ── END OF CHAPTER 1: Account setup is complete ──
+            Approved mockup: docs/mockups/onboarding-setup-complete-mockup.html.
+            Bridges Account Setup into the walkthrough, and tells the customer
+            where the walkthrough lives so leaving it never feels final. */}
+        {setupDone && !showAiResearch && (
+          <div style={styles.body}>
+            <div style={{ ...styles.welcomeIcon, background: '#F0FDF4', borderColor: '#A7F3D0' }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+                stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+            <h2 style={styles.stepTitle}>Your account setup is complete</h2>
+            <p style={styles.stepSub}>
+              Your business details are saved. Next, we will walk through how to use ProjectCheckin, starting with how to add your team members.
+            </p>
+
+            <div style={{ display: 'flex', gap: 11, alignItems: 'flex-start', background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 10, padding: '13px 14px', marginBottom: 22, fontSize: 13, color: '#4B7A94', lineHeight: 1.6 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0EA5E9" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}>
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              <span>
+                You can return to this tutorial at any time. Open <strong style={{ color: '#0C4A6E', fontWeight: 700 }}>Support Center</strong> in the left sidebar, then click <strong style={{ color: '#0C4A6E', fontWeight: 700 }}>Interactive Tutorial</strong>.
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 14, borderTop: '1px solid #E0F2FE' }}>
+              <button onClick={() => setStep(lastSetupStep)} style={{ ...styles.btnSkip, marginTop: 0, alignSelf: 'auto', padding: 0 }}>
+                Back
+              </button>
+              <button
+                style={{ ...styles.btnPrimary, width: 'auto', height: 44, padding: '0 20px', marginTop: 0, flexShrink: 0 }}
+                onClick={() => goToChapter(2)}
+              >
+                Continue
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                  stroke="white" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/>
+                  <polyline points="12 5 19 12 12 19"/></svg>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── CHAPTERS 2-7 ──
             Each chapter's steps are specified separately and are not written
             yet. Until they land, the chapter announces itself and hands off:
@@ -1123,17 +1532,31 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
               )}
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 20, paddingTop: 14, borderTop: '1px solid #E0F2FE' }}>
-                <button onClick={() => goToChapter(chapter - 1)} style={{ ...styles.btnSkip, marginTop: 0, alignSelf: 'auto', padding: 0 }}>
+                <button
+                  onClick={() => {
+                    goToChapter(chapter - 1)
+                    // Back from Team lands on the setup-complete screen, the
+                    // last thing the customer saw, not the start of Account Setup.
+                    if (chapter === 2) setStep(SETUP_DONE_STEP)
+                  }}
+                  style={{ ...styles.btnSkip, marginTop: 0, alignSelf: 'auto', padding: 0 }}
+                >
                   Back
                 </button>
                 <button
                   style={{ ...styles.btnPrimary, width: 'auto', height: 44, padding: '0 20px', marginTop: 0, flexShrink: 0 }}
-                  onClick={() => {
+                  onClick={async () => {
                     if (!ready) { nextChapter(); return }
+                    // The tour's pages are only reachable once the completion
+                    // flag has reached the session token.
+                    await markAccountSetupDone()
                     // The overlay owns the screen from here, so the modal has
-                    // to get out of the way before it opens.
+                    // to get out of the way before it opens. The tour is told
+                    // where to hand back to when it finishes, so both the
+                    // first run and the tutorial replay carry on to the next
+                    // chapter.
                     onExit?.()
-                    startCoachMarks(chapter)
+                    startCoachMarks(chapter, { chapter: chapterAfter(chapter), mode: replay ? 'tutorial' : 'onboarding' })
                   }}
                 >
                   {ready ? 'Show me' : chapter >= CHAPTERS.length ? 'Finish' : 'Continue'}
@@ -1218,7 +1641,7 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
         {chapter === 1 && !showAiResearch && step === 5 && hasWidgetStep && (
           <div style={styles.body}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' as const, color: '#F97316', marginBottom: 5 }}>
-              Step 5 of {maxStep} — Optional
+              Optional
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <h2 style={{ ...styles.stepTitle, marginBottom: 0 }}>Website Integration for Local SEO</h2>
@@ -1380,7 +1803,7 @@ export default function OnboardingModal({ planTier, orgSlug, replay = false, onE
             {/* Footer: skip left, save & finish right */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 20, paddingTop: 14, borderTop: '1px solid #E0F2FE' }}>
               <div>
-                <button onClick={() => goToChapter(2)} style={{ ...styles.btnSkip, marginTop: 0, alignSelf: 'flex-start', textAlign: 'left' as const, padding: 0 }}>
+                <button onClick={finishAccountSetup} style={{ ...styles.btnSkip, marginTop: 0, alignSelf: 'flex-start', textAlign: 'left' as const, padding: 0 }}>
                   Skip — set up later in Account → Connections
                 </button>
                 <div style={{ fontSize: 11.5, color: '#4B7A94', lineHeight: 1.5, marginTop: 6 }}>
