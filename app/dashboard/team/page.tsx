@@ -105,7 +105,7 @@ export default function TeamPage() {
   return (
     <DashboardShell title="Team">
       {/* Invite card */}
-      <div className="db-shell-card">
+      <div className="db-shell-card" data-tour="team-invite">
         <div className="db-shell-card-title">Invite New Member</div>
         <form onSubmit={handleInvite} className="db-shell-form">
           <input
@@ -157,7 +157,7 @@ export default function TeamPage() {
       </div>
 
       {/* Members table */}
-      <div className="db-shell-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="db-shell-card" data-tour="team-list" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
           <div className="db-shell-card-title" style={{ marginBottom: 0 }}>Team Members</div>
         </div>

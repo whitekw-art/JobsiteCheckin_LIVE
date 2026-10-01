@@ -1,9 +1,13 @@
 'use client'
 
-import { useEffect, useState, useCallback, FormEvent } from 'react'
+import { Suspense, useEffect, useState, useCallback, FormEvent } from 'react'
 import { useSession, signOut } from 'next-auth/react'
+import { useSearchParams } from 'next/navigation'
 import DashboardShell from '@/components/DashboardShell'
+import BusinessNameWarning from '@/components/BusinessNameWarning'
 import { tierHasFeature } from '@/lib/planVersions'
+import { GBP_PERMISSION_LABEL, GSC_PERMISSION_LABEL } from '@/lib/googlePermissions'
+import { GoogleGIcon, GoogleWordmark } from '@/components/GoogleIcons'
 import {
   TRADES,
   OTHER_OPTION,
@@ -131,25 +135,12 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
 }
 
 // Google G icon for the card header icon box (compact — just the G)
-const GoogleGIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 48 48" fill="none">
-    <path d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 20-9 20-20 0-1.2-.1-2.5-.4-3.5z" fill="#FFC107"/>
-    <path d="M6.3 14.7l6.6 4.8C14.6 16 19 12 24 12c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4c-7.7 0-14.4 4.4-17.7 10.7z" fill="#FF3D00"/>
-    <path d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.3 35.3 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.5 16.3 44 24 44z" fill="#4CAF50"/>
-    <path d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.2 5.2C41.1 35.6 44 30.2 44 24c0-1.2-.1-2.5-.4-3.5z" fill="#1976D2"/>
-  </svg>
-)
-
-// Full Google wordmark for the connect button
-const GoogleWordmark = () => (
-  <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.3px', lineHeight: 1 }}>
-    <span style={{ color: '#4285F4' }}>G</span>
-    <span style={{ color: '#EA4335' }}>o</span>
-    <span style={{ color: '#FBBC05' }}>o</span>
-    <span style={{ color: '#4285F4' }}>g</span>
-    <span style={{ color: '#34A853' }}>l</span>
-    <span style={{ color: '#EA4335' }}>e</span>
-  </span>
+// Names the exact permission Google asks for, in Google's own words, so the
+// customer recognises it on the consent screen and allows it.
+const GbpPermissionNote = () => (
+  <div style={{ marginTop: 12, fontSize: 12, color: 'var(--t2)', lineHeight: 1.6 }}>
+    Google will ask you to allow one permission: <strong style={{ color: 'var(--t1)' }}>&ldquo;{GBP_PERMISSION_LABEL}.&rdquo;</strong> Allow it so ProjectCheckin can post your finished jobs to your listing. If you have already connected Search Console, Google will also list &ldquo;{GSC_PERMISSION_LABEL},&rdquo; which comes from that connection.
+  </div>
 )
 
 const ChevronRight = () => (
@@ -188,7 +179,7 @@ function ActiveTag() {
 // Collapsible connections card. Header (icon + title + sub + status) toggles the body.
 function ConnCard({
   icon, iconBg = 'var(--surface-3)', title, titleExtra, sub, status, open, onToggle,
-  locked = false, accent = false, cardStyle, children,
+  locked = false, accent = false, cardStyle, tour, children,
 }: {
   icon: React.ReactNode
   iconBg?: string
@@ -201,11 +192,13 @@ function ConnCard({
   locked?: boolean
   accent?: boolean
   cardStyle?: React.CSSProperties
+  tour?: string
   children: React.ReactNode
 }) {
   return (
     <div
       className="db-shell-card"
+      {...(tour ? { 'data-tour': tour } : {})}
       style={{
         padding: 0, overflow: 'hidden', opacity: locked ? 0.72 : 1,
         ...(accent ? { borderColor: 'var(--sky)', boxShadow: '0 0 0 1px var(--sky)' } : {}),
@@ -734,7 +727,9 @@ function SecurityCard() {
 }
 
 
-export default function AccountPage() {
+function AccountPageContent() {
+  const deepLinkParams = useSearchParams()
+  const [nameChange, setNameChange] = useState<{ from: string; to: string } | null>(null)
   const { data: session } = useSession()
   const planTier = (session?.user as any)?.planTier as string | null | undefined
 
@@ -1497,6 +1492,21 @@ export default function AccountPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasGbp])
 
+  // Deep link to a tab and, optionally, an already-expanded card:
+  // /account?tab=connections&card=cname. The onboarding walkthrough explains
+  // the website-integration options but sends people here to set them up.
+  useEffect(() => {
+    const tab = deepLinkParams.get('tab')
+    const card = deepLinkParams.get('card')
+    if (!tab && !card) return
+    const tabs: Tab[] = ['general', 'team', 'billing', 'connections']
+    if (tab && tabs.includes(tab as Tab)) setActiveTab(tab as Tab)
+    if (card) setOpenCards((prev) => ({ ...prev, [card]: true }))
+    // The query stays in the URL on purpose. The tutorial moves between tabs
+    // by changing it, and stripping it here would undo that and put the
+    // walkthrough into a navigation loop.
+  }, [deepLinkParams])
+
   async function reloadGbpStatus() {
     try {
       const res = await fetch('/api/organization/gbp')
@@ -1713,8 +1723,24 @@ export default function AccountPage() {
     setProductList([...productList, ...defaults.filter((d) => !existing.has(d.toLowerCase()))])
   }
 
+  /**
+   * Renaming the business is the one field on this form that reaches well
+   * beyond the form, so it is gated behind an explicit confirmation rather
+   * than saved with everything else. See the modal for what it touches.
+   */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    if (!profile) return
+    const nextName = orgName.trim()
+    const priorName = (profile.name || '').trim()
+    if (priorName && nextName && nextName !== priorName) {
+      setNameChange({ from: priorName, to: nextName })
+      return
+    }
+    await saveProfile()
+  }
+
+  const saveProfile = async () => {
     if (!profile) return
     setSaving(true)
     setMessage(null)
@@ -1760,7 +1786,7 @@ export default function AccountPage() {
     <DashboardShell title="Account">
 
       {/* Sub-tab navigation */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
+      <div data-tour="acct-tabs" style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
         {(['general', 'team', 'billing', 'connections'] as Tab[]).map((tab) => (
           <button key={tab} style={subTabStyle(activeTab === tab)} onClick={() => setActiveTab(tab)}>
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -1774,11 +1800,11 @@ export default function AccountPage() {
           desktop order is corrected in CSS rather than by duplicating markup. */}
       {activeTab === 'general' && (
         <div className="acct-general-grid">
-          <div className="db-shell-card acct-col-security">
+          <div className="db-shell-card acct-col-security" data-tour="acct-security">
             <SecurityCard />
           </div>
 
-          <div className="db-shell-card acct-col-business">
+          <div className="db-shell-card acct-col-business" data-tour="acct-business">
           <div className="db-shell-card-title">Business Profile</div>
 
           {loading ? (
@@ -1842,7 +1868,7 @@ export default function AccountPage() {
                 />
               </div>
 
-              <div>
+              <div data-tour="acct-trade">
                 <label htmlFor="business-trade" className="db-shell-label">Trade / Industry</label>
                 <select
                   id="business-trade"
@@ -1859,7 +1885,7 @@ export default function AccountPage() {
                 </div>
               </div>
 
-              <div>
+              <div data-tour="acct-products">
                 <label className="db-shell-label">Products / Services</label>
                 <div style={{ fontSize: 11.5, color: 'var(--t3)', marginBottom: 10, lineHeight: 1.5 }}>
                   These are the options your team sees on the Check-In form. Add, remove, or rename them anytime.
@@ -1943,7 +1969,7 @@ export default function AccountPage() {
               {/* \u2500\u2500 AI Business Profile (Titan only) \u2500\u2500 */}
               {isTitan && (
                 <>
-                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 18, marginTop: 4 }}>
+                  <div data-tour="acct-ai" style={{ borderTop: '1px solid var(--border)', paddingTop: 18, marginTop: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <span className="db-shell-subsection-title">AI Business Profile</span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: 10.5, fontWeight: 700, background: '#FFF7ED', color: '#C2410C', border: '1px solid #FED7AA' }}>Titan</span>
@@ -1966,7 +1992,7 @@ export default function AccountPage() {
                       </div>
                       <div>
                         <label htmlFor="ai-about" className="db-shell-label">About your business</label>
-                        <textarea id="ai-about" className="db-shell-input" style={{ width: '100%', minWidth: 0, height: 'auto', padding: '9px 13px', resize: 'vertical' }} rows={3} value={aiAbout} onChange={(e) => setAiAbout(e.target.value)} placeholder="1\u20132 sentences about what you do and who you serve." />
+                        <textarea id="ai-about" className="db-shell-input" style={{ width: '100%', minWidth: 0, height: 'auto', padding: '9px 13px', resize: 'vertical' }} rows={3} value={aiAbout} onChange={(e) => setAiAbout(e.target.value)} placeholder="1 to 2 sentences about what you do and who you serve." />
                       </div>
                     </div>
 
@@ -2058,7 +2084,7 @@ export default function AccountPage() {
 
       {/* ── BILLING TAB ── */}
       {activeTab === 'billing' && (
-        <div className="db-shell-card" style={{ maxWidth: 520 }}>
+        <div className="db-shell-card" data-tour="acct-billing" style={{ maxWidth: 520 }}>
           <div className="db-shell-card-title">Subscription</div>
 
           {planTier ? (
@@ -2119,6 +2145,7 @@ export default function AccountPage() {
               : gbpStatus === 'select_location' || gbpStatus === 'no_locations' ? <StatusDot state="disabled" label="Action needed" />
               : <StatusDot state="disabled" label="Not connected" />
             }
+            tour="conn-gbp"
             open={!!openCards['gbp']}
             onToggle={() => toggleCard('gbp')}
             locked={!hasGbp}
@@ -2218,6 +2245,7 @@ export default function AccountPage() {
                     <GoogleWordmark />
                     {gbpBusy ? 'Opening Google\u2026' : 'Reconnect Google Business Profile'}
                   </button>
+                  <GbpPermissionNote />
                 </>
               ) : !gbpConnected ? (
                 <>
@@ -2225,6 +2253,7 @@ export default function AccountPage() {
                     <GoogleWordmark />
                     {gbpBusy ? 'Opening Google…' : 'Connect Google Business Profile'}
                   </button>
+                  <GbpPermissionNote />
                   {/* Offered before the customer clicks Connect, not only after
                       it fails — picking the wrong Google account is the most
                       common problem, and the guide covers it up front. */}
@@ -2314,6 +2343,7 @@ export default function AccountPage() {
             title="Enable Google Business Review Requests"
             sub="Send customers directly to your Google Business Review page"
             status={profile?.gbpReviewLink ? <StatusDot state="active" label="Active" /> : <StatusDot state="disabled" label="Disabled" />}
+            tour="conn-review"
             open={!!openCards['review']}
             onToggle={() => toggleCard('review')}
           >
@@ -2399,7 +2429,7 @@ export default function AccountPage() {
 
           {/* ── Website Integration for Local SEO — family: mutually exclusive, Good/Better/Best ── */}
           {hasWebsiteIntegration && (
-          <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface)', padding: '16px 16px 4px', marginBottom: 16, boxShadow: 'var(--shadow-card)' }}>
+          <div data-tour="conn-website" style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface)', padding: '16px 16px 4px', marginBottom: 16, boxShadow: 'var(--shadow-card)' }}>
             <div style={{ padding: '2px 4px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                 <div>
@@ -3163,6 +3193,7 @@ export default function AccountPage() {
             title="Share Your Project Check-In Portfolio"
             sub="Share your work and track visits from any source"
             status={<StatusDot state="active" label="Active" />}
+            tour="conn-share"
             open={!!openCards['share']}
             onToggle={() => toggleCard('share')}
           >
@@ -3249,6 +3280,7 @@ export default function AccountPage() {
               : gscStatus === 'no_properties' ? <StatusDot state="disabled" label="Action needed" />
               : <StatusDot state="disabled" label="Not connected" />
             }
+            tour="conn-gsc"
             open={!!openCards['gsc']}
             onToggle={() => toggleCard('gsc')}
             locked={!hasGsc}
@@ -3389,6 +3421,17 @@ export default function AccountPage() {
       )}
 
       {/* Downgrade warning modal — rendered outside tabs so it always overlays */}
+      {nameChange && (
+        <BusinessNameWarning
+          from={nameChange.from}
+          to={nameChange.to}
+          // This route updates the name only; the slug is left as it is.
+          slugWillChange={false}
+          onCancel={() => { setOrgName(nameChange.from); setNameChange(null) }}
+          onConfirm={() => { setNameChange(null); saveProfile() }}
+        />
+      )}
+
       {showDowngradeWarning && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)',
@@ -3507,5 +3550,15 @@ export default function AccountPage() {
       )}
 
     </DashboardShell>
+  )
+}
+
+// useSearchParams (for the ?tab= deep link) needs a Suspense boundary, or the
+// production build fails to prerender this page. Same pattern as Check-In.
+export default function AccountPage() {
+  return (
+    <Suspense>
+      <AccountPageContent />
+    </Suspense>
   )
 }

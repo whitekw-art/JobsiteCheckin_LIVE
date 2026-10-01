@@ -6,8 +6,13 @@ import Link from 'next/link'
 import { geocodeJobAddress } from '@/lib/geocode'
 import { slugify } from '@/lib/slugify'
 import OnboardingModal from '@/components/OnboardingModal'
+import { savedWalkthroughChapter } from '@/lib/onboardingProgress'
 import { tierHasFeature } from '@/lib/planVersions'
 import '@/styles/dashboard.css'
+
+import CoachMarks, { isCoachTourActive } from '@/components/CoachMarks'
+import { REVEAL_SUPPORT_NAV } from '@/lib/navReveal'
+import { DEMO_JOBS, isDemoJob } from '@/lib/demoJobs'
 
 interface CheckIn {
   id: string
@@ -548,6 +553,20 @@ export default function Dashboard() {
   const canPublish = isOwner || session?.user?.role === 'ADMIN'
 
   // Data
+  /**
+   * Tutorial demo mode, reached only via /dashboard?tutorial=1.
+   *
+   * A new account has no jobs, so the Job Dashboard chapter of the tutorial
+   * would have no rows, no expanded detail and no action buttons to point at.
+   * In this mode the real components render two obviously fake jobs instead,
+   * and every action is inert so nothing can fire against a fake id. The
+   * customer's own dashboard at /dashboard is untouched.
+   */
+  const [demoMode, setDemoMode] = useState(false)
+  useEffect(() => {
+    setDemoMode(new URLSearchParams(window.location.search).get('tutorial') === '1')
+  }, [])
+
   const [checkIns, setCheckIns] = useState<CheckIn[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -558,7 +577,19 @@ export default function Dashboard() {
   // The group always starts collapsed here, because no route under /help can
   // ever be the current page while this sidebar is the one being rendered.
   const [supportOpen, setSupportOpen] = useState(false)
+  useEffect(() => {
+    const open = () => setSupportOpen(true)
+    window.addEventListener(REVEAL_SUPPORT_NAV, open)
+    return () => window.removeEventListener(REVEAL_SUPPORT_NAV, open)
+  }, [])
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+
+  // In the tutorial, open the live example on arrival. The chapter walks
+  // through the expanded detail, and those controls do not exist in the DOM
+  // for the overlay to point at while the row is collapsed.
+  useEffect(() => {
+    if (demoMode) setExpandedIds(new Set(['demo-live']))
+  }, [demoMode])
   const [activeFilter, setActiveFilter] = useState<'all' | 'live' | 'draft'>('all')
   const [installerFilter, setInstallerFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState<'all' | '30' | '90'>('all')
@@ -704,6 +735,7 @@ export default function Dashboard() {
   // the local row so the button settles into its posted state without a full
   // refetch of every job.
   const handleGbpPost = async (checkInId: string) => {
+    if (isDemoJob(checkInId)) return
     setGbpPostingId(checkInId)
     setGbpPostError((prev) => {
       const next = { ...prev }
@@ -753,6 +785,7 @@ export default function Dashboard() {
   // postable. Not tier-gated — a downgraded customer still owns whatever they
   // already posted and must be able to take it down.
   const handleGbpRetract = async (checkInId: string) => {
+    if (isDemoJob(checkInId)) return
     setGbpRetractingId(checkInId)
     setGbpPostError((prev) => {
       const next = { ...prev }
@@ -787,6 +820,24 @@ export default function Dashboard() {
   }
 
   const fetchCheckIns = async () => {
+    if (new URLSearchParams(window.location.search).get('tutorial') === '1') {
+      const demo = DEMO_JOBS as unknown as CheckIn[]
+      setCheckIns(demo)
+      setEditCustomers(
+        Object.fromEntries(
+          demo.map((c) => [
+            c.id,
+            {
+              name: c.homeCustomerName || '',
+              phones: [{ type: 'Mobile', num: c.homeCustomerPhone || '' }],
+              emails: [{ type: 'Home', addr: c.homeCustomerEmail || '' }],
+            },
+          ])
+        )
+      )
+      setLoading(false)
+      return
+    }
     try {
       const res = await fetch('/api/get-checkins-supabase')
       if (res.ok) {
@@ -930,6 +981,7 @@ export default function Dashboard() {
   // ── Address save ───────────────────────────────────────────────────────────
 
   const handleEditSave = async (checkIn: CheckIn) => {
+    if (isDemoJob(checkIn.id)) return
     const addr = editAddresses[checkIn.id]
     if (!addr) return
     setSavingId(checkIn.id)
@@ -978,6 +1030,7 @@ export default function Dashboard() {
   // ── Publish ────────────────────────────────────────────────────────────────
 
   const handleTogglePublish = async (checkIn: CheckIn) => {
+    if (isDemoJob(checkIn.id)) return
     setTogglingId(checkIn.id)
     try {
       const res = await fetch('/api/checkins/publish', {
@@ -1032,6 +1085,7 @@ export default function Dashboard() {
   }
 
   const handlePublishClick = (checkIn: CheckIn) => {
+    if (isDemoJob(checkIn.id)) return
     const { hardBlocked, warnings } = validateForPublish(checkIn)
     if (hardBlocked) return
     setPublishModal({ checkIn, warnings })
@@ -1046,6 +1100,7 @@ export default function Dashboard() {
   // ── Download ───────────────────────────────────────────────────────────────
 
   const handleDownload = async (checkIn: CheckIn) => {
+    if (isDemoJob(checkIn.id)) return
     if (!checkIn.photoUrls || checkIn.photoUrls.length === 0) return
     setDownloadingId(checkIn.id)
     try {
@@ -1083,6 +1138,7 @@ export default function Dashboard() {
   // ── Notes save ────────────────────────────────────────────────────────────
 
   const handleNoteSave = async (checkIn: CheckIn) => {
+    if (isDemoJob(checkIn.id)) return
     const notes = editNotes[checkIn.id] ?? ''
     setSavingNoteId(checkIn.id)
     try {
@@ -1109,6 +1165,7 @@ export default function Dashboard() {
   // ── AI description generate ────────────────────────────────────────────────
 
   const handleAiGenerate = async (checkIn: CheckIn) => {
+    if (isDemoJob(checkIn.id)) return
     setAiGeneratingId(checkIn.id)
     setAiGenerateError((prev) => { const n = { ...prev }; delete n[checkIn.id]; return n })
     try {
@@ -1136,6 +1193,7 @@ export default function Dashboard() {
   }
 
   const handleAiNoteSave = async (checkIn: CheckIn) => {
+    if (isDemoJob(checkIn.id)) return
     const notes = editNotes[checkIn.id] ?? ''
     setAiSavingId(checkIn.id)
     try {
@@ -1160,6 +1218,7 @@ export default function Dashboard() {
   // ── Customer info save ─────────────────────────────────────────────────────
 
   const handleCustomerSave = async (checkIn: CheckIn) => {
+    if (isDemoJob(checkIn.id)) return
     const cust = editCustomers[checkIn.id]
     if (!cust) return
     setSavingCustomerId(checkIn.id)
@@ -1341,6 +1400,7 @@ export default function Dashboard() {
   // ── Photo delete ───────────────────────────────────────────────────────────
 
   const handlePhotoDelete = async (checkIn: CheckIn, url: string) => {
+    if (isDemoJob(checkIn.id)) return
     const key = `${checkIn.id}:${url}`
     setDeletingPhotoKey(key)
     try {
@@ -1368,6 +1428,7 @@ export default function Dashboard() {
   // Cover photo — used as the WordPress featured image and the share preview.
   // Clicking the current cover clears it and returns to automatic selection.
   const handleSetCoverPhoto = async (checkIn: CheckIn, url: string) => {
+    if (isDemoJob(checkIn.id)) return
     const next = checkIn.featuredPhotoUrl === url ? null : url
     const previous = checkIn.featuredPhotoUrl ?? null
 
@@ -1414,6 +1475,20 @@ export default function Dashboard() {
   const portfolioUrl = orgSlug ? `${baseUrl}/portfolio/${orgSlug}` : null
 
   const needsOnboarding = (session?.user as any)?.onboardingComplete === false
+
+  // The modal stays up for the walkthrough chapters too, which run after
+  // Account Setup has already marked the account complete; storage is the only
+  // record of those. Sticky on purpose: the session flips to complete while the
+  // customer is mid-walkthrough, and that must not pull the modal away. It
+  // leaves only when a chapter hands off to a tour (onExit) or the run ends,
+  // which navigates away.
+  // A tour already running here (the Job Dashboard chapter tours this page)
+  // keeps the modal down until the tour hands back.
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  useEffect(() => {
+    if (isCoachTourActive()) return
+    if (needsOnboarding || savedWalkthroughChapter() !== null) setShowOnboarding(true)
+  }, [needsOnboarding])
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -1539,7 +1614,7 @@ export default function Dashboard() {
                   <span className="db-nav-child-dot" />
                   Guides
                 </Link>
-                <Link className="db-nav-child" href="/help/tutorial" onClick={() => setSidebarOpen(false)}>
+                <Link data-tour="nav-tutorial" className="db-nav-child" href="/help/tutorial" onClick={() => setSidebarOpen(false)}>
                   <span className="db-nav-child-dot" />
                   Interactive Tutorial
                 </Link>
@@ -1583,15 +1658,21 @@ export default function Dashboard() {
             </button>
             <h1 className="db-page-title">Job Dashboard</h1>
             <div className="db-topbar-right">
-              <Link className="db-btn-new" href="/check-in">
+              <Link className="db-btn-new" href="/check-in" data-tour="jd-new">
                 <IcoPlus />
                 New Check-In
               </Link>
             </div>
           </div>
 
+          {demoMode && (
+            <div style={{ margin: '0 0 14px', padding: '10px 14px', borderRadius: 9, background: '#FFFBEB', border: '1px solid rgba(217,119,6,.3)', fontSize: 12.5, fontWeight: 600, color: '#92400E', lineHeight: 1.55 }}>
+              Tutorial preview. The jobs below are made-up examples so the walkthrough has something to show. None of this is your data, and the buttons do nothing here.
+            </div>
+          )}
+
           {/* Stats */}
-          <div className="db-stats-row">
+          <div className="db-stats-row" data-tour="jd-stats">
             <div className="db-stat-cell">
               <div className="db-stat-num">{checkIns.length}</div>
               <div className="db-stat-lbl">Total Jobs</div>
@@ -1612,7 +1693,7 @@ export default function Dashboard() {
 
           {/* Portfolio bar */}
           {portfolioUrl && publishedCount > 0 && (
-            <div className="db-portfolio-bar">
+            <div className="db-portfolio-bar" data-tour="jd-portfolio">
               <div className="db-portfolio-left">
                 <div className="db-portfolio-dot" />
                 <span className="db-portfolio-txt">
@@ -1638,7 +1719,7 @@ export default function Dashboard() {
           )}
 
           {/* Filter bar */}
-          <div className="db-filter-bar">
+          <div className="db-filter-bar" data-tour="jd-filters">
             <div className="db-filter-tabs">
               {(['all', 'live', 'draft'] as const).map((f) => (
                 <button
@@ -1714,7 +1795,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="db-jobs-list">
-                {paginatedCheckIns.map((checkIn) => {
+                {paginatedCheckIns.map((checkIn, rowIndex) => {
                   const { mo, dy } = formatDate(checkIn.timestamp)
                   const address = buildAddress(checkIn)
                   const isExpanded = expandedIds.has(checkIn.id)
@@ -1725,12 +1806,14 @@ export default function Dashboard() {
                     zip: checkIn.zip || '',
                   }
                   const { hardBlocked } = validateForPublish(checkIn)
+                  const isDetailTourRow = checkIn.id === 'demo-live'
                   const publicUrl = getPublicUrl(checkIn)
 
                   return (
                     <div
                       key={checkIn.id}
                       className={`db-job-card${isExpanded ? ' open' : ''}`}
+                      {...(rowIndex === 0 ? { 'data-tour': 'jd-row' } : {})}
                     >
                       {/* Collapsed row */}
                       <div
@@ -1762,14 +1845,14 @@ export default function Dashboard() {
                           </div>
                         </div>
 
-                        <div className="db-card-status">
+                        <div className="db-card-status" {...(rowIndex === 0 ? { 'data-tour': 'jd-status' } : {})}>
                           <span className={`db-status-chip ${checkIn.isPublic ? 'db-s-live' : 'db-s-draft'}`}>
                             <span className="db-chip-dot" />
                             {checkIn.isPublic ? 'Live' : 'Draft'}
                           </span>
                         </div>
 
-                        <div className="db-card-action">
+                        <div className="db-card-action" {...(rowIndex === 0 ? { 'data-tour': 'jd-publish' } : {})}>
                           {canPublish && checkIn.isPublic ? (
                             <button
                               className="db-btn-unpub"
@@ -1796,14 +1879,14 @@ export default function Dashboard() {
                           ) : null}
                         </div>
 
-                        <div className="db-card-chev">
+                        <div className="db-card-chev" {...(rowIndex === 0 ? { 'data-tour': 'jd-chev' } : {})}>
                           <IcoChevron />
                         </div>
                       </div>
 
                       {/* Expanded detail */}
                       <div className="db-card-detail">
-                        <div className="db-detail-grid">
+                        <div className="db-detail-grid" {...(isDetailTourRow ? { 'data-tour': 'jd-detail' } : {})}>
                           {/* Left col: customer info + address + job info + notes */}
                           <div className="db-detail-col">
 
@@ -2129,7 +2212,7 @@ export default function Dashboard() {
                                   </div>
                                   {/* Generate button \u2014 Titan only */}
                                   {tierHasFeature(planTier, 'ai_job_description') && (
-                                    <div style={{ marginTop: 10 }}>
+                                    <div style={{ marginTop: 10 }} {...(isDetailTourRow ? { 'data-tour': 'jd-ai' } : {})}>
                                       <button
                                         style={{
                                           display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -2238,7 +2321,7 @@ export default function Dashboard() {
                               </div>
                             )}
 
-                            <div className="db-detail-btns">
+                            <div className="db-detail-btns" {...(isDetailTourRow ? { 'data-tour': 'jd-actions' } : {})}>
                               {checkIn.isPublic && (
                                 <>
                                   <button
@@ -2380,6 +2463,7 @@ export default function Dashboard() {
                               )}
                               {tierHasFeature(planTier, 'review_request') && (
                               <button
+                                {...(isDetailTourRow ? { 'data-tour': 'jd-review' } : {})}
                                 className="db-btn-ghost db-btn-review"
                                 data-tooltip="Texts and/or emails your customer a personalized message and link to leave you a Google review"
                                 onClick={(e) => { e.stopPropagation(); openReviewModal(checkIn) }}
@@ -2441,10 +2525,12 @@ export default function Dashboard() {
       </div>
 
       {/* Modals rendered outside db-root so they stack above z-index:10 */}
-      {needsOnboarding && (
+      {showOnboarding && session && (
         <OnboardingModal
           planTier={(session?.user as any)?.planTier}
           orgSlug={session?.user?.orgSlug ?? undefined}
+          accountSetupDone={!needsOnboarding}
+          onExit={() => setShowOnboarding(false)}
         />
       )}
       {publishModal && (
@@ -2623,6 +2709,10 @@ export default function Dashboard() {
           </div>
         )
       })()}
+      {/* This page has its own shell rather than DashboardShell, so the coach
+          overlay is mounted separately here. Without it a tour that navigates
+          to the dashboard would simply vanish. */}
+      <CoachMarks />
     </>
   )
 }

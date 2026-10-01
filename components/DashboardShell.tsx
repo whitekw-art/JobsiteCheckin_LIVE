@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import CoachMarks from '@/components/CoachMarks'
+import { REVEAL_SUPPORT_NAV } from '@/lib/navReveal'
 import '@/styles/dashboard.css'
 
 function IcoCheckin() {
@@ -158,6 +160,11 @@ export default function DashboardShell({ title, children, action }: Props) {
   const inSupport = pathname === '/help' || Boolean(pathname?.startsWith('/help/'))
   const [supportOpen, setSupportOpen] = useState(inSupport)
   useEffect(() => { if (inSupport) setSupportOpen(true) }, [inSupport])
+  useEffect(() => {
+    const open = () => setSupportOpen(true)
+    window.addEventListener(REVEAL_SUPPORT_NAV, open)
+    return () => window.removeEventListener(REVEAL_SUPPORT_NAV, open)
+  }, [])
 
   // Guides owns bare /help, so it is active anywhere under /help EXCEPT the
   // tutorial. Matching on the prefix alone would light both children at once
@@ -256,6 +263,7 @@ export default function DashboardShell({ title, children, action }: Props) {
                 Guides
               </Link>
               <Link
+                data-tour="nav-tutorial"
                 className={`db-nav-child${onTutorial ? ' active' : ''}`}
                 href="/help/tutorial"
                 onClick={() => setSidebarOpen(false)}
@@ -306,6 +314,9 @@ export default function DashboardShell({ title, children, action }: Props) {
           {children}
         </div>
       </div>
+      {/* Mounted here, not per page: a coach-mark chapter walks the customer
+          across several routes and has to outlive each one. */}
+      <CoachMarks />
     </div>
   )
 }

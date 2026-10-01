@@ -127,10 +127,23 @@ if (
     // Onboarding gate — if the owner/admin hasn't completed onboarding,
     // keep them on /dashboard (where the modal lives). Allow API calls through
     // so the onboarding PATCH can complete.
+    // One exception: the website-integration step's "Set this up in Account →
+    // Connections" link (OnbSetupLink) opens /account?tab=connections in a new
+    // tab. Without this exemption the gate bounced that tab back to /dashboard,
+    // so the customer saw a second copy of the onboarding modal instead of the
+    // connect form. Scoped to the Connections tab only, so every other page
+    // stays gated until onboarding is done.
+    const isOnboardingConnectionsLink =
+      pathname === '/account' && req.nextUrl.searchParams.get('tab') === 'connections'
+    // Help guides are read-only and are linked from onboarding steps (opened
+    // in a new tab), so they stay reachable while Account Setup is unfinished.
+    const isHelpGuide = pathname.startsWith('/help/guides/')
     if (
       token &&
       token.onboardingComplete === false &&
       token.role !== 'SUPER_ADMIN' &&
+      !isOnboardingConnectionsLink &&
+      !isHelpGuide &&
       !pathname.startsWith('/dashboard') &&
       !pathname.startsWith('/subscribe') &&
       !pathname.startsWith('/pricing') &&
@@ -139,7 +152,14 @@ if (
       pathname !== '/' &&
       pathname !== ''
     ) {
-      return NextResponse.redirect(new URL('/dashboard', req.url))
+      // The Google Business Profile connect step in onboarding sends the
+      // customer to Google, whose callback returns to /account?gbp=<outcome>.
+      // That outcome is carried over to /dashboard, where the onboarding modal
+      // reads it, so a cancelled or failed connection still gets explained.
+      const dest = new URL('/dashboard', req.url)
+      const gbpOutcome = pathname === '/account' ? req.nextUrl.searchParams.get('gbp') : null
+      if (gbpOutcome) dest.searchParams.set('gbp', gbpOutcome)
+      return NextResponse.redirect(dest)
     }
 
     // Role-based access control

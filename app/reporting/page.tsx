@@ -595,7 +595,7 @@ export default async function ReportingPage({
             </div>
           </div>
           <Link
-            href="/account"
+            href="/account?tab=connections&card=gbp"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'var(--surface)', border: '1px solid var(--border-2)', color: 'var(--t2)', textDecoration: 'none', flexShrink: 0 }}
           >
             {gbpConnected ? 'Manage connection' : 'Connect GBP'}
@@ -606,7 +606,7 @@ export default async function ReportingPage({
         </div>
         <div className="rpt-gbp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
           {['Profile Views', 'Direction Requests', 'Search Appearances'].map((label, i) => (
-            <div key={label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px', boxShadow: 'var(--shadow-card)' }}>
+            <div key={label} data-tour={`rpt-gbp-${label.toLowerCase().replace(/\s+/g, '-')}`} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px', boxShadow: 'var(--shadow-card)' }}>
               <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--t3)', marginBottom: 8 }}>{label}</div>
               <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--t3)', lineHeight: 1, letterSpacing: '-0.3px' }}>—</div>
               <div style={{ marginTop: 10, height: 4, borderRadius: 4, background: 'var(--surface-3)' }} />
@@ -619,7 +619,7 @@ export default async function ReportingPage({
           ) : (
             <>
               Connect your Google Business Profile in{' '}
-              <Link href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
+              <Link href="/account?tab=connections&card=gbp" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
                 Account &rsaquo; Connections
               </Link>{' '}
               to see GBP metrics here.
@@ -641,7 +641,7 @@ export default async function ReportingPage({
             </div>
           </div>
           <Link
-            href="/account"
+            href="/account?tab=connections&card=gsc"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'var(--surface)', border: '1px solid var(--border-2)', color: 'var(--t2)', textDecoration: 'none', flexShrink: 0, whiteSpace: 'nowrap' }}
           >
             {gscData ? 'Manage connection' : 'Connect GSC'}
@@ -657,7 +657,7 @@ export default async function ReportingPage({
             { label: 'Impressions', value: gscData?.totals.impressions },
             { label: 'Avg. Position', value: gscData?.totals.position },
           ].map(({ label, value }) => (
-            <div key={label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px', boxShadow: 'var(--shadow-card)' }}>
+            <div key={label} data-tour={`rpt-gsc-${label.toLowerCase().replace(/\.\s*/g, '-').replace(/\s+/g, '-')}`} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px', boxShadow: 'var(--shadow-card)' }}>
               <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--t3)', marginBottom: 8 }}>{label}</div>
               <div style={{ fontSize: 24, fontWeight: 700, color: gscData ? 'var(--t1)' : 'var(--t3)', lineHeight: 1, letterSpacing: '-0.3px' }}>
                 {value === undefined ? '—' : value.toLocaleString()}
@@ -670,7 +670,7 @@ export default async function ReportingPage({
         {!gscData ? (
           <div style={{ marginTop: 10, background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--t3)', lineHeight: 1.5 }}>
             Connect Google Search Console in{' '}
-            <Link href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
+            <Link href="/account?tab=connections&card=gsc" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
               Account &rsaquo; Connections
             </Link>{' '}
             to see this data here.
@@ -774,7 +774,7 @@ export default async function ReportingPage({
         {/* Right column: Recent GBP Posts (always visible) + Portfolio Views (gated independently) */}
         <div className="rpt-sidebar-grid" style={{ display: 'grid', gridTemplateColumns: showPortfolioViews ? '1fr 1fr' : '1fr', gap: 12 }}>
           {/* Recent GBP Posts */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 16px', boxShadow: 'var(--shadow-card)' }}>
+          <div data-tour="rpt-gbp-posts" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 16px', boxShadow: 'var(--shadow-card)' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)', marginBottom: 14 }}>Recent GBP Posts</div>
             {recentGbpPosts.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -820,7 +820,7 @@ export default async function ReportingPage({
                   ) : (
                     <>
                       No posts yet.{' '}
-                      <Link href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
+                      <Link href="/account?tab=connections&card=gbp" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
                         Connect GBP
                       </Link>
                     </>
@@ -852,7 +852,7 @@ export default async function ReportingPage({
                 </svg>
                 <div style={{ fontSize: 11, color: 'var(--t3)', textAlign: 'center', lineHeight: 1.5 }}>
                   No data yet.{' '}
-                  <Link href="/account" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
+                  <Link href="/account?tab=connections&card=share" style={{ color: 'var(--sky-text)', fontWeight: 600, textDecoration: 'none' }}>
                     Share your link
                   </Link>
                 </div>
