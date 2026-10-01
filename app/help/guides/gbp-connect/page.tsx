@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import DashboardShell from '@/components/DashboardShell'
 import { GuideBreadcrumb, GuideSection, Step, guideP, guidePLast, guideStrong, guideLink, guideHint } from '@/components/HelpGuideSections'
+import { GBP_PERMISSION_LABEL, GSC_PERMISSION_LABEL } from '@/lib/googlePermissions'
 
 export const metadata: Metadata = { title: 'Connect Your Google Business Profile — Help & Support' }
 
@@ -37,7 +38,9 @@ export default function GbpConnectGuidePage() {
           <Step n={5}>
             Google takes over and asks which Google account to use. <strong style={guideStrong}>Pick the account that manages your business listing</strong> — see the next section if you&apos;re not certain which one that is.
           </Step>
-          <Step n={6}>Google shows what ProjectCheckin is asking permission to do. Click <strong style={guideStrong}>Continue</strong> or <strong style={guideStrong}>Allow</strong>.</Step>
+          <Step n={6}>
+            Google shows what ProjectCheckin is asking permission to do. It asks for one permission: <strong style={guideStrong}>&ldquo;{GBP_PERMISSION_LABEL}.&rdquo;</strong> Allow it, then click <strong style={guideStrong}>Continue</strong> or <strong style={guideStrong}>Allow</strong>. ProjectCheckin needs this permission to post your finished jobs to your listing. If you have already connected Search Console, Google will also list &ldquo;{GSC_PERMISSION_LABEL},&rdquo; which comes from that connection.
+          </Step>
           <Step n={7}>You land back in ProjectCheckin automatically. The card now says <strong style={guideStrong}>Active</strong> with a green dot, and shows which business it&apos;s connected to.</Step>
           <p style={guidePLast}>
             That&apos;s it. Go to your <Link href="/dashboard" style={guideLink}>Job Dashboard</Link>, open any published job, and you&apos;ll see a <strong style={guideStrong}>Post to Google</strong> button.

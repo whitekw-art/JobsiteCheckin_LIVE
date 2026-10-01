@@ -6,10 +6,11 @@ import Link from 'next/link'
 import { geocodeJobAddress } from '@/lib/geocode'
 import { slugify } from '@/lib/slugify'
 import OnboardingModal from '@/components/OnboardingModal'
+import { savedWalkthroughChapter } from '@/lib/onboardingProgress'
 import { tierHasFeature } from '@/lib/planVersions'
 import '@/styles/dashboard.css'
 
-import CoachMarks from '@/components/CoachMarks'
+import CoachMarks, { isCoachTourActive } from '@/components/CoachMarks'
 import { REVEAL_SUPPORT_NAV } from '@/lib/navReveal'
 import { DEMO_JOBS, isDemoJob } from '@/lib/demoJobs'
 
@@ -1475,6 +1476,20 @@ export default function Dashboard() {
 
   const needsOnboarding = (session?.user as any)?.onboardingComplete === false
 
+  // The modal stays up for the walkthrough chapters too, which run after
+  // Account Setup has already marked the account complete; storage is the only
+  // record of those. Sticky on purpose: the session flips to complete while the
+  // customer is mid-walkthrough, and that must not pull the modal away. It
+  // leaves only when a chapter hands off to a tour (onExit) or the run ends,
+  // which navigates away.
+  // A tour already running here (the Job Dashboard chapter tours this page)
+  // keeps the modal down until the tour hands back.
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  useEffect(() => {
+    if (isCoachTourActive()) return
+    if (needsOnboarding || savedWalkthroughChapter() !== null) setShowOnboarding(true)
+  }, [needsOnboarding])
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   const getPublicUrl = (checkIn: CheckIn) => {
@@ -2510,10 +2525,12 @@ export default function Dashboard() {
       </div>
 
       {/* Modals rendered outside db-root so they stack above z-index:10 */}
-      {needsOnboarding && (
+      {showOnboarding && session && (
         <OnboardingModal
           planTier={(session?.user as any)?.planTier}
           orgSlug={session?.user?.orgSlug ?? undefined}
+          accountSetupDone={!needsOnboarding}
+          onExit={() => setShowOnboarding(false)}
         />
       )}
       {publishModal && (
