@@ -88,6 +88,7 @@ if (
   !pathname.startsWith('/mockups/') &&
   !pathname.startsWith('/sitemap') &&
   pathname !== '/robots.txt' &&
+  pathname !== '/llms.txt' &&
   pathname !== '/pricing' &&
   pathname !== '/privacy' &&
   pathname !== '/terms' &&
