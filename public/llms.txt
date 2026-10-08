@@ -1,0 +1,28 @@
+# ProjectCheckin
+
+> ProjectCheckin is cutting-edge software for field service businesses that turns each completed job into marketing and lead gen. A crew member photographs completed work and submits from a phone. ProjectCheckin then transforms the real-world images and data into a special electronic asset that tells Google the geo-locations you do business, that you have real demand from real customers, and the products and services you offer. Google ingests this data, and the more you submit, the better you rank. ProjectCheckin is the next-level solution that larger companies pay agencies thousands per month to obtain. Your projects are posted to your Google Business Profile and website by simply clicking an "Approve" button in your dashboard. Your GBP will begin ranking higher through additional features that will increase 5-star review quantity with virtually no effort. ProjectCheckin will turn you into a fully optimized, world-class technical local SEO machine, proving to AI search engines you do real work in that exact neighborhood!
+
+ProjectCheckin is built for local service businesses that deliver products and services at different locations, such as residential or commercial addresses. Each published job adds a page that search engines can index for the service and the city where the work was done. Every job that is completed and approved by you is transformed into a beautifully designed portfolio page that you can share with prospects, post to social media, feature in marketing content, or publish anywhere else you desire. These pages will integrate directly with your own website through a WordPress connection, a custom subdomain, or an embeddable widget, so if you only publish jobs and never share anywhere else, your website rankings will continue to improve and compound over time if used consistently.
+
+## Product
+- [Home page](https://projectcheckin.com/): How ProjectCheckin turns completed jobs into new customers.
+- [Pricing](https://projectcheckin.com/pricing): The plans and the features included in each.
+- [Local Job Pages](https://projectcheckin.com/features/local-job-pages): How each completed job becomes a public page with photos, location, and business information.
+- [Google Business Profile posts](https://projectcheckin.com/features/gbp-post-generator): How a published job is posted to the business's Google Business Profile with its photo and a caption.
+- [Review requests](https://projectcheckin.com/features/review-requests): How the owner sends a review request by text or email from their own phone, with the Google review link included.
+- [AI Copywriter](https://projectcheckin.com/features/ai-copywriter): How AI reads the job photos and writes a job description for the owner to review and publish.
+- [AI Review Request Agent](https://projectcheckin.com/features/ai-review-request): How AI writes a personalized review request from the job details and handles the replies.
+- [Before and after photos](https://projectcheckin.com/features/before-after): How tagged before and after photos become a comparison slider on the job page.
+- [Job portfolio](https://projectcheckin.com/features/portfolio): How published jobs collect into one public portfolio page the business can share with a single link.
+
+## Blog
+- [11 Google Ranking Factors That Actually Matter for Service Businesses in 2026](https://projectcheckin.com/blog/google-ranking-factors-2026)
+- [AI Overviews Are Cutting Clicks. Here's What the Data Actually Shows.](https://projectcheckin.com/blog/ai-overviews-what-the-data-shows)
+- [How Window, Door, and Garage Door Companies Get Found Online in 2026](https://projectcheckin.com/blog/window-door-companies-get-found-2026)
+- [The Real Reason Getting Google Reviews Is So Hard, But Your Competitors Get Hundreds](https://projectcheckin.com/blog/why-competitors-have-more-google-reviews-2026)
+- [Why Isn't My Google Business Profile Showing Up on Google Maps?](https://projectcheckin.com/blog/why-google-business-profile-not-showing-up-maps)
+- [Best Free Local SEO Tools (2026)](https://projectcheckin.com/blog/best-free-local-seo-tools)
+
+## Optional
+- [Privacy Policy](https://projectcheckin.com/privacy)
+- [Terms of Service](https://projectcheckin.com/terms)
