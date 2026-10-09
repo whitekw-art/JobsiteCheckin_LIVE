@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState, useCallback, FormEvent } from 'react'
+import { wpConnectionActive } from '@/lib/wpStatus'
 import { useSession, signOut } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import DashboardShell from '@/components/DashboardShell'
@@ -1154,7 +1155,8 @@ function AccountPageContent() {
       setWpPassword('') // never keep the credential in component state after use
     } catch (err: any) {
       setWpError(err.message)
-      setWpStatus('failed')
+      // A failed reconnect keeps the reconnect steps on screen for the stored site.
+      setWpStatus((prev) => (prev === 'needs_reconnect' ? prev : 'failed'))
     } finally {
       setWpSaving(false)
     }
@@ -2892,21 +2894,107 @@ function AccountPageContent() {
               title="Publish Into Your WordPress Site"
               titleExtra={<TierLabel label="Best" />}
               sub="Real posts in your own theme — the deepest local-SEO integration we offer."
-              status={wpStatus === 'connected' ? <ActiveTag /> : undefined}
-              accent={wpStatus === 'connected'}
+              status={
+                wpStatus === 'needs_reconnect' ? <StatusDot state="disabled" label="Reconnect needed" />
+                : wpConnectionActive(wpStatus) ? <ActiveTag />
+                : undefined
+              }
+              accent={wpConnectionActive(wpStatus)}
               open={!!openCards['wordpress']}
               onToggle={() => toggleCard('wordpress')}
               cardStyle={{ marginBottom: 0 }}
             >
 
-              {wpStatus === 'connected' ? (
-                /* State: connected */
+              {wpStatus === 'needs_reconnect' ? (
+                /* State: the saved Application Password was rejected */
                 <div style={{ padding: '16px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--red-bg, #FEF2F2)', color: 'var(--red, #DC2626)' }}>
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
-                      Connected
+                      Reconnect needed
                     </span>
+                    <button
+                      onClick={() => {
+                        if (confirm('ProjectCheckin can no longer log into this site, so it cannot remove the job posts and photos it published there. They will stay on your site until you delete them in WordPress. Nothing is deleted from ProjectCheckin. Continue?')) {
+                          handleDisconnectWordPress()
+                        }
+                      }}
+                      disabled={wpDisconnecting}
+                      style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--red, #DC2626)', cursor: wpDisconnecting ? 'default' : 'pointer', padding: 0 }}
+                    >
+                      {wpDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--t3)', fontFamily: 'monospace', letterSpacing: '-0.2px', marginTop: 7 }}>{wpConnectedUrl}</div>
+
+                  <div style={{ background: 'var(--red-bg, #FEF2F2)', border: '1px solid rgba(220,38,38,.22)', borderRadius: 8, padding: '11px 14px', marginTop: 12, fontSize: 12, color: 'var(--red, #DC2626)', lineHeight: 1.65 }}>
+                    <strong>ProjectCheckin can no longer log into your WordPress site.</strong> This usually means the Application Password was deleted or regenerated, or the WordPress username changed. Jobs already on your site stay there. Jobs published since then are saved in ProjectCheckin and marked on your Job Dashboard.
+                    <ol style={{ margin: '8px 0 0 18px', padding: 0 }}>
+                      <li style={{ marginTop: 3 }}>In WordPress, go to Users, then Profile, then Application Passwords, and add a new one.</li>
+                      <li style={{ marginTop: 3 }}>Paste it below, check your username, and click Reconnect.</li>
+                      <li style={{ marginTop: 3 }}>Open your Job Dashboard and click Post to WordPress on each job marked as not posted.</li>
+                    </ol>
+                  </div>
+
+                  {wpError && (
+                    <div style={{ fontSize: 12.5, color: 'var(--red, #DC2626)', lineHeight: 1.5, marginTop: 12 }}>{wpError}</div>
+                  )}
+
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginTop: 14, marginBottom: 6 }}>Site address</label>
+                  <input
+                    type="text"
+                    value={wpConnectedUrl ?? ''}
+                    readOnly
+                    style={{ width: '100%', background: 'var(--surface-3)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--t3)', outline: 'none' }}
+                  />
+                  <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5, marginTop: 6, marginBottom: 14 }}>
+                    To connect a different site, use Disconnect first.
+                  </div>
+
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>WordPress username</label>
+                  <input
+                    type="text"
+                    value={wpUsername}
+                    onChange={(e) => setWpUsername(e.target.value)}
+                    autoComplete="off"
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', outline: 'none', marginBottom: 14 }}
+                  />
+
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>New Application Password</label>
+                  <input
+                    type="password"
+                    value={wpPassword}
+                    onChange={(e) => setWpPassword(e.target.value)}
+                    placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"
+                    autoComplete="new-password"
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--t1)', outline: 'none', marginBottom: 14 }}
+                  />
+
+                  <button
+                    // wpSiteUrl already holds the stored address (loaded with the
+                    // card); the route refuses any other site.
+                    onClick={handleConnectWordPress}
+                    disabled={wpSaving || !wpUsername.trim() || !wpPassword.trim()}
+                    style={{ background: 'var(--sky-text)', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: wpSaving ? 'default' : 'pointer', opacity: wpSaving || !wpUsername.trim() || !wpPassword.trim() ? 0.6 : 1 }}
+                  >
+                    {wpSaving ? 'Reconnecting…' : 'Reconnect'}
+                  </button>
+                </div>
+              ) : wpConnectionActive(wpStatus) ? (
+                /* State: connected (or connected but refused, 'blocked') */
+                <div style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {wpStatus === 'blocked' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: '#FFFBEB', color: '#92400E' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                        Connected, jobs blocked
+                      </span>
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                        Connected
+                      </span>
+                    )}
                     <button
                       onClick={() => {
                         if (confirm('Disconnecting removes the job posts and photos we published from your WordPress site. Nothing is deleted from ProjectCheckin. Continue?')) {
@@ -2927,9 +3015,16 @@ function AccountPageContent() {
                       : 'New jobs you publish will appear on your site automatically. Jobs published before you connected are not included.'}
                   </p>
 
-                  {wpFailedCount > 0 && (
+                  {wpStatus === 'blocked' ? (
                     <div style={{ background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', marginTop: 12, fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
-                      {wpFailedCount} {wpFailedCount === 1 ? 'job' : 'jobs'} couldn&apos;t be published to your site. Reconnect below with a new Application Password and we&apos;ll try again automatically.
+                      <strong>Your WordPress site refused ProjectCheckin&apos;s request.</strong> A security plugin, your web host&apos;s firewall, or a WordPress user that no longer has permission to publish are the usual causes. Ask your web host or website developer to allow ProjectCheckin to use the WordPress REST API, and confirm the connected user can publish posts. Then repost the marked jobs from your{' '}
+                      <a href="/dashboard" style={{ color: 'var(--sky-text)', fontWeight: 700 }}>Job Dashboard</a>.
+                    </div>
+                  ) : wpFailedCount > 0 && (
+                    <div style={{ background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', marginTop: 12, fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
+                      <strong>{wpFailedCount} {wpFailedCount === 1 ? 'job' : 'jobs'} did not post to your WordPress site.</strong> This can happen when your web host was busy or your site was briefly unavailable. Open your{' '}
+                      <a href="/dashboard" style={{ color: 'var(--sky-text)', fontWeight: 700 }}>Job Dashboard</a>{' '}
+                      and click Post to WordPress on each job marked as not posted.
                     </div>
                   )}
 
@@ -3462,7 +3557,7 @@ function AccountPageContent() {
             </p>
             <ul style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.7, paddingLeft: 18, marginBottom: 14 }}>
               <li>Higher-tier features will be turned off</li>
-              {wpStatus === 'connected' && (
+              {wpConnectionActive(wpStatus) && (
                 <li>
                   Job posts and photos published to <strong>{wpConnectedUrl}</strong> will no longer be
                   displayed on your site

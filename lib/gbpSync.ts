@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { wpConnectionActive } from '@/lib/wpStatus'
 import { slugify } from '@/lib/slugify'
 import { tierHasFeature } from '@/lib/planVersions'
 import { createLocalPost, deleteLocalPost, buildPostSummary, type GbpResult } from '@/lib/gbpApi'
@@ -392,7 +393,7 @@ function resolveLinkTarget(
     // 1 — WordPress, strongest: a real post on their own domain. Requires THIS
     // job to have actually synced, not just a live connection — linking to a
     // post that failed to sync would be a dead link on their Google listing.
-    if (org.wpConnectionStatus === 'connected' && job.wpPostUrl) {
+    if (wpConnectionActive(org.wpConnectionStatus) && job.wpPostUrl) {
       return withUtm(job.wpPostUrl, utm)
     }
     // 2 — CNAME subdomain: a real page on their domain, though the jobs index

@@ -15,7 +15,10 @@ import {
   uploadMedia,
   getPageContent,
   updatePageContent,
+  testConnection,
 } from '@/lib/wordpressApi'
+import { WP_SYNC_CLAIM_STALE_MS, wpConnectionActive } from '@/lib/wpStatus'
+import { sendWordPressReconnectEmail } from '@/lib/wordpressEmails'
 
 // Orchestration for WordPress native publishing (Phase 3, Website Integration
 // for Local SEO). Decides WHAT syncs and WHEN; lib/wordpressApi.ts does the
@@ -23,7 +26,9 @@ import {
 //
 // Sync status values on CheckIn.wpSyncStatus:
 //   'synced'   — live on the customer's WordPress site right now
-//   'failed'   — last sync attempt failed, needs attention
+//   'failed'   — last sync attempt failed, needs attention (shown on the Job
+//                Dashboard with a Post to WordPress button)
+//   'syncing'  — in-flight claim held by one sync (see claimJobForSync)
 //   'revoked'  — was live under an active Titan subscription, pulled down when
 //                they cancelled/downgraded. PERMANENT marker: these are the
 //                jobs restored automatically on any future Titan resubscribe,
@@ -119,6 +124,9 @@ type OrgContext = {
     email: string | null
     planTier: string | null
     wpCreateNewPosts: boolean
+    wpSiteUrl: string | null
+    wpConnectionStatus: string | null
+    wpConnectedAt: Date | null
   }
   creds: WpCredentials
 }
@@ -145,10 +153,11 @@ async function getOrgContext(orgId: string): Promise<OrgContext | null> {
       wpUsername: true,
       wpApplicationPassword: true,
       wpConnectionStatus: true,
+      wpConnectedAt: true,
     },
   })
   if (!org) return null
-  if (org.wpConnectionStatus !== 'connected') return null
+  if (!wpConnectionActive(org.wpConnectionStatus)) return null
   if (!tierHasFeature(org.planTier, 'website_integration')) return null
   if (!org.wpSiteUrl || !org.wpUsername || !org.wpApplicationPassword) return null
 
@@ -425,13 +434,96 @@ export function pickMapping<T extends MappingLike>(
 }
 
 /**
+ * Claim a job for one sync. A conditional UPDATE, so when two callers race
+ * (a publish hook, an edit hook, a Post to WordPress click) Postgres lets
+ * exactly one through and the other exits without creating a second post.
+ * `wpSyncedAt` doubles as the claim time so a claim left behind by a crash or
+ * a timeout can be reclaimed after WP_SYNC_CLAIM_STALE_MS. The explicit null
+ * branch is required: Prisma's `not` filter does not match NULL.
+ */
+async function claimJobForSync(jobId: string): Promise<boolean> {
+  const claimedAt = new Date()
+  const staleBefore = new Date(claimedAt.getTime() - WP_SYNC_CLAIM_STALE_MS)
+  const claim = await prisma.checkIn.updateMany({
+    where: {
+      id: jobId,
+      OR: [
+        { wpSyncStatus: null },
+        { wpSyncStatus: { not: 'syncing' } },
+        { AND: [{ wpSyncStatus: 'syncing' }, { wpSyncedAt: { lt: staleBefore } }] },
+        { AND: [{ wpSyncStatus: 'syncing' }, { wpSyncedAt: null }] },
+      ],
+    },
+    data: { wpSyncStatus: 'syncing', wpSyncedAt: claimedAt },
+  })
+  return claim.count === 1
+}
+
+/**
+ * The saved Application Password was rejected. Confirm with a second request
+ * before acting, because a host security plugin that briefly locks out logins
+ * can return 401 for a correct password. Then flip the connection to
+ * 'needs_reconnect', but only if it has not been reconnected since this sync
+ * began (wpConnectedAt unchanged); otherwise a slow, stale sync could undo the
+ * customer's fresh reconnect. The conditional UPDATE also makes the owner
+ * email fire once per change, however many syncs fail at the same moment.
+ */
+async function handleRejectedLogin(ctx: OrgContext): Promise<void> {
+  const recheck = await testConnection(ctx.creds)
+  if (recheck.ok || recheck.kind !== 'auth') return
+
+  const flipped = await prisma.organization.updateMany({
+    where: {
+      id: ctx.org.id,
+      wpConnectionStatus: { in: ['connected', 'blocked'] },
+      wpConnectedAt: ctx.org.wpConnectedAt,
+    },
+    data: { wpConnectionStatus: 'needs_reconnect' },
+  })
+  if (flipped.count === 1) {
+    await sendWordPressReconnectEmail(ctx.org.id, ctx.org.wpSiteUrl)
+  }
+}
+
+/**
+ * A published job that would normally post, for an org on Titan whose
+ * connection is waiting to be reconnected, is marked 'failed' so the Job
+ * Dashboard shows it. Every other reason for having no context (never
+ * connected, not on Titan, disconnected) is not a failure and marks nothing.
+ */
+async function markFailedIfAwaitingReconnect(job: {
+  id: string
+  organizationId: string
+  wpPostId: number | null
+  city: string | null
+  state: string | null
+  doorType: string | null
+}): Promise<void> {
+  const org = await prisma.organization.findUnique({
+    where: { id: job.organizationId },
+    select: { planTier: true, wpConnectionStatus: true, wpCreateNewPosts: true },
+  })
+  if (!org || org.wpConnectionStatus !== 'needs_reconnect') return
+  if (!tierHasFeature(org.planTier, 'website_integration')) return
+
+  const mappings = await prisma.wordPressPageMapping.findMany({
+    where: { organizationId: job.organizationId },
+  })
+  const wouldPost = pickMapping(mappings, job) != null || job.wpPostId != null || org.wpCreateNewPosts
+  if (!wouldPost) return
+
+  await prisma.checkIn.update({ where: { id: job.id }, data: { wpSyncStatus: 'failed' } })
+}
+
+/**
  * Publish (or re-publish) one job to the customer's WordPress site.
  * Safe to call repeatedly — updates in place when a post already exists.
+ * `busy` means another sync of this same job is already running.
  */
 export async function syncCheckIn(
   checkInId: string,
   opts: { skipMappingRender?: boolean } = {}
-): Promise<{ ok: boolean; error?: string; transient?: boolean }> {
+): Promise<{ ok: boolean; error?: string; transient?: boolean; busy?: boolean }> {
   const job = await prisma.checkIn.findUnique({
     where: { id: checkInId },
     select: { ...JOB_SELECT, isPublic: true, organizationId: true },
@@ -440,7 +532,10 @@ export async function syncCheckIn(
   if (!job.isPublic) return { ok: false, error: 'Job is not published.' }
 
   const ctx = await getOrgContext(job.organizationId)
-  if (!ctx) return { ok: false, error: 'No active WordPress connection.' }
+  if (!ctx) {
+    await markFailedIfAwaitingReconnect({ ...job, organizationId: job.organizationId })
+    return { ok: false, error: 'No active WordPress connection.' }
+  }
 
   const { creds, org } = ctx
 
@@ -461,64 +556,96 @@ export async function syncCheckIn(
   const shouldPost = mapping != null || job.wpPostId != null || org.wpCreateNewPosts
   if (!shouldPost) return { ok: true }
 
-  // Reconcile photos against what we've already uploaded (reuse existing,
-  // upload new, drop removed) — shared with page injection.
-  const media = await reconcileJobMedia(creds, job)
-
-  // Featured image: the customer's explicit pick, else the "after" shot,
-  // else the first photo. Matched on origin, not the WordPress URL.
-  const featuredMediaId =
-    media.find((m) => m.origin === job.featuredPhotoUrl)?.id ??
-    media.find((m) => m.role === 'after')?.id ??
-    media[0]?.id ??
-    null
-
-  const title = job.seoTitle?.trim() || jobTitle(job)
-  const description = jobDescription(job)
-  const excerpt = description.slice(0, 155)
-  const slug = slugify(`${job.doorType || 'job'} ${job.city || ''} ${job.state || ''}`) || `job-${job.id.slice(0, 8)}`
-
-  const [categoryId, tagId] = await Promise.all([
-    job.doorType ? ensureCategory(creds, job.doorType.trim()) : Promise.resolve(null),
-    job.city
-      ? ensureTag(creds, [job.city.trim(), job.state?.trim()].filter(Boolean).join(' '))
-      : Promise.resolve(null),
-  ])
-
-  const input: WpPostInput = {
-    title,
-    content: buildContent(job, org, media, creds.siteUrl),
-    excerpt,
-    slug,
-    categoryIds: categoryId ? [categoryId] : [],
-    tagIds: tagId ? [tagId] : [],
-    featuredMediaId,
-    seoTitle: title,
-    seoDescription: excerpt,
+  if (!(await claimJobForSync(job.id))) {
+    return { ok: false, busy: true, error: 'This job is already being posted to WordPress.' }
   }
 
-  const result = job.wpPostId
-    ? await updatePost(creds, job.wpPostId, input)
-    : await createPost(creds, input)
+  try {
+    // Reconcile photos against what we've already uploaded (reuse existing,
+    // upload new, drop removed) — shared with page injection.
+    const media = await reconcileJobMedia(creds, job)
 
-  if (!result.ok || !result.data) {
+    // Featured image: the customer's explicit pick, else the "after" shot,
+    // else the first photo. Matched on origin, not the WordPress URL.
+    const featuredMediaId =
+      media.find((m) => m.origin === job.featuredPhotoUrl)?.id ??
+      media.find((m) => m.role === 'after')?.id ??
+      media[0]?.id ??
+      null
+
+    const title = job.seoTitle?.trim() || jobTitle(job)
+    const description = jobDescription(job)
+    const excerpt = description.slice(0, 155)
+    const slug = slugify(`${job.doorType || 'job'} ${job.city || ''} ${job.state || ''}`) || `job-${job.id.slice(0, 8)}`
+
+    const [categoryId, tagId] = await Promise.all([
+      job.doorType ? ensureCategory(creds, job.doorType.trim()) : Promise.resolve(null),
+      job.city
+        ? ensureTag(creds, [job.city.trim(), job.state?.trim()].filter(Boolean).join(' '))
+        : Promise.resolve(null),
+    ])
+
+    const input: WpPostInput = {
+      title,
+      content: buildContent(job, org, media, creds.siteUrl),
+      excerpt,
+      slug,
+      categoryIds: categoryId ? [categoryId] : [],
+      tagIds: tagId ? [tagId] : [],
+      featuredMediaId,
+      seoTitle: title,
+      seoDescription: excerpt,
+    }
+
+    let result = job.wpPostId
+      ? await updatePost(creds, job.wpPostId, input)
+      : await createPost(creds, input)
+
+    // The post was deleted by hand in WordPress. Without this, every later
+    // edit of the job would fail forever; create a fresh post instead.
+    if (!result.ok && job.wpPostId && result.kind === 'not_found') {
+      result = await createPost(creds, input)
+    }
+
+    if (!result.ok || !result.data) {
+      await prisma.checkIn.update({
+        where: { id: job.id },
+        data: { wpSyncStatus: 'failed' },
+      })
+      if (result.kind === 'auth') {
+        await handleRejectedLogin(ctx)
+      } else if (result.kind === 'forbidden' && org.wpConnectionStatus === 'connected') {
+        await prisma.organization.updateMany({
+          where: { id: org.id, wpConnectionStatus: 'connected' },
+          data: { wpConnectionStatus: 'blocked' },
+        })
+      }
+      return { ok: false, error: result.error, transient: result.transient }
+    }
+
     await prisma.checkIn.update({
       where: { id: job.id },
-      data: { wpSyncStatus: 'failed' },
+      data: {
+        wpPostId: result.data.id,
+        wpPostUrl: result.data.link,
+        wpMedia: media.length ? JSON.stringify(media) : null,
+        wpSyncedAt: new Date(),
+        wpSyncStatus: 'synced',
+      },
     })
-    return { ok: false, error: result.error, transient: result.transient }
-  }
 
-  await prisma.checkIn.update({
-    where: { id: job.id },
-    data: {
-      wpPostId: result.data.id,
-      wpPostUrl: result.data.link,
-      wpMedia: media.length ? JSON.stringify(media) : null,
-      wpSyncedAt: new Date(),
-      wpSyncStatus: 'synced',
-    },
-  })
+    // A refused (403) connection clears itself once a post goes through.
+    if (org.wpConnectionStatus === 'blocked') {
+      await prisma.organization.updateMany({
+        where: { id: org.id, wpConnectionStatus: 'blocked' },
+        data: { wpConnectionStatus: 'connected' },
+      })
+    }
+  } catch (err) {
+    // Never leave the claim behind on an unexpected error.
+    await prisma.checkIn.update({ where: { id: job.id }, data: { wpSyncStatus: 'failed' } })
+    throw err
+  }
 
   // The post now exists; refresh the showcase on the job's most-specific mapped
   // page so its card (linking to this post) appears/updates. Builder pages
@@ -555,8 +682,14 @@ export async function unsyncCheckIn(
     },
   })
   if (!job?.organizationId) return { ok: true }
-  // Nothing was ever synced for this job.
-  if (!job.wpPostId && job.wpSyncStatus !== 'synced' && !job.wpMedia) return { ok: true }
+  // Nothing was ever synced for this job. A 'failed' or 'syncing' mark is
+  // cleared so an unpublished job never shows as "not posted".
+  if (!job.wpPostId && job.wpSyncStatus !== 'synced' && !job.wpMedia) {
+    if (job.wpSyncStatus === 'failed' || job.wpSyncStatus === 'syncing') {
+      await prisma.checkIn.update({ where: { id: job.id }, data: { wpSyncStatus: null } })
+    }
+    return { ok: true }
+  }
 
   // Deliberately bypasses getOrgContext's Titan gate (see getDirectCreds):
   // revocation has to work at the exact moment a subscription ends.
@@ -641,6 +774,14 @@ export async function revokeOrgWordPress(orgId: string): Promise<{ removed: numb
     await clearPageMapping(m.id, 'revoked')
     await sleep(BULK_DELAY_MS)
   }
+
+  // 3) Jobs that never reached the site keep no "not posted" mark once the
+  //    connection or the plan is gone, so the Job Dashboard shows nothing for
+  //    a feature the customer no longer has.
+  await prisma.checkIn.updateMany({
+    where: { organizationId: orgId, wpPostId: null, wpSyncStatus: { in: ['failed', 'syncing'] } },
+    data: { wpSyncStatus: null },
+  })
   return { removed }
 }
 
@@ -737,7 +878,7 @@ export async function hasActiveWordPressConnection(orgId: string): Promise<boole
     where: { id: orgId },
     select: { wpConnectionStatus: true },
   })
-  return org?.wpConnectionStatus === 'connected'
+  return wpConnectionActive(org?.wpConnectionStatus)
 }
 
 // ── Phase 3b: existing-page injection ────────────────────────────────────────

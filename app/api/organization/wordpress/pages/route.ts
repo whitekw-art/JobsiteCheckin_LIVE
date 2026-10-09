@@ -2,6 +2,7 @@ export const runtime = 'nodejs'
 
 import { NextRequest, NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { wpConnectionActive } from '@/lib/wpStatus'
 import { getCurrentUser } from '@/lib/auth'
 import { tierHasFeature } from '@/lib/planVersions'
 import { decryptCredential } from '@/lib/wpCredentials'
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
     if ('error' in g) return g.error
     const { org } = g
 
-    if (org.wpConnectionStatus !== 'connected') {
+    if (!wpConnectionActive(org.wpConnectionStatus)) {
       return NextResponse.json({ error: 'Connect your WordPress site first.' }, { status: 400 })
     }
     const creds = orgCreds(org)

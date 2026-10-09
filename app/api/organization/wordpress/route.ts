@@ -49,7 +49,8 @@ export async function GET() {
 
     const [syncedCount, failedCount] = await Promise.all([
       prisma.checkIn.count({ where: { organizationId: org.id, wpSyncStatus: 'synced' } }),
-      prisma.checkIn.count({ where: { organizationId: org.id, wpSyncStatus: 'failed' } }),
+      // Published jobs only: an unpublished job is never shown as "not posted".
+      prisma.checkIn.count({ where: { organizationId: org.id, isPublic: true, wpSyncStatus: 'failed' } }),
     ])
 
     return NextResponse.json({
@@ -102,12 +103,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Reconnecting must stay on the same site. Every job's stored post id
+    // belongs to the site it was posted to, so switching sites here would
+    // point later edits at the wrong site's posts. Disconnect first instead.
+    if (org.wpSiteUrl && org.wpConnectionStatus && org.wpConnectionStatus !== 'failed') {
+      if (normalizeSiteUrl(org.wpSiteUrl).toLowerCase() !== siteUrl.toLowerCase()) {
+        return NextResponse.json(
+          { error: 'To connect a different site, disconnect this one first.' },
+          { status: 400 }
+        )
+      }
+    }
+
     const test = await testConnection({ siteUrl, username, password })
     if (!test.ok) {
-      await prisma.organization.update({
-        where: { id: org.id },
-        data: { wpConnectionStatus: 'failed' },
-      })
+      // A failed reconnect attempt leaves 'needs_reconnect' in place so the
+      // card keeps showing the reconnect steps for the stored site.
+      if (org.wpConnectionStatus !== 'needs_reconnect') {
+        await prisma.organization.update({
+          where: { id: org.id },
+          data: { wpConnectionStatus: 'failed' },
+        })
+      }
       return NextResponse.json(
         { error: test.error || 'Connection failed — double-check your site address and Application Password, then try again.' },
         { status: 400 }
