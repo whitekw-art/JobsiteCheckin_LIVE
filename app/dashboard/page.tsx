@@ -36,6 +36,9 @@ interface CheckIn {
   gbpPostUrl?: string | null
   gbpPostedAt?: string | null
   gbpPostStatus?: string | null
+  /** Set only for a Titan org with a stored WordPress connection. */
+  wpState?: 'failed' | 'syncing' | null
+  hasWpPost?: boolean
 }
 
 interface EditAddr {
@@ -607,6 +610,15 @@ export default function Dashboard() {
   // who has not connected yet still sees the old copy-and-paste window rather
   // than a button that would fail.
   const [gbpLive, setGbpLive] = useState(false)
+
+  // ── WordPress repost (Titan, failed connection only) ──
+  // `wpOrg` is null unless this org is on Titan AND has a stored WordPress
+  // connection; the data route enforces that, so nothing below can show for
+  // any other plan. Only one job posts at a time: while `wpPostingId` is set,
+  // every other Post to WordPress button is locked.
+  const [wpOrg, setWpOrg] = useState<{ status: string | null } | null>(null)
+  const [wpPostingId, setWpPostingId] = useState<string | null>(null)
+  const [wpPostError, setWpPostError] = useState<Record<string, string>>({})
   const [gbpPostingId, setGbpPostingId] = useState<string | null>(null)
   const [gbpRetractingId, setGbpRetractingId] = useState<string | null>(null)
   const [gbpPostError, setGbpPostError] = useState<Record<string, string>>({})
@@ -781,6 +793,47 @@ export default function Dashboard() {
     }
   }
 
+  // Reposts one job that did not reach the customer's WordPress site.
+  const handleWpPost = async (checkInId: string) => {
+    if (isDemoJob(checkInId) || wpPostingId) return
+    setWpPostingId(checkInId)
+    setWpPostError((prev) => {
+      const next = { ...prev }
+      delete next[checkInId]
+      return next
+    })
+    try {
+      const res = await fetch('/api/checkins/wp-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkInId }),
+      })
+      const data = await res.json().catch(() => null)
+      if (res.ok) {
+        setCheckIns((prev) => prev.map((c) => (c.id === checkInId ? { ...c, wpState: null, hasWpPost: true } : c)))
+        return
+      }
+      if (data?.needsReconnect) {
+        setWpOrg({ status: 'needs_reconnect' })
+      } else if (data?.wpConnectionStatus) {
+        setWpOrg({ status: data.wpConnectionStatus })
+      }
+      if (!data?.needsReconnect && data?.wpConnectionStatus !== 'needs_reconnect') {
+        setWpPostError((prev) => ({
+          ...prev,
+          [checkInId]: data?.error || 'This job did not post to WordPress. Try again in a few minutes.',
+        }))
+      }
+    } catch {
+      setWpPostError((prev) => ({
+        ...prev,
+        [checkInId]: 'This job did not post to WordPress. Try again in a few minutes.',
+      }))
+    } finally {
+      setWpPostingId(null)
+    }
+  }
+
   // Removes the post from Google and resets the job's local state back to
   // postable. Not tier-gated — a downgraded customer still owns whatever they
   // already posted and must be able to take it down.
@@ -844,6 +897,7 @@ export default function Dashboard() {
         const data = await res.json()
         const loaded: CheckIn[] = data.checkIns || []
         setCheckIns(loaded)
+        setWpOrg(data.wordpress ?? null)
         // Pre-populate editCustomers so review modal has data without requiring card open
         setEditCustomers(
           Object.fromEntries(
@@ -2458,6 +2512,62 @@ export default function Dashboard() {
                                         )}
                                       </span>
                                     )}
+                                  </>
+                                )
+                              )}
+                              {/* WordPress: shown only on a published job that did not
+                                  reach the site, for a Titan org with a stored
+                                  connection (wpOrg is null otherwise). */}
+                              {wpOrg && checkIn.isPublic && checkIn.wpState && (
+                                wpPostingId === checkIn.id || checkIn.wpState === 'syncing' ? (
+                                  <span className="db-btn-ghost db-btn-wp-busy">
+                                    <span className="db-gbp-spinner" />Posting to WordPress&hellip;
+                                  </span>
+                                ) : wpOrg.status === 'needs_reconnect' ? (
+                                  <span className="db-wp-msg">
+                                    {checkIn.hasWpPost
+                                      ? 'Latest changes not posted to WordPress.'
+                                      : 'Not posted to WordPress.'}{' '}
+                                    {isOwner ? (
+                                      <>
+                                        ProjectCheckin can no longer log into your site.{' '}
+                                        <a
+                                          href="/account?tab=connections&card=wordpress"
+                                          className="db-gbp-reconnect"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          Reconnect WordPress
+                                        </a>
+                                        , then return here to post this job.
+                                      </>
+                                    ) : (
+                                      <span className="db-wp-msg-plain">
+                                        Ask your account owner to reconnect WordPress, then post this job.
+                                      </span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <>
+                                    <button
+                                      className="db-btn-ghost db-btn-gbp-failed"
+                                      disabled={wpPostingId !== null}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleWpPost(checkIn.id)
+                                      }}
+                                    >
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                                      Post to WordPress
+                                    </button>
+                                    <span className="db-wp-msg">
+                                      {wpPostError[checkIn.id]
+                                        ? wpPostError[checkIn.id]
+                                        : wpPostingId !== null
+                                          ? 'Locked until the current post finishes.'
+                                          : checkIn.hasWpPost
+                                            ? 'Latest changes not posted to WordPress. The earlier version is still on your site.'
+                                            : 'Not posted to WordPress.'}
+                                    </span>
                                   </>
                                 )
                               )}

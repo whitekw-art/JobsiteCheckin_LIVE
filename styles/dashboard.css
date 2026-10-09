@@ -1072,6 +1072,17 @@
   line-height: 1.4;
 }
 
+/* WordPress repost on a job that did not reach the customer's site. Reuses
+   the Post to Google failed-button styling; the message sits beside it. */
+.db-btn-ghost.db-btn-wp-busy { color: var(--t2); cursor: default; opacity: .8; }
+.db-wp-msg {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--red);
+  line-height: 1.4;
+}
+.db-wp-msg-plain { color: var(--t2); }
+
 /* Shown beside .db-gbp-error only when Google rejected the stored grant.
    Retrying cannot fix that, so the customer needs a route to Connections
    rather than a button that will fail again. */

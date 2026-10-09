@@ -60,6 +60,16 @@ export default function WordPressPublishingGuidePage() {
           <p style={guidePLast}><strong style={guideStrong}>In short:</strong> keep auto-posting on, highlight jobs on the strong pages you already have, build new pages only for your top city-and-service combos, and let the rest fill in on its own.</p>
         </GuideSection>
 
+        <GuideSection title="If a Job Doesn&apos;t Post to Your Site">
+          <p style={guideP}>When a published job does not reach your WordPress site, your Job Dashboard marks it <strong style={guideStrong}>Not posted to WordPress</strong>. If you edited a job that was already on your site, the mark reads <strong style={guideStrong}>Latest changes not posted to WordPress</strong>, and the earlier version stays on your site until the new one goes through.</p>
+          <p style={guideP}><strong style={guideStrong}>If the WordPress card says Reconnect needed:</strong> ProjectCheckin can no longer log into your site, and the account owner receives one email about it. This usually happens after the Application Password is deleted or regenerated, or after the WordPress username changes. Jobs already on your site stay there.</p>
+          <Step n={1}>In WordPress, go to <strong style={guideStrong}>Users → Profile → Application Passwords</strong> and add a new one.</Step>
+          <Step n={2}>In ProjectCheckin, open <strong style={guideStrong}>Account</strong>, then the <strong style={guideStrong}>Connections</strong> tab, and open the WordPress card. Paste the new password, check your username, and click <strong style={guideStrong}>Reconnect</strong>.</Step>
+          <Step n={3}>Open your Job Dashboard and click <strong style={guideStrong}>Post to WordPress</strong> on each marked job. Jobs post one at a time, so the other buttons stay locked until the current post finishes.</Step>
+          <p style={guideP}><strong style={guideStrong}>If the WordPress card says Connected, jobs blocked:</strong> your site refused ProjectCheckin&apos;s request. The usual causes are a security plugin, your web host&apos;s firewall, or a WordPress user that no longer has permission to publish posts. Ask your web host or website developer to allow ProjectCheckin to use the WordPress REST API, then click Post to WordPress on each marked job.</p>
+          <p style={guidePLast}><strong style={guideStrong}>If the WordPress card says Connected:</strong> the usual cause is a busy web host or a site that was down for a few minutes. Wait a few minutes, then click Post to WordPress on the marked job.</p>
+        </GuideSection>
+
         <GuideSection title="If You Ever Cancel">
           <p style={guidePLast}>If you downgrade or cancel, your job content is taken back off your WordPress site, but your own pages are never changed or deleted. Nothing is lost in ProjectCheckin. The moment you return to the Titan plan, everything comes back on its own.</p>
         </GuideSection>
