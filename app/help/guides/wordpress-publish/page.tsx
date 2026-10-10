@@ -42,6 +42,15 @@ export default function WordPressPublishingGuidePage() {
           <Step n={4}>Click <strong style={guideStrong}>Save page</strong>.</Step>
         </GuideSection>
 
+        <GuideSection title="If Your Page Was Built With a Page Builder">
+          <p style={guideP}>Some pages are designed with a page builder such as Divi, Elementor, or WPBakery. ProjectCheckin cannot add the job list to these pages, so it leaves them unchanged. Every job still becomes its own post under <strong style={guideStrong}>Posts → All Posts</strong>, the same as for any other page.</p>
+          <p style={guideP}><strong style={guideStrong}>To show the job list on a page, map a page made in the standard WordPress editor:</strong></p>
+          <Step n={1}>In WordPress, go to <strong style={guideStrong}>Pages → Add New</strong>. The new page opens in the standard WordPress editor. Leave the Divi or Elementor button unclicked, because clicking it turns the page into a builder page.</Step>
+          <Step n={2}>Add a title and any text you want on the page, then click <strong style={guideStrong}>Publish</strong>.</Step>
+          <Step n={3}>In the WordPress card in ProjectCheckin, click <strong style={guideStrong}>Add a page</strong>, paste the address of the new page, and click <strong style={guideStrong}>Save page</strong>, the same as in the steps above.</Step>
+          <p style={guidePLast}>ProjectCheckin recognizes Divi, Elementor, and WPBakery pages and shows a notice when you save one. It cannot recognize every page builder. If the job list does not appear on a page you mapped, create a new page in the standard editor as above and map that one instead.</p>
+        </GuideSection>
+
         <GuideSection title="Step 3 (Optional) — Choose Exactly Where Jobs Land on the Page">
           <p style={guideP}>By default, jobs are added to the bottom of the page. If you want them somewhere specific, place a marker where you want them:</p>
           <Step n={1}>In the <strong style={guideStrong}>Add a page</strong> form, click <strong style={guideStrong}>Optional: choose exactly where it lands</strong> and copy the marker.</Step>
