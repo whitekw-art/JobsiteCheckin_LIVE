@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import DashboardShell from '@/components/DashboardShell'
-import { GuideBreadcrumb, GuideSection, Step, guideP, guidePLast, guideStrong, guideLink } from '@/components/HelpGuideSections'
+import { GuideBreadcrumb, GuideSection, GuideSubsection, Step, guideP, guidePLast, guideStrong, guideLink } from '@/components/HelpGuideSections'
 
 export const metadata: Metadata = { title: 'WordPress Publishing Guide — Help & Support' }
 
@@ -48,7 +48,7 @@ export default function WordPressPublishingGuidePage() {
           <Step n={1}>In WordPress, go to <strong style={guideStrong}>Pages → Add New</strong>. The new page opens in the standard WordPress editor. Leave the Divi or Elementor button unclicked, because clicking it turns the page into a builder page.</Step>
           <Step n={2}>Add a title and any text you want on the page, then click <strong style={guideStrong}>Publish</strong>.</Step>
           <Step n={3}>In the WordPress card in ProjectCheckin, click <strong style={guideStrong}>Add a page</strong>, paste the address of the new page, and click <strong style={guideStrong}>Save page</strong>, the same as in the steps above.</Step>
-          <p style={guidePLast}>ProjectCheckin recognizes Divi, Elementor, and WPBakery pages and shows a notice when you save one. It cannot recognize every page builder. If the job list does not appear on a page you mapped, create a new page in the standard editor as above and map that one instead.</p>
+          <p style={guidePLast}>ProjectCheckin recognizes Divi, Elementor, and WPBakery pages and shows a notice with code WP-201 when you save one. It cannot recognize every page builder. If the job list does not appear on a page you mapped, create a new page in the standard editor as above and map that one instead.</p>
         </GuideSection>
 
         <GuideSection title="Step 3 (Optional) — Choose Exactly Where Jobs Land on the Page">
@@ -71,12 +71,75 @@ export default function WordPressPublishingGuidePage() {
 
         <GuideSection title="If a Job Doesn&apos;t Post to Your Site">
           <p style={guideP}>When a published job does not reach your WordPress site, your Job Dashboard marks it <strong style={guideStrong}>Not posted to WordPress</strong>. If you edited a job that was already on your site, the mark reads <strong style={guideStrong}>Latest changes not posted to WordPress</strong>, and the earlier version stays on your site until the new one goes through.</p>
-          <p style={guideP}><strong style={guideStrong}>If the WordPress card says Reconnect needed:</strong> ProjectCheckin can no longer log into your site, and the account owner receives one email about it. This usually happens after the Application Password is deleted or regenerated, or after the WordPress username changes. Jobs already on your site stay there.</p>
+          <p style={guideP}><strong style={guideStrong}>If the WordPress card says Reconnect needed (code WP-101):</strong> ProjectCheckin can no longer log into your site, and the account owner receives one email about it. This usually happens after the Application Password is deleted or regenerated, or after the WordPress username changes. Jobs already on your site stay there.</p>
           <Step n={1}>In WordPress, go to <strong style={guideStrong}>Users → Profile → Application Passwords</strong> and add a new one.</Step>
           <Step n={2}>In ProjectCheckin, open <strong style={guideStrong}>Account</strong>, then the <strong style={guideStrong}>Connections</strong> tab, and open the WordPress card. Paste the new password, check your username, and click <strong style={guideStrong}>Reconnect</strong>.</Step>
           <Step n={3}>Open your Job Dashboard and click <strong style={guideStrong}>Post to WordPress</strong> on each marked job. Jobs post one at a time, so the other buttons stay locked until the current post finishes.</Step>
-          <p style={guideP}><strong style={guideStrong}>If the WordPress card says Connected, jobs blocked:</strong> your site refused ProjectCheckin&apos;s request. The usual causes are a security plugin, your web host&apos;s firewall, or a WordPress user that no longer has permission to publish posts. Ask your web host or website developer to allow ProjectCheckin to use the WordPress REST API, then click Post to WordPress on each marked job.</p>
+          <p style={guideP}><strong style={guideStrong}>If the WordPress card says Connected, jobs blocked (code WP-102):</strong> your site refused ProjectCheckin&apos;s request. The usual causes are a security plugin, your web host&apos;s firewall, or a WordPress user that no longer has permission to publish posts. Ask your web host or website developer to allow ProjectCheckin to use the WordPress REST API, then click Post to WordPress on each marked job.</p>
           <p style={guidePLast}><strong style={guideStrong}>If the WordPress card says Connected:</strong> the usual cause is a busy web host or a site that was down for a few minutes. Wait a few minutes, then click Post to WordPress on the marked job.</p>
+        </GuideSection>
+
+        <GuideSection
+          title="Error Codes"
+          id="error-codes"
+          openForHashes={['wp-101', 'wp-102', 'wp-103', 'wp-104', 'wp-105', 'wp-106', 'wp-201', 'wp-no-code']}
+        >
+          <p style={guideP}>When something goes wrong with your WordPress connection or a mapped page, ProjectCheckin shows a code that starts with WP-. Find the code below to see what caused it and how to fix it.</p>
+
+          <GuideSubsection title="WP-101: ProjectCheckin can no longer log into your site" id="wp-101">
+            <p style={guideP}>WordPress rejected the saved login, and a second check confirmed it. This usually happens after the Application Password is deleted or regenerated, or after the WordPress username changes. Jobs already on your site stay there.</p>
+            <Step n={1}>In WordPress, go to <strong style={guideStrong}>Users → Profile → Application Passwords</strong> and add a new one.</Step>
+            <Step n={2}>In ProjectCheckin, open <strong style={guideStrong}>Account</strong>, then the <strong style={guideStrong}>Connections</strong> tab, and open the WordPress card. Paste the new password, check your username, and click <strong style={guideStrong}>Reconnect</strong>.</Step>
+            <Step n={3}>On your Job Dashboard, click <strong style={guideStrong}>Post to WordPress</strong> on each job marked as not posted.</Step>
+          </GuideSubsection>
+
+          <GuideSubsection title="WP-102: Your site refused the request" id="wp-102">
+            <p style={guideP}>Your site blocked ProjectCheckin. The usual causes are a security plugin, your web host&apos;s firewall, or a WordPress user that can no longer publish posts.</p>
+            <Step n={1}>Ask your web host or website developer to allow ProjectCheckin to use the WordPress REST API.</Step>
+            <Step n={2}>In WordPress, check under <strong style={guideStrong}>Users</strong> that the connected account can still publish posts.</Step>
+            <Step n={3}>Click <strong style={guideStrong}>Post to WordPress</strong> on each marked job, or <strong style={guideStrong}>Try again</strong> on the page in the WordPress card.</Step>
+          </GuideSubsection>
+
+          <GuideSubsection title="WP-103: Your web host did not answer in time" id="wp-103">
+            <p style={guideP}>Your web host was busy, limited how many requests it accepts, or your site was down for a few minutes.</p>
+            <Step n={1}>Wait a few minutes.</Step>
+            <Step n={2}>Click <strong style={guideStrong}>Post to WordPress</strong> on the marked job, or <strong style={guideStrong}>Try again</strong> on the page in the WordPress card.</Step>
+            <Step n={3}>If the code keeps coming back over a day, ask your web host whether your plan limits how many requests the site accepts.</Step>
+          </GuideSubsection>
+
+          <GuideSubsection title="WP-104: WordPress did not save the post or the job list" id="wp-104">
+            <p style={guideP}>WordPress answered ProjectCheckin but did not save the job post or the job list, for a reason the other codes do not cover.</p>
+            <Step n={1}>Click <strong style={guideStrong}>Post to WordPress</strong> on the marked job, or <strong style={guideStrong}>Try again</strong> on the page in the WordPress card.</Step>
+            <Step n={2}>If the code comes back, check that you can publish a post in WordPress yourself with the connected account, and ask your web host or website developer to check the site&apos;s error log.</Step>
+          </GuideSubsection>
+
+          <GuideSubsection title="WP-105: The connected account is below Administrator" id="wp-105">
+            <p style={guideP}>WordPress removes scripts and maps from posts written by an account without full publishing rights. Your job posts still publish, but without their map and without the hidden details that describe each job to Google. An Administrator account keeps them; on a standard single-site WordPress install, an Editor account also keeps them.</p>
+            <Step n={1}>Log into WordPress with an Administrator account.</Step>
+            <Step n={2}>Go to <strong style={guideStrong}>Users → Profile → Application Passwords</strong> and add one named ProjectCheckin.</Step>
+            <Step n={3}>In the WordPress card in ProjectCheckin, click <strong style={guideStrong}>Change account</strong>, enter that username and the new password, and save.</Step>
+          </GuideSubsection>
+
+          <GuideSubsection title="WP-106: Your site address changed or WordPress could not be found" id="wp-106">
+            <p style={guideP}>Your site sent ProjectCheckin to a different address, or ProjectCheckin could not find WordPress at the saved address. This usually happens after a website moves to a new address, switches between an address with www and one without it, or turns off the WordPress REST API.</p>
+            <Step n={1}>Open your website in a browser and note the exact address it shows, including whether it starts with www.</Step>
+            <Step n={2}>In the WordPress card in ProjectCheckin, click <strong style={guideStrong}>Change account</strong>, enter that exact address with your username and an Application Password, and save.</Step>
+            <Step n={3}>If the code comes back, ask your web host or website developer whether the WordPress REST API is turned off.</Step>
+          </GuideSubsection>
+
+          <GuideSubsection title="WP-201: The page was built with a page builder" id="wp-201">
+            <p style={guideP}>The page you mapped was designed with a page builder such as Divi, Elementor or WPBakery, and ProjectCheckin cannot add the job list to it. Every job still becomes its own post under <strong style={guideStrong}>Posts → All Posts</strong>.</p>
+            <Step n={1}>In WordPress, go to <strong style={guideStrong}>Pages → Add New</strong>. Leave the Divi or Elementor button unclicked, because clicking it turns the page into a builder page.</Step>
+            <Step n={2}>Add a title and any text you want on the page, then click <strong style={guideStrong}>Publish</strong>.</Step>
+            <Step n={3}>In the WordPress card in ProjectCheckin, remove the old page, click <strong style={guideStrong}>Add a page</strong>, paste the address of the new page, and click <strong style={guideStrong}>Save page</strong>.</Step>
+          </GuideSubsection>
+
+          <GuideSubsection title="The job list is missing and no code is shown" id="wp-no-code">
+            <p style={guideP}>ProjectCheckin saved the job list, but something on your site keeps it from showing. The usual causes are a page builder ProjectCheckin does not recognize (for example Beaver Builder, Bricks, Oxygen, Breakdance or Brizy), a page cache that still serves an older copy of the page, a theme that prints page content in its own way, or a security plugin that removes the list.</p>
+            <Step n={1}>Clear your site&apos;s page cache from your caching plugin or your web host&apos;s dashboard, then open the page in a private browser window.</Step>
+            <Step n={2}>If the page was built with a page builder, follow the WP-201 steps to create a page in the standard editor and map it.</Step>
+            <Step n={3}>If the list is still missing, ask your web host or website developer to check whether a plugin or the theme removes it.</Step>
+          </GuideSubsection>
         </GuideSection>
 
         <GuideSection title="If You Ever Cancel">

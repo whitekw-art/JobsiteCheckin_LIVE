@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { syncCheckIn, rerenderMappingForLocation } from '@/lib/wordpressSync'
+import { refreshJobAfterEdit, findHomeownerName, HOMEOWNER_NAME_ERROR } from '@/lib/jobContent'
+import { applyPhotoChanges, deleteStoredPhotos, splitPhotoUrls, LAST_PHOTO_ERROR } from '@/lib/jobPhotos'
 
 function cleanPhone(v: string | null | undefined): string | null {
   if (typeof v !== 'string') return null
@@ -34,10 +35,15 @@ function isOwnStorageUrl(value: unknown): value is string {
   if (!host) return false
   try {
     const u = new URL(value.trim())
+    // Exactly one plain file name after the bucket prefix, with no query string
+    // or fragment: a variant URL could otherwise alias another object.
     return (
       u.protocol === 'https:' &&
       u.hostname === host &&
-      u.pathname.startsWith(STORAGE_PREFIX)
+      u.pathname.startsWith(STORAGE_PREFIX) &&
+      /^[A-Za-z0-9._-]+$/.test(u.pathname.slice(STORAGE_PREFIX.length)) &&
+      !u.search &&
+      !u.hash
     )
   } catch {
     return false
@@ -62,12 +68,15 @@ export async function PATCH(request: NextRequest) {
       doorType,
       notes,
       appendPhotoUrls,
+      removePhotoUrls,
       beforePhotoUrl,
       afterPhotoUrl,
       homeCustomerName,
       homeCustomerPhone,
       homeCustomerEmail,
       aiDescriptionGeneratedAt,
+      latitude,
+      longitude,
     } = body as {
       id: string
       installer?: string
@@ -78,12 +87,15 @@ export async function PATCH(request: NextRequest) {
       doorType?: string
       notes?: string
       appendPhotoUrls?: string[]
+      removePhotoUrls?: string[]
       beforePhotoUrl?: string | null
       afterPhotoUrl?: string | null
       homeCustomerName?: string | null
       homeCustomerPhone?: string | null
       homeCustomerEmail?: string | null
       aiDescriptionGeneratedAt?: string | null
+      latitude?: number | null
+      longitude?: number | null
     }
 
     if (!id) {
@@ -101,16 +113,35 @@ export async function PATCH(request: NextRequest) {
 
     const checkIn = await prisma.checkIn.findFirst({
       where,
-      select: { id: true, photoUrls: true, city: true, state: true, doorType: true },
+      select: {
+        id: true,
+        photoUrls: true,
+        street: true,
+        city: true,
+        state: true,
+        zip: true,
+        doorType: true,
+        notes: true,
+        isPublic: true,
+        homeCustomerName: true,
+        beforePhotoUrl: true,
+        afterPhotoUrl: true,
+        featuredPhotoUrl: true,
+      },
     })
     if (!checkIn) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    // Append new photo URLs to existing
-    const existing = checkIn.photoUrls
-      ? checkIn.photoUrls.split(',').map((u) => u.trim()).filter(Boolean)
-      : []
+    // Workers may edit only their own UNPUBLISHED jobs. A published job is live
+    // on the business's website and Google; only an owner or admin changes it.
+    if (currentUser.role === 'USER' && checkIn.isPublic) {
+      return NextResponse.json(
+        { error: 'This job is published. Ask an owner or admin to make changes.' },
+        { status: 403 }
+      )
+    }
+
     const incoming = (appendPhotoUrls ?? []).filter(isOwnStorageUrl)
     if ((appendPhotoUrls?.length ?? 0) !== incoming.length) {
       return NextResponse.json(
@@ -118,7 +149,53 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       )
     }
-    const combined = [...existing, ...incoming]
+    const photoChange = applyPhotoChanges(
+      {
+        photoUrls: splitPhotoUrls(checkIn.photoUrls),
+        beforePhotoUrl: checkIn.beforePhotoUrl,
+        afterPhotoUrl: checkIn.afterPhotoUrl,
+        featuredPhotoUrl: checkIn.featuredPhotoUrl,
+      },
+      {
+        remove: Array.isArray(removePhotoUrls) ? removePhotoUrls : [],
+        append: incoming,
+        before: beforePhotoUrl,
+        after: afterPhotoUrl,
+      }
+    )
+    if (!photoChange.ok) {
+      return NextResponse.json({ error: photoChange.error }, { status: 400 })
+    }
+    if (checkIn.isPublic && photoChange.next.photoUrls.length === 0) {
+      return NextResponse.json({ error: LAST_PHOTO_ERROR }, { status: 400 })
+    }
+
+    // A published job's description is public text: it must never carry the
+    // homeowner's name. Checked against the name stored on the job (or the one
+    // being saved now), the only name that can be detected reliably.
+    const nextNotes = notes !== undefined ? notes : checkIn.notes
+    const nextName = homeCustomerName !== undefined ? homeCustomerName : checkIn.homeCustomerName
+    if (checkIn.isPublic && findHomeownerName(nextNotes, nextName)) {
+      return NextResponse.json({ error: HOMEOWNER_NAME_ERROR }, { status: 400 })
+    }
+
+    // When the address changes, the old coordinates point at the old place.
+    // The client geocodes the new address and sends the result; if it could
+    // not, the coordinates are cleared rather than left pointing at the wrong
+    // house (an exact map pin must never show the wrong location).
+    const addressChanged =
+      (street !== undefined && street !== checkIn.street) ||
+      (city !== undefined && city !== checkIn.city) ||
+      (state !== undefined && state !== checkIn.state) ||
+      (zip !== undefined && zip !== checkIn.zip)
+    const validCoords =
+      typeof latitude === 'number' && Number.isFinite(latitude) && Math.abs(latitude) <= 90 &&
+      typeof longitude === 'number' && Number.isFinite(longitude) && Math.abs(longitude) <= 180
+    const locationData = addressChanged
+      ? validCoords
+        ? { latitude, longitude, locationSource: 'ADDRESS' }
+        : { latitude: null, longitude: null, locationSource: null }
+      : {}
 
     const updated = await prisma.checkIn.update({
       where: { id: checkIn.id },
@@ -130,52 +207,45 @@ export async function PATCH(request: NextRequest) {
         ...(zip !== undefined && { zip }),
         ...(doorType !== undefined && { doorType }),
         ...(notes !== undefined && { notes }),
-        photoUrls: combined.join(','),
-        // Same origin pinning as appendPhotoUrls — these feed the same
-        // public rendering and server-side fetch paths.
-        ...(beforePhotoUrl !== undefined && {
-          beforePhotoUrl: isOwnStorageUrl(beforePhotoUrl) ? beforePhotoUrl : null,
-        }),
-        ...(afterPhotoUrl !== undefined && {
-          afterPhotoUrl: isOwnStorageUrl(afterPhotoUrl) ? afterPhotoUrl : null,
-        }),
+        // Tags can only point at this job's own photos (applyPhotoChanges),
+        // which are pinned to our storage, so no separate origin check needed.
+        photoUrls: photoChange.next.photoUrls.join(','),
+        beforePhotoUrl: photoChange.next.beforePhotoUrl,
+        afterPhotoUrl: photoChange.next.afterPhotoUrl,
+        featuredPhotoUrl: photoChange.next.featuredPhotoUrl,
         ...(homeCustomerName !== undefined && { homeCustomerName: homeCustomerName?.trim() || null }),
         ...(homeCustomerPhone !== undefined && { homeCustomerPhone: cleanPhone(homeCustomerPhone) }),
         ...(homeCustomerEmail !== undefined && { homeCustomerEmail: homeCustomerEmail?.trim() || null }),
         ...(aiDescriptionGeneratedAt !== undefined && {
           aiDescriptionGeneratedAt: aiDescriptionGeneratedAt ? new Date(aiDescriptionGeneratedAt) : null,
         }),
+        ...locationData,
       },
     })
 
-    // Keep the customer's WordPress post in step with the edit. Only published
-    // jobs sync — syncCheckIn itself re-checks that and the Titan gate.
-    if (updated.isPublic) {
-      // Did this edit move the job to a different location/service? If so, its
-      // OLD existing-page block must be rebuilt so it no longer shows the job
-      // (design §9.5). syncCheckIn handles the new placement.
-      const moved =
-        updated.city !== checkIn.city ||
-        updated.state !== checkIn.state ||
-        updated.doorType !== checkIn.doorType
-      const orgId = currentUser.organizationId
+    // Regenerate the public title and description from the saved fields, and
+    // keep the customer's WordPress post in step with the edit.
+    await refreshJobAfterEdit(updated.id, {
+      city: checkIn.city,
+      state: checkIn.state,
+      doorType: checkIn.doorType,
+    })
+
+    // Removed photos are deleted from storage once the job no longer uses
+    // them, so a removed photo is not left publicly reachable at its URL.
+    if (photoChange.removed.length > 0) {
       after(async () => {
-        try {
-          await syncCheckIn(checkIn.id)
-          if (moved) {
-            await rerenderMappingForLocation(orgId, {
-              city: checkIn.city,
-              state: checkIn.state,
-              doorType: checkIn.doorType,
-            })
-          }
-        } catch (err) {
-          console.error('WordPress resync failed after job edit:', err)
-        }
+        await deleteStoredPhotos(photoChange.removed, currentUser.organizationId!)
       })
     }
 
-    return NextResponse.json({ success: true, id: updated.id })
+    return NextResponse.json({
+      success: true,
+      id: updated.id,
+      photoUrls: photoChange.next.photoUrls,
+      beforePhotoUrl: photoChange.next.beforePhotoUrl,
+      afterPhotoUrl: photoChange.next.afterPhotoUrl,
+    })
   } catch (error) {
     console.error('Error updating check-in:', error)
     return NextResponse.json({ error: 'Failed to update' }, { status: 500 })

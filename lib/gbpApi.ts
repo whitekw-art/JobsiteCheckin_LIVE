@@ -260,6 +260,55 @@ export async function listLocations(
   }
 }
 
+/** The business's public storefront address as Google holds it. */
+export interface GbpStorefrontAddress {
+  addressLines: string[]
+  locality: string | null
+  administrativeArea: string | null
+  postalCode: string | null
+  regionCode: string | null
+}
+
+/**
+ * Read the storefront address of the connected location, so the business
+ * address ProjectCheckin publishes matches the Business Profile exactly.
+ * Returns data: null when the location has no storefront address, which is
+ * how Google represents a service-area business that hides its address
+ * (the API says the field "should not be set" for customer-location-only
+ * businesses). Content from this API may be kept no more than 30 days, so
+ * callers refresh it on a schedule.
+ */
+export async function getStorefrontAddress(
+  encryptedRefresh: string,
+  encryptedAccess: string | null,
+  locationName: string
+): Promise<GbpResult<GbpStorefrontAddress | null>> {
+  const auth = authorizedClient(encryptedRefresh, encryptedAccess)
+  if (!auth) return { ok: false, needsReconnect: true, error: 'Your Google connection needs to be set up again.' }
+  try {
+    const infoApi = google.mybusinessbusinessinformation({ version: 'v1', auth })
+    const res = await infoApi.locations.get(
+      { name: locationName, readMask: 'storefrontAddress' },
+      { timeout: REQUEST_TIMEOUT_MS }
+    )
+    const a = res.data.storefrontAddress
+    const lines = (a?.addressLines ?? []).map((l) => l.trim()).filter(Boolean)
+    if (!a || lines.length === 0) return { ok: true, data: null }
+    return {
+      ok: true,
+      data: {
+        addressLines: lines,
+        locality: a.locality ?? null,
+        administrativeArea: a.administrativeArea ?? null,
+        postalCode: a.postalCode ?? null,
+        regionCode: a.regionCode ?? null,
+      },
+    }
+  } catch (err) {
+    return { ok: false, ...classify(err, 'We could not read your Google business address.') }
+  }
+}
+
 export interface LocalPostInput {
   /** Post body. Trimmed to ~300 chars by buildPostSummary before it gets here. */
   summary: string

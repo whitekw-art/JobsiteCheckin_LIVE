@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
+import { parseStoredAddress } from '@/lib/gbpBusinessInfo'
 import { slugify } from '@/lib/slugify'
 import PortfolioClient from './PortfolioClient'
 
@@ -82,7 +83,8 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
 
   const jobs = org.checkIns
   const doorTypes = [...new Set(jobs.map((c) => c.doorType).filter((v): v is string => Boolean(v)))]
-  const cities = [...new Set(jobs.map((c) => c.city).filter((v): v is string => Boolean(v)))]
+  // Trimmed before de-duplicating: "Huntsville " and "Huntsville" are one city.
+  const cities = [...new Set(jobs.map((c) => c.city?.trim()).filter((v): v is string => Boolean(v)))]
 
   const normalizedWebsite =
     org.website && org.website.startsWith('http')
@@ -162,11 +164,26 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
     })),
   ]
 
+  // Same @id as the business node on every job page, so all pages describe
+  // one business. Its address is the storefront address from the Google
+  // Business Profile, or none for a service-area business that hides it.
+  const storefront = parseStoredAddress(org.gbpBusinessAddress)
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
+    '@id': `${baseUrl}/portfolio/${orgSlug}#business`,
     name: org.name,
     ...(org.phone && { telephone: org.phone }),
+    ...(storefront && {
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: storefront.addressLines.join(', '),
+        ...(storefront.locality && { addressLocality: storefront.locality }),
+        ...(storefront.administrativeArea && { addressRegion: storefront.administrativeArea }),
+        ...(storefront.postalCode && { postalCode: storefront.postalCode }),
+        ...(storefront.regionCode && { addressCountry: storefront.regionCode }),
+      },
+    }),
     ...(normalizedWebsite && { url: normalizedWebsite }),
     ...(cities.length > 0 && {
       areaServed: cities.map((city) => ({

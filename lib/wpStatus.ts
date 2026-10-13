@@ -40,3 +40,43 @@ export function wpJobDisplayState(
   }
   return null
 }
+
+// ── WordPress error codes ────────────────────────────────────────────────────
+// Each code is shown to the customer only when its cause is confirmed by what
+// WordPress actually answered, and each links to its entry in the WordPress
+// guide (/help/guides/wordpress-publish#wp-101 and so on).
+//   WP-101 login rejected (a 401, confirmed by a second login check)
+//   WP-102 request refused (403)
+//   WP-103 host busy or briefly down (429, 5xx, timeout, network failure)
+//   WP-104 WordPress answered but did not save, for another reason
+//   WP-105 connected account is below Administrator (scripts and maps stripped)
+//   WP-106 site address redirects, or WordPress could not be found there
+//   WP-201 mapped page built with a page builder (derived from builderBlocked)
+export type WpErrorCode = 'WP-101' | 'WP-102' | 'WP-103' | 'WP-104' | 'WP-105' | 'WP-106' | 'WP-201'
+
+export function wpErrorCodeForKind(
+  kind: string | undefined,
+  opts: { loginConfirmedRejected?: boolean } = {}
+): WpErrorCode {
+  switch (kind) {
+    case 'auth':
+      // A single 401 that a second login check does not confirm is not proof
+      // the password is dead (a security plugin can briefly lock out logins).
+      return opts.loginConfirmedRejected ? 'WP-101' : 'WP-104'
+    case 'forbidden':
+      return 'WP-102'
+    case 'rate_limited':
+    case 'server':
+    case 'network':
+      return 'WP-103'
+    case 'unreachable':
+    case 'not_found':
+      return 'WP-106'
+    default:
+      return 'WP-104'
+  }
+}
+
+export function wpErrorGuideHref(code: string): string {
+  return `/help/guides/wordpress-publish#${code.toLowerCase()}`
+}

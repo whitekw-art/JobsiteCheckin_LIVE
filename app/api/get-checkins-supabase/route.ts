@@ -41,6 +41,7 @@ export async function GET() {
         wpSyncStatus: true,
         wpSyncedAt: true,
         wpPostId: true,
+        wpErrorCode: true,
       },
       orderBy: {
         timestamp: 'desc',
@@ -64,7 +65,7 @@ export async function GET() {
     const wordpress = wpApplies ? { status: org!.wpConnectionStatus } : null
     const now = Date.now()
 
-    const checkIns = rawCheckIns.map(({ wpSyncStatus, wpSyncedAt, wpPostId, ...checkIn }) => ({
+    const checkIns = rawCheckIns.map(({ wpSyncStatus, wpSyncedAt, wpPostId, wpErrorCode, ...checkIn }) => ({
       ...checkIn,
       photoUrls: checkIn.photoUrls
         ? checkIn.photoUrls
@@ -76,6 +77,9 @@ export async function GET() {
       // job is a first post ("Not posted") or an edit ("Latest changes not posted").
       wpState: wpApplies ? wpJobDisplayState({ isPublic: checkIn.isPublic, wpSyncStatus, wpSyncedAt }, now) : null,
       hasWpPost: wpPostId != null,
+      // The exact error code behind a failed job (WP-101 to WP-106), shown on
+      // its badge with a link to the guide. A stale claim has no code.
+      wpErrorCode: wpApplies && wpSyncStatus === 'failed' ? wpErrorCode : null,
     }))
 
     return NextResponse.json({ checkIns, wordpress })

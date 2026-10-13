@@ -17,8 +17,9 @@ import {
   updatePageContent,
   testConnection,
 } from '@/lib/wordpressApi'
-import { WP_SYNC_CLAIM_STALE_MS, wpConnectionActive } from '@/lib/wpStatus'
+import { WP_SYNC_CLAIM_STALE_MS, wpConnectionActive, wpErrorCodeForKind } from '@/lib/wpStatus'
 import { sendWordPressReconnectEmail } from '@/lib/wordpressEmails'
+import { parseStoredAddress } from '@/lib/gbpBusinessInfo'
 
 // Orchestration for WordPress native publishing (Phase 3, Website Integration
 // for Local SEO). Decides WHAT syncs and WHEN; lib/wordpressApi.ts does the
@@ -127,6 +128,7 @@ type OrgContext = {
     wpSiteUrl: string | null
     wpConnectionStatus: string | null
     wpConnectedAt: Date | null
+    gbpBusinessAddress: unknown
   }
   creds: WpCredentials
 }
@@ -154,6 +156,7 @@ async function getOrgContext(orgId: string): Promise<OrgContext | null> {
       wpApplicationPassword: true,
       wpConnectionStatus: true,
       wpConnectedAt: true,
+      gbpBusinessAddress: true,
     },
   })
   if (!org) return null
@@ -186,6 +189,9 @@ type JobRecord = {
   wpPostId: number | null
   wpPostUrl: string | null
   wpMedia: string | null
+  zip: string | null
+  latitude: number | null
+  longitude: number | null
 }
 
 /**
@@ -227,6 +233,9 @@ const JOB_SELECT = {
   wpPostId: true,
   wpPostUrl: true,
   wpMedia: true,
+  zip: true,
+  latitude: true,
+  longitude: true,
 } as const
 
 function jobTitle(job: JobRecord): string {
@@ -246,14 +255,23 @@ function jobDescription(job: JobRecord): string {
  */
 function buildJsonLd(job: JobRecord, org: OrgContext['org'], siteUrl: string): string {
   // Stable business identity across every job post on their site, so the posts
-  // all reference one entity instead of each declaring its own.
+  // all reference one entity instead of each declaring its own. The business's
+  // own address comes from its Google Business Profile (none when it hides its
+  // address as a service-area business); the job site's city, zip and exact
+  // coordinates describe where this service was performed, never the business.
   const businessId = `${org.website || siteUrl}#business`
+  const storefront = parseStoredAddress(org.gbpBusinessAddress)
+  const city = job.city?.trim()
+  const state = job.state?.trim()
+  const zip = job.zip?.trim()
+  const hasCoords = typeof job.latitude === 'number' && typeof job.longitude === 'number'
+
   const graph: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'Service',
     name: jobTitle(job),
     ...(jobDescription(job) ? { description: jobDescription(job) } : {}),
-    ...(job.timestamp ? { datePublished: job.timestamp.toISOString() } : {}),
+    ...(job.doorType ? { serviceType: job.doorType.trim() } : {}),
     provider: {
       '@type': 'LocalBusiness',
       '@id': businessId,
@@ -261,16 +279,36 @@ function buildJsonLd(job: JobRecord, org: OrgContext['org'], siteUrl: string): s
       ...(org.website ? { url: org.website } : {}),
       ...(org.phone ? { telephone: org.phone } : {}),
       ...(org.email ? { email: org.email } : {}),
+      ...(storefront
+        ? {
+            address: {
+              '@type': 'PostalAddress',
+              streetAddress: storefront.addressLines.join(', '),
+              ...(storefront.locality ? { addressLocality: storefront.locality } : {}),
+              ...(storefront.administrativeArea ? { addressRegion: storefront.administrativeArea } : {}),
+              ...(storefront.postalCode ? { postalCode: storefront.postalCode } : {}),
+              ...(storefront.regionCode ? { addressCountry: storefront.regionCode } : {}),
+            },
+          }
+        : {}),
     },
-    ...(job.city
+    ...(city || hasCoords
       ? {
           areaServed: {
             '@type': 'Place',
-            address: {
-              '@type': 'PostalAddress',
-              addressLocality: job.city,
-              ...(job.state ? { addressRegion: job.state } : {}),
-            },
+            ...(city
+              ? {
+                  address: {
+                    '@type': 'PostalAddress',
+                    addressLocality: city,
+                    ...(state ? { addressRegion: state } : {}),
+                    ...(zip ? { postalCode: zip } : {}),
+                  },
+                }
+              : {}),
+            ...(hasCoords
+              ? { geo: { '@type': 'GeoCoordinates', latitude: job.latitude, longitude: job.longitude } }
+              : {}),
           },
         }
       : {}),
@@ -468,9 +506,9 @@ async function claimJobForSync(jobId: string): Promise<boolean> {
  * customer's fresh reconnect. The conditional UPDATE also makes the owner
  * email fire once per change, however many syncs fail at the same moment.
  */
-async function handleRejectedLogin(ctx: OrgContext): Promise<void> {
+async function handleRejectedLogin(ctx: OrgContext): Promise<boolean> {
   const recheck = await testConnection(ctx.creds)
-  if (recheck.ok || recheck.kind !== 'auth') return
+  if (recheck.ok || recheck.kind !== 'auth') return false
 
   const flipped = await prisma.organization.updateMany({
     where: {
@@ -483,6 +521,7 @@ async function handleRejectedLogin(ctx: OrgContext): Promise<void> {
   if (flipped.count === 1) {
     await sendWordPressReconnectEmail(ctx.org.id, ctx.org.wpSiteUrl)
   }
+  return true
 }
 
 /**
@@ -512,7 +551,7 @@ async function markFailedIfAwaitingReconnect(job: {
   const wouldPost = pickMapping(mappings, job) != null || job.wpPostId != null || org.wpCreateNewPosts
   if (!wouldPost) return
 
-  await prisma.checkIn.update({ where: { id: job.id }, data: { wpSyncStatus: 'failed' } })
+  await prisma.checkIn.update({ where: { id: job.id }, data: { wpSyncStatus: 'failed', wpErrorCode: 'WP-101' } })
 }
 
 /**
@@ -608,13 +647,17 @@ export async function syncCheckIn(
     }
 
     if (!result.ok || !result.data) {
+      // The code is decided only from what WordPress actually answered; a 401
+      // counts as a rejected login only after the second check confirms it.
+      const loginConfirmedRejected = result.kind === 'auth' ? await handleRejectedLogin(ctx) : false
       await prisma.checkIn.update({
         where: { id: job.id },
-        data: { wpSyncStatus: 'failed' },
+        data: {
+          wpSyncStatus: 'failed',
+          wpErrorCode: wpErrorCodeForKind(result.kind, { loginConfirmedRejected }),
+        },
       })
-      if (result.kind === 'auth') {
-        await handleRejectedLogin(ctx)
-      } else if (result.kind === 'forbidden' && org.wpConnectionStatus === 'connected') {
+      if (result.kind === 'forbidden' && org.wpConnectionStatus === 'connected') {
         await prisma.organization.updateMany({
           where: { id: org.id, wpConnectionStatus: 'connected' },
           data: { wpConnectionStatus: 'blocked' },
@@ -631,6 +674,7 @@ export async function syncCheckIn(
         wpMedia: media.length ? JSON.stringify(media) : null,
         wpSyncedAt: new Date(),
         wpSyncStatus: 'synced',
+        wpErrorCode: null,
       },
     })
 
@@ -643,7 +687,7 @@ export async function syncCheckIn(
     }
   } catch (err) {
     // Never leave the claim behind on an unexpected error.
-    await prisma.checkIn.update({ where: { id: job.id }, data: { wpSyncStatus: 'failed' } })
+    await prisma.checkIn.update({ where: { id: job.id }, data: { wpSyncStatus: 'failed', wpErrorCode: 'WP-104' } })
     throw err
   }
 
@@ -686,7 +730,7 @@ export async function unsyncCheckIn(
   // cleared so an unpublished job never shows as "not posted".
   if (!job.wpPostId && job.wpSyncStatus !== 'synced' && !job.wpMedia) {
     if (job.wpSyncStatus === 'failed' || job.wpSyncStatus === 'syncing') {
-      await prisma.checkIn.update({ where: { id: job.id }, data: { wpSyncStatus: null } })
+      await prisma.checkIn.update({ where: { id: job.id }, data: { wpSyncStatus: null, wpErrorCode: null } })
     }
     return { ok: true }
   }
@@ -711,6 +755,7 @@ export async function unsyncCheckIn(
       wpMedia: null,
       wpSyncedAt: null,
       wpSyncStatus: reason === 'revoked' ? 'revoked' : null,
+      wpErrorCode: null,
     },
   })
 
@@ -780,7 +825,7 @@ export async function revokeOrgWordPress(orgId: string): Promise<{ removed: numb
   //    a feature the customer no longer has.
   await prisma.checkIn.updateMany({
     where: { organizationId: orgId, wpPostId: null, wpSyncStatus: { in: ['failed', 'syncing'] } },
-    data: { wpSyncStatus: null },
+    data: { wpSyncStatus: null, wpErrorCode: null },
   })
   return { removed }
 }
@@ -1010,14 +1055,26 @@ export async function renderPageMapping(mappingId: string): Promise<{ rendered: 
   }
 
   const page = await getPageContent(creds, mapping.wpPageId, pageType)
-  if (!page.ok || !page.data) return { rendered: 0 }
+  if (!page.ok || !page.data) {
+    await prisma.wordPressPageMapping.update({
+      where: { id: mapping.id },
+      data: { errorCode: wpErrorCodeForKind(page.kind) },
+    })
+    return { rendered: 0 }
+  }
   const spliced = spliceBlock(page.data.raw, block)
   const write = await updatePageContent(creds, mapping.wpPageId, pageType, spliced.content)
-  if (!write.ok) return { rendered: 0 }
+  if (!write.ok) {
+    await prisma.wordPressPageMapping.update({
+      where: { id: mapping.id },
+      data: { errorCode: wpErrorCodeForKind(write.kind) },
+    })
+    return { rendered: 0 }
+  }
 
   await prisma.wordPressPageMapping.update({
     where: { id: mapping.id },
-    data: { markerMode: spliced.markerMode, lastRenderedAt: new Date() },
+    data: { markerMode: spliced.markerMode, lastRenderedAt: new Date(), errorCode: null },
   })
   return { rendered: jobs.length }
 }

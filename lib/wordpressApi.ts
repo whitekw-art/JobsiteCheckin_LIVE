@@ -155,8 +155,8 @@ function jsonInit(method: string, body: unknown): RequestInit {
  */
 export async function testConnection(
   creds: WpCredentials
-): Promise<WpResult<{ userId: number; canPublish: boolean }>> {
-  const me = await wpJson<{ id: number; capabilities?: Record<string, boolean> }>(
+): Promise<WpResult<{ userId: number; canPublish: boolean; canEmbedCode: boolean; role: string | null }>> {
+  const me = await wpJson<{ id: number; capabilities?: Record<string, boolean>; roles?: string[] }>(
     creds,
     '/wp/v2/users/me?context=edit'
   )
@@ -172,7 +172,14 @@ export async function testConnection(
       kind: 'forbidden',
     }
   }
-  return { ok: true, data: { userId: me.data.id, canPublish } }
+  // Without unfiltered_html (only Administrators, and Editors on single-site
+  // installs, have it), WordPress strips <script> and <iframe> from posts this
+  // account writes: the job's structured data and any embedded map vanish.
+  const canEmbedCode = me.data.capabilities?.unfiltered_html === true
+  // The account's role as WordPress reports it (for example "author"), used
+  // only to name it in the WP-105 warning.
+  const role = Array.isArray(me.data.roles) && me.data.roles.length > 0 ? me.data.roles[0] : null
+  return { ok: true, data: { userId: me.data.id, canPublish, canEmbedCode, role } }
 }
 
 /** Find a category/tag by exact name, creating it if it doesn't exist yet. */
@@ -486,7 +493,7 @@ export async function getPageContent(
     creds,
     `/wp/v2/${rest}/${pageId}?context=edit&_fields=content`
   )
-  if (!res.ok || !res.data) return { ok: false, error: res.error, transient: res.transient }
+  if (!res.ok || !res.data) return { ok: false, error: res.error, transient: res.transient, status: res.status, kind: res.kind }
   return { ok: true, data: { raw: res.data.content?.raw ?? '' } }
 }
 
@@ -507,6 +514,6 @@ export async function updatePageContent(
     `/wp/v2/${rest}/${pageId}`,
     jsonInit('POST', { content: fullContent })
   )
-  if (!res.ok || !res.data) return { ok: false, error: res.error, transient: res.transient }
+  if (!res.ok || !res.data) return { ok: false, error: res.error, transient: res.transient, status: res.status, kind: res.kind }
   return { ok: true }
 }
