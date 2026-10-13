@@ -21,6 +21,9 @@ Requirements:
 - Do not begin with "I" or "We"
 - Output only the description — no preamble, no explanation`
 
+const NO_NAMES_RULE =
+  'Never include any person\'s name: not the homeowner, the customer, their family, or any crew member, even if a name appears in the notes. Refer to them as "the homeowner" or "the crew" instead.'
+
 async function getSystemPrompt(): Promise<string> {
   try {
     const row = await prisma.adminConfig.findUnique({
@@ -173,7 +176,9 @@ export async function POST(req: Request) {
       userContent.push({ type: 'image_url', image_url: { url, detail: 'low' } })
     }
 
-    const systemPrompt = await getSystemPrompt()
+    // Appended in code so it applies even when the prompt is overridden in the
+    // admin panel: job descriptions are public text and must not name people.
+    const systemPrompt = `${await getSystemPrompt()}\n\n${NO_NAMES_RULE}`
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',

@@ -42,6 +42,7 @@ model Organization {
   wpConnectionStatus       String?
   wpConnectedAt            DateTime?
   wpCreateNewPosts         Boolean                @default(true)
+  wpLimitedAccount         Boolean                @default(false)
   gscAccessToken           String?
   gscRefreshToken          String?
   gscPropertyUrl           String?
@@ -55,6 +56,8 @@ model Organization {
   gbpConnectionStatus      String?
   gbpConnectedAt           DateTime?
   gbpAutoPost              Boolean                @default(true)
+  gbpBusinessAddress       Json?
+  gbpBusinessInfoFetchedAt DateTime?
   showEngagementMetrics    Boolean                @default(false)
   showPortfolioViewsMetric Boolean                @default(false)
   Invitations              Invitations[]
@@ -80,6 +83,7 @@ model WordPressPageMapping {
   wpPageType     String // 'page' | 'post'
   builderBlocked Boolean      @default(false) // detected page builder → inject disabled, job falls back to a new post
   markerMode     String       @default("append") // 'marker' (customer placed one) | 'append'
+  errorCode      String? // last WordPress error code for this page (WP-1xx), null when the last render worked
   lastRenderedAt DateTime?
   createdAt      DateTime     @default(now())
 
@@ -139,6 +143,7 @@ model CheckIn {
   wpMedia                  String?
   wpSyncedAt               DateTime?
   wpSyncStatus             String?
+  wpErrorCode              String?
   gbpPostName              String?
   gbpPostUrl               String?
   gbpPostedAt              DateTime?

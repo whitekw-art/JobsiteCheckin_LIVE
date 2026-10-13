@@ -1,6 +1,7 @@
 export const runtime = 'nodejs'
 
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { refreshGbpBusinessInfo } from '@/lib/gbpBusinessInfo'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { tierHasFeature } from '@/lib/planVersions'
@@ -59,6 +60,11 @@ export async function GET() {
           gbpConnectionStatus: single ? 'connected' : 'select_location',
         },
       })
+      if (single) {
+        after(async () => {
+          await refreshGbpBusinessInfo(org.id).catch((err) => console.error('GBP address refresh failed:', err))
+        })
+      }
     }
 
     return NextResponse.json({ locations })

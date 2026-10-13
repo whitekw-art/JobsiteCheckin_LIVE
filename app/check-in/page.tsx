@@ -45,6 +45,15 @@ function CheckInContent() {
   const [existingPhotoUrls, setExistingPhotoUrls] = useState<string[]>([])
   const [existingBeforePhotoUrl, setExistingBeforePhotoUrl] = useState<string | null>(null)
   const [existingAfterPhotoUrl, setExistingAfterPhotoUrl] = useState<string | null>(null)
+  // The address as loaded in edit mode, so a save can tell whether it changed
+  // and the job's coordinates need to follow the new address.
+  const [originalAddress, setOriginalAddress] = useState<string | null>(null)
+  // Edit mode: saved photos marked for removal (applied only on Save Changes),
+  // the tag each one held so Undo can restore it, and the job's public state.
+  const [removedExisting, setRemovedExisting] = useState<string[]>([])
+  const [removedTags, setRemovedTags] = useState<Record<string, 'before' | 'after' | null>>({})
+  const [jobIsPublic, setJobIsPublic] = useState(false)
+  const [jobPostedToGoogle, setJobPostedToGoogle] = useState(false)
   // Product dropdown is driven by the org's own editable list (Account → General),
   // not a hardcoded trade list. `doorType` still holds the final submitted value in
   // both branches, so no submit-path changes are needed.
@@ -125,6 +134,9 @@ function CheckInContent() {
         setExistingPhotoUrls(c.photoUrls || [])
         setExistingBeforePhotoUrl(c.beforePhotoUrl || null)
         setExistingAfterPhotoUrl(c.afterPhotoUrl || null)
+        setOriginalAddress([c.street, c.city, c.state, c.zip].map((v: string | null) => (v || '').trim()).join('|'))
+        setJobIsPublic(Boolean(c.isPublic))
+        setJobPostedToGoogle(c.gbpPostStatus === 'posted')
       })
       .catch(() => {})
   }, [editId])
@@ -233,12 +245,11 @@ function CheckInContent() {
     setPhotoPreviews(nextPreviews)
     setPhotoTags(nextTags)
 
-    // Extract EXIF from the first new photo
+    // The job's location comes from the first photo that carries GPS; a later
+    // photo never moves it (Keith, 2026-10-11).
     const exif = await extractExifLocation(supported[0])
     if (exif?.lat != null && exif?.lng != null) {
-      setPhotoLocation(exif)
-    } else if (!append) {
-      setPhotoLocation(null)
+      setPhotoLocation((prev) => prev ?? exif)
     }
   }
 
@@ -249,10 +260,10 @@ function CheckInContent() {
     e.target.value = '' // reset so same shot can be retaken
   }
 
-  // Library: replaces (existing behavior)
+  // Library: adds to the photos already attached, the same as Take Photo
   const handleLibraryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
-    addFiles(files, false)
+    if (files.length > 0) addFiles(files, true)
     e.target.value = ''
   }
 
@@ -263,9 +274,48 @@ function CheckInContent() {
     setPhotoTags((prev) => prev.filter((_, i) => i !== idx))
   }
 
+  // One photo per tag across saved and new photos: choosing BEFORE on a photo
+  // clears BEFORE from every other photo (the same for AFTER).
   const setTag = (idx: number, tag: null | 'before' | 'after') => {
-    setPhotoTags((prev) => prev.map((t, i) => i === idx ? tag : t))
+    setPhotoTags((prev) => prev.map((t, i) => (i === idx ? tag : tag && t === tag ? null : t)))
+    if (tag === 'before') setExistingBeforePhotoUrl(null)
+    if (tag === 'after') setExistingAfterPhotoUrl(null)
   }
+
+  const setExistingTag = (url: string, tag: 'before' | 'after') => {
+    const current = tag === 'before' ? existingBeforePhotoUrl : existingAfterPhotoUrl
+    const setCurrent = tag === 'before' ? setExistingBeforePhotoUrl : setExistingAfterPhotoUrl
+    if (current === url) {
+      setCurrent(null)
+      return
+    }
+    setCurrent(url)
+    setPhotoTags((prev) => prev.map((t) => (t === tag ? null : t)))
+    // A photo holds one tag at a time.
+    if (tag === 'before' && existingAfterPhotoUrl === url) setExistingAfterPhotoUrl(null)
+    if (tag === 'after' && existingBeforePhotoUrl === url) setExistingBeforePhotoUrl(null)
+  }
+
+  const removeExistingPhoto = (url: string) => {
+    const tag = existingBeforePhotoUrl === url ? 'before' : existingAfterPhotoUrl === url ? 'after' : null
+    setRemovedTags((prev) => ({ ...prev, [url]: tag }))
+    if (tag === 'before') setExistingBeforePhotoUrl(null)
+    if (tag === 'after') setExistingAfterPhotoUrl(null)
+    setRemovedExisting((prev) => (prev.includes(url) ? prev : [...prev, url]))
+  }
+
+  // Undo restores the photo, and its tag only if no other photo has taken
+  // that tag in the meantime (the newer choice wins).
+  const undoRemoveExisting = (url: string) => {
+    setRemovedExisting((prev) => prev.filter((u) => u !== url))
+    const tag = removedTags[url]
+    if (tag === 'before' && !existingBeforePhotoUrl && !photoTags.includes('before')) setExistingBeforePhotoUrl(url)
+    if (tag === 'after' && !existingAfterPhotoUrl && !photoTags.includes('after')) setExistingAfterPhotoUrl(url)
+  }
+
+  const keptExistingCount = existingPhotoUrls.filter((u) => !removedExisting.includes(u)).length
+  const totalPhotosAfterSave = keptExistingCount + photos.length
+  const LAST_PHOTO_MESSAGE = 'Every published job must contain at least 1 photo.'
 
   const handleAfterCameraCapture = (file: File) => {
     const preview = URL.createObjectURL(file)
@@ -281,6 +331,11 @@ function CheckInContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     console.log('HANDLE_SUBMIT_RUNNING')
     e.preventDefault()
+    if (editId && jobIsPublic && totalPhotosAfterSave === 0) {
+      setMessageType('error')
+      setMessage(LAST_PHOTO_MESSAGE)
+      return
+    }
     setIsSubmitting(true)
     setMessage('')
 
@@ -326,6 +381,28 @@ function CheckInContent() {
       const resolved = editId
         ? { latitude: null, longitude: null, locationSource: 'DEVICE' as const }
         : await resolveLocation()
+
+      // Edit mode: when the address changed, geocode the new one so the job's
+      // coordinates (map pin, structured data) follow it. A failed lookup sends
+      // nulls, and the server clears the old coordinates instead of keeping a
+      // pin on the old house.
+      let editCoords: { latitude: number | null; longitude: number | null } | null = null
+      if (editId) {
+        const currentAddress = [street, city, state, zip].map((v) => v.trim()).join('|')
+        if (originalAddress !== null && currentAddress !== originalAddress) {
+          let geocoded = null
+          try {
+            geocoded = await Promise.race([
+              geocodeJobAddress(jobAddress),
+              new Promise<null>((r) => setTimeout(() => r(null), 4000)),
+            ])
+          } catch { geocoded = null }
+          editCoords =
+            geocoded && Number.isFinite(geocoded.lat) && Number.isFinite(geocoded.lng)
+              ? { latitude: geocoded.lat, longitude: geocoded.lng }
+              : { latitude: null, longitude: null }
+        }
+      }
       console.log('RESOLVE_LOCATION_RESULT', resolved)
 
       const uploadedUrls: string[] = []
@@ -365,11 +442,20 @@ function CheckInContent() {
               doorType,
               notes,
               appendPhotoUrls: uploadedUrls,
-              beforePhotoUrl: newBeforePhotoUrl ?? existingBeforePhotoUrl,
-              afterPhotoUrl: newAfterPhotoUrl ?? existingAfterPhotoUrl,
+              removePhotoUrls: removedExisting,
+              // Sent explicitly so a cleared tag is saved as cleared. Plans
+              // without before/after tagging clear any tags left from a
+              // higher plan (Keith, 2026-10-11).
+              beforePhotoUrl: canBeforeAfter
+                ? newBeforePhotoUrl ?? (existingBeforePhotoUrl && !removedExisting.includes(existingBeforePhotoUrl) ? existingBeforePhotoUrl : null)
+                : null,
+              afterPhotoUrl: canBeforeAfter
+                ? newAfterPhotoUrl ?? (existingAfterPhotoUrl && !removedExisting.includes(existingAfterPhotoUrl) ? existingAfterPhotoUrl : null)
+                : null,
               homeCustomerName: homeCustomerName.trim() || null,
               homeCustomerPhone: homeCustomerPhone.trim() || null,
               homeCustomerEmail: homeCustomerEmail.trim() || null,
+              ...(editCoords ?? {}),
             }),
           })
         : await fetch('/api/submit-checkin-supabase', {
@@ -395,9 +481,9 @@ function CheckInContent() {
             }),
           })
 
+      const resData = await res.json().catch(() => null)
       if (!res.ok) {
-        const errData = await res.json().catch(() => null)
-        throw new Error(errData?.error || 'Failed to submit check-in')
+        throw new Error(resData?.error || 'Failed to submit check-in')
       }
 
       setMessageType('success')
@@ -410,6 +496,13 @@ function CheckInContent() {
         setPhotos([]); setPhotoPreviews([]); setPhotoTags([]); setPhotoLocation(null)
       } else {
         setPhotos([]); setPhotoPreviews([]); setPhotoTags([])
+        setOriginalAddress([street, city, state, zip].map((v) => v.trim()).join('|'))
+        // The saved job is now the starting point for further edits.
+        if (Array.isArray(resData?.photoUrls)) setExistingPhotoUrls(resData.photoUrls)
+        setExistingBeforePhotoUrl(resData?.beforePhotoUrl ?? null)
+        setExistingAfterPhotoUrl(resData?.afterPhotoUrl ?? null)
+        setRemovedExisting([])
+        setRemovedTags({})
       }
 
     } catch (err: any) {
@@ -426,6 +519,26 @@ function CheckInContent() {
     'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
     'VA','WA','WV','WI','WY',
   ]
+
+  // Workers (USER role) may edit only their own unpublished jobs. The server
+  // enforces the same rule; this screen explains it instead of showing a form
+  // whose save would be refused.
+  if (editId && isUserRole && jobIsPublic) {
+    return (
+      <DashboardShell title="Edit Check-In">
+        <div className="ci-card">
+          <div className="ci-body">
+            <div className="ci-photo-note">
+              This job is published, so only an owner or admin can make changes to it. Ask your account owner to edit it from the Job Dashboard.
+            </div>
+            <a href="/my-jobs" className="ci-undo" style={{ display: 'inline-block', textDecoration: 'none', marginTop: 8 }}>
+              Back to My Jobs
+            </a>
+          </div>
+        </div>
+      </DashboardShell>
+    )
+  }
 
   return (
     <>
@@ -615,39 +728,10 @@ function CheckInContent() {
             <div className="ci-photo-section" data-tour="ci-photos">
               <span className="ci-label">Photos</span>
 
-              {/* Existing photos in edit mode */}
-              {existingPhotoUrls.length > 0 && (
-                <div style={{ marginBottom: 10 }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
-                    Current photos ({existingPhotoUrls.length})
-                  </span>
-                  <div className="ci-preview-grid">
-                    {existingPhotoUrls.map((url, i) => (
-                      <div key={i} className="ci-preview-item">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt={`Photo ${i + 1}`} />
-                        {url === existingBeforePhotoUrl && (
-                          <div style={{
-                            position: 'absolute', bottom: 4, left: 4,
-                            background: '#2563eb', color: '#fff',
-                            fontSize: '0.6rem', fontWeight: 700, padding: '2px 5px',
-                            borderRadius: 3, letterSpacing: '0.03em',
-                          }}>BEFORE</div>
-                        )}
-                        {url === existingAfterPhotoUrl && (
-                          <div style={{
-                            position: 'absolute', bottom: 4, left: 4,
-                            background: '#16a34a', color: '#fff',
-                            fontSize: '0.6rem', fontWeight: 700, padding: '2px 5px',
-                            borderRadius: 3, letterSpacing: '0.03em',
-                          }}>AFTER</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginTop: 6 }}>
-                    Add new photos below:
-                  </span>
+              {/* Edit mode: a Google post keeps its own copy of posted photos. */}
+              {editId && jobPostedToGoogle && (
+                <div className="ci-photo-note">
+                  This job is posted to Google. The Google post keeps its current photos, including any you remove here, until you click Remove from Google on the Job Dashboard.
                 </div>
               )}
 
@@ -717,22 +801,83 @@ function CheckInContent() {
               {/* Count badge */}
               {photos.length > 0 && (
                 <span className="ci-photo-count">
-                  {photos.length} photo{photos.length !== 1 ? 's' : ''} attached
+                  {editId && existingPhotoUrls.length > 0
+                    ? `${keptExistingCount + photos.length} photos: ${keptExistingCount} saved, ${photos.length} new`
+                    : `${photos.length} photo${photos.length !== 1 ? 's' : ''} attached`}
                 </span>
               )}
 
-              {/* Previews with remove buttons */}
-              {photoPreviews.length > 0 && (
+              {/* One grid for saved and new photos. Saved photos are removed
+                  only when Save Changes runs; until then Undo brings them back. */}
+              {(existingPhotoUrls.length > 0 || photoPreviews.length > 0) && (
                 <div className="ci-preview-grid">
+                  {existingPhotoUrls.map((url, i) => {
+                    const removed = removedExisting.includes(url)
+                    return (
+                      <div key={`saved-${url}`} className={`ci-preview-item${removed ? ' removed' : ''}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Saved photo ${i + 1}`} />
+                        {removed ? (
+                          <div className="ci-removed-overlay">
+                            Removed
+                            <button type="button" className="ci-undo" onClick={() => undoRemoveExisting(url)}>
+                              Undo
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className="ci-preview-remove"
+                              onClick={() => removeExistingPhoto(url)}
+                              aria-label={`Remove saved photo ${i + 1}`}
+                            >
+                              ×
+                            </button>
+                            {canBeforeAfter && <div style={{
+                              position: 'absolute', bottom: 4, left: 4, right: 4,
+                              display: 'flex', gap: 3,
+                            }}>
+                        <button
+                          type="button"
+                          onClick={() => setExistingTag(url, 'before')}
+                          style={{
+                            flex: 1, fontSize: '0.6rem', fontWeight: 700, padding: '2px 0',
+                            border: 'none', borderRadius: 3, cursor: 'pointer',
+                            background: existingBeforePhotoUrl === url ? '#2563eb' : 'rgba(0,0,0,0.55)',
+                            color: '#fff', letterSpacing: '0.03em',
+                          }}
+                        >
+                          BEFORE
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setExistingTag(url, 'after')}
+                          style={{
+                            flex: 1, fontSize: '0.6rem', fontWeight: 700, padding: '2px 0',
+                            border: 'none', borderRadius: 3, cursor: 'pointer',
+                            background: existingAfterPhotoUrl === url ? '#16a34a' : 'rgba(0,0,0,0.55)',
+                            color: '#fff', letterSpacing: '0.03em',
+                          }}
+                        >
+                          AFTER
+                        </button>
+                            </div>}
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
                   {photoPreviews.map((src, i) => (
-                    <div key={i} className="ci-preview-item">
+                    <div key={`new-${src}`} className="ci-preview-item">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt={`Photo ${i + 1}`} />
+                      <img src={src} alt={`New photo ${i + 1}`} />
+                      {editId && existingPhotoUrls.length > 0 && <span className="ci-new-label">New</span>}
                       <button
                         type="button"
                         className="ci-preview-remove"
                         onClick={() => removePhoto(i)}
-                        aria-label={`Remove photo ${i + 1}`}
+                        aria-label={`Remove new photo ${i + 1}`}
                       >
                         ×
                       </button>
@@ -768,6 +913,21 @@ function CheckInContent() {
                       </div>}
                     </div>
                   ))}
+                </div>
+              )}
+
+              {editId && existingPhotoUrls.length > 0 && (
+                <p className="ci-photo-status">
+                  {existingPhotoUrls.length} photo{existingPhotoUrls.length !== 1 ? 's are' : ' is'} on this job.
+                  {removedExisting.length > 0 &&
+                    ` ${removedExisting.length} photo${removedExisting.length !== 1 ? 's' : ''} will be removed when you click Save Changes. Removed photos cannot be restored after you save.`}
+                  {photos.length > 0 && ' New photos upload when you click Save Changes.'}
+                </p>
+              )}
+
+              {editId && jobIsPublic && totalPhotosAfterSave === 0 && (
+                <div className="ci-photo-note warn">
+                  {LAST_PHOTO_MESSAGE} Add a photo or click Undo to keep one.
                 </div>
               )}
             </div>

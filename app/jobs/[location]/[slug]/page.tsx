@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { slugify } from '@/lib/slugify'
+import { parseStoredAddress } from '@/lib/gbpBusinessInfo'
 import { CheckInPageViewTracker } from '@/components/CheckInPageViewTracker'
 import JobDetailClient from './JobDetailClient'
 
@@ -230,56 +231,88 @@ export default async function JobPage(
     itemListElement: breadcrumbItems,
   }
 
-  // Build JSON-LD structured data
-  const localBusiness: Record<string, any> = {
+  // Structured data. The business and the job are separate entities: the
+  // business keeps one stable identity and address on every page (its address
+  // copied from its Google Business Profile, or none for a service-area
+  // business that hides it), and the job site's location and coordinates
+  // describe the page's own content. Before 2026-10-11 the job's city, zip and
+  // coordinates were attached to the business, so every job page said the
+  // business sat at a different job site.
+  const pageUrl = `${baseUrl}/jobs/${location}/${slug}`
+  const businessId = orgSlug ? `${baseUrl}/portfolio/${orgSlug}#business` : `${pageUrl}#business`
+  const storefront = parseStoredAddress(organization?.gbpBusinessAddress)
+
+  const business: Record<string, unknown> = {
     '@type': 'LocalBusiness',
+    '@id': businessId,
     name: organization?.name || undefined,
   }
-  if (businessPhone) localBusiness.telephone = businessPhone
-  if (normalizedWebsiteHref) localBusiness.url = normalizedWebsiteHref
-  if (city || state || zip) {
-    localBusiness.address = {
+  if (businessPhone) business.telephone = businessPhone
+  if (normalizedWebsiteHref) business.url = normalizedWebsiteHref
+  if (storefront) {
+    business.address = {
       '@type': 'PostalAddress',
-      ...(city && { addressLocality: city }),
-      ...(state && { addressRegion: state }),
-      ...(zip && { postalCode: zip }),
+      streetAddress: storefront.addressLines.join(', '),
+      ...(storefront.locality && { addressLocality: storefront.locality }),
+      ...(storefront.administrativeArea && { addressRegion: storefront.administrativeArea }),
+      ...(storefront.postalCode && { postalCode: storefront.postalCode }),
+      ...(storefront.regionCode && { addressCountry: storefront.regionCode }),
     }
   }
-  if (
-    typeof checkIn.latitude === 'number' &&
-    typeof checkIn.longitude === 'number'
-  ) {
-    localBusiness.geo = {
+
+  const service: Record<string, unknown> = {
+    '@type': 'Service',
+    '@id': `${pageUrl}#service`,
+    name: effectiveTitle,
+    description: effectiveDescription,
+    provider: { '@id': businessId },
+  }
+  if (doorType) service.serviceType = doorType
+  if (city || state) {
+    service.areaServed = {
+      '@type': 'Place',
+      name: [city, state].filter(Boolean).join(', '),
+    }
+  }
+
+  const jobPlace: Record<string, unknown> = { '@type': 'Place' }
+  if (city || state || zip) {
+    jobPlace.address = {
+      '@type': 'PostalAddress',
+      ...(city && { addressLocality: city.trim() }),
+      ...(state && { addressRegion: state.trim() }),
+      ...(zip && { postalCode: zip.trim() }),
+    }
+  }
+  if (typeof checkIn.latitude === 'number' && typeof checkIn.longitude === 'number') {
+    jobPlace.geo = {
       '@type': 'GeoCoordinates',
       latitude: checkIn.latitude,
       longitude: checkIn.longitude,
     }
   }
 
-  const jsonLd: Record<string, any> = {
-    '@context': 'https://schema.org',
-    '@type': 'Service',
+  const webPage: Record<string, unknown> = {
+    '@type': 'WebPage',
+    '@id': pageUrl,
+    url: pageUrl,
     name: effectiveTitle,
     description: effectiveDescription,
-    provider: localBusiness,
+    about: { '@id': `${pageUrl}#service` },
+    ...(jobPlace.address || jobPlace.geo ? { contentLocation: jobPlace } : {}),
   }
-  if (doorType) jsonLd.serviceType = doorType
-  if (checkIn.timestamp) {
-    jsonLd.datePublished = checkIn.timestamp.toISOString()
-    jsonLd.dateModified = checkIn.timestamp.toISOString()
-  }
-  if (city || state) {
-    jsonLd.areaServed = {
-      '@type': 'Place',
-      name: [city, state].filter(Boolean).join(', '),
-    }
-  }
+  if (checkIn.timestamp) webPage.datePublished = checkIn.timestamp.toISOString()
   if (photos.length > 0) {
-    jsonLd.image = photos.map((url, i) => ({
+    webPage.image = photos.map((url, i) => ({
       '@type': 'ImageObject',
       url: url.startsWith('http') ? url : `${baseUrl}${url}`,
       name: [doorType, city, state].filter(Boolean).join(' - ') || `Job photo ${i + 1}`,
     }))
+  }
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [webPage, service, business],
   }
 
   return (

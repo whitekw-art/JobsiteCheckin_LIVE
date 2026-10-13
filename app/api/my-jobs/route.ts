@@ -36,6 +36,7 @@ export async function GET() {
         locationSource: true,
         latitude: true,
         longitude: true,
+        gbpPostStatus: true,
       },
       orderBy: { timestamp: 'desc' },
     })

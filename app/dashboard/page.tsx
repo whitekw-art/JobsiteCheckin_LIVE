@@ -13,6 +13,7 @@ import '@/styles/dashboard.css'
 import CoachMarks, { isCoachTourActive } from '@/components/CoachMarks'
 import { REVEAL_SUPPORT_NAV } from '@/lib/navReveal'
 import { DEMO_JOBS, isDemoJob } from '@/lib/demoJobs'
+import { wpErrorGuideHref } from '@/lib/wpStatus'
 
 interface CheckIn {
   id: string
@@ -39,6 +40,8 @@ interface CheckIn {
   /** Set only for a Titan org with a stored WordPress connection. */
   wpState?: 'failed' | 'syncing' | null
   hasWpPost?: boolean
+  /** Exact error code (WP-101 to WP-106) behind a failed job. */
+  wpErrorCode?: string | null
 }
 
 interface EditAddr {
@@ -171,6 +174,94 @@ function PublishModal({
       </div>
     </div>
   )
+}
+
+// Confirmation window for actions on a published job (Edit warning and
+// Unpublish). Same layout as the Publish window; Escape and a click outside
+// act as Cancel.
+function JobConfirmModal({
+  title,
+  jobLabel,
+  lines,
+  note,
+  confirmLabel,
+  busyLabel,
+  danger,
+  busy,
+  error,
+  onConfirm,
+  onClose,
+}: {
+  title: string
+  jobLabel: string
+  lines: string[]
+  note?: string
+  confirmLabel: string
+  busyLabel?: string
+  danger?: boolean
+  busy?: boolean
+  error?: string | null
+  onConfirm: () => void
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !busy) onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [busy, onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={() => { if (!busy) onClose() }}
+    >
+      <div
+        className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        {jobLabel && <p className="text-sm text-gray-500 mt-1">{jobLabel}</p>}
+        {error && (
+          <div className="mt-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
+        <ul className="mt-4 space-y-2">
+          {lines.map((line) => (
+            <li key={line} className="flex items-start gap-2 text-sm text-gray-700">
+              <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${danger ? 'bg-red-500' : 'bg-sky-500'}`} />
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+        {note && <p className="mt-3 text-sm text-gray-600">{note}</p>}
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="px-4 py-2 rounded text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 min-h-[44px]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className={`px-4 py-2 rounded text-sm font-medium text-white disabled:opacity-50 min-h-[44px] ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-sky-600 hover:bg-sky-700'}`}
+          >
+            {busy && busyLabel ? busyLabel : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function jobLabelOf(checkIn: CheckIn): string {
+  return [checkIn.doorType, [checkIn.city, checkIn.state].filter(Boolean).join(', ')]
+    .filter(Boolean)
+    .join(' \u2022 ')
 }
 
 // ── SVG icons ────────────────────────────────────────────────────────────────
@@ -683,6 +774,13 @@ export default function Dashboard() {
     warnings: string[]
     blockingError?: string
   } | null>(null)
+
+  // Confirmation windows on a published job (Keith, 2026-10-11): Edit warns
+  // what changes go live, Unpublish explains what is removed. Both appear
+  // every time.
+  const [editWarnJob, setEditWarnJob] = useState<CheckIn | null>(null)
+  const [unpublishJob, setUnpublishJob] = useState<CheckIn | null>(null)
+  const [unpublishError, setUnpublishError] = useState<string | null>(null)
 
   // Download
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
@@ -1913,7 +2011,8 @@ export default function Dashboard() {
                               disabled={togglingId === checkIn.id}
                               onClick={(e) => {
                                 e.stopPropagation()
-                                handleTogglePublish(checkIn)
+                                setUnpublishError(null)
+                                setUnpublishJob(checkIn)
                               }}
                             >
                               {togglingId === checkIn.id ? 'Saving\u2026' : 'Unpublish'}
@@ -2525,6 +2624,15 @@ export default function Dashboard() {
                                   </span>
                                 ) : wpOrg.status === 'needs_reconnect' ? (
                                   <span className="db-wp-msg">
+                                    <a
+                                      href={wpErrorGuideHref('WP-101')}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="db-gbp-reconnect"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      WP-101
+                                    </a>{' '}
                                     {checkIn.hasWpPost
                                       ? 'Latest changes not posted to WordPress.'
                                       : 'Not posted to WordPress.'}{' '}
@@ -2560,6 +2668,19 @@ export default function Dashboard() {
                                       Post to WordPress
                                     </button>
                                     <span className="db-wp-msg">
+                                      {checkIn.wpErrorCode && !wpPostError[checkIn.id] && wpPostingId === null && (
+                                        <>
+                                          <a
+                                            href={wpErrorGuideHref(checkIn.wpErrorCode)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="db-gbp-reconnect"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            {checkIn.wpErrorCode}
+                                          </a>{' '}
+                                        </>
+                                      )}
                                       {wpPostError[checkIn.id]
                                         ? wpPostError[checkIn.id]
                                         : wpPostingId !== null
@@ -2587,7 +2708,13 @@ export default function Dashboard() {
                               <Link
                                 href={`/check-in?id=${checkIn.id}`}
                                 className="db-btn-ghost"
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (checkIn.isPublic && !isDemoJob(checkIn.id)) {
+                                    e.preventDefault()
+                                    setEditWarnJob(checkIn)
+                                  }
+                                }}
                               >
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -2643,6 +2770,69 @@ export default function Dashboard() {
           onExit={() => setShowOnboarding(false)}
         />
       )}
+      {editWarnJob && (
+        <JobConfirmModal
+          title="Edit a published job?"
+          jobLabel={jobLabelOf(editWarnJob)}
+          lines={[
+            wpOrg
+              ? 'Changes you save go live on your website and on ProjectCheckin right away.'
+              : 'Changes you save go live on your ProjectCheckin job page right away.',
+            "Google reads the updated page again, and the page can move up or down in Google's search results.",
+            ...(editWarnJob.gbpPostStatus === 'posted'
+              ? ['The Google post for this job keeps its current photos and text until you click Remove from Google on the job card.']
+              : []),
+          ]}
+          confirmLabel="Continue"
+          onConfirm={() => {
+            const id = editWarnJob.id
+            setEditWarnJob(null)
+            window.location.href = `/check-in?id=${id}`
+          }}
+          onClose={() => setEditWarnJob(null)}
+        />
+      )}
+      {unpublishJob && (() => {
+        const hasWp = Boolean(wpOrg && unpublishJob.hasWpPost)
+        const onGoogle = unpublishJob.gbpPostStatus === 'posted'
+        const comesBack = [
+          'the ProjectCheckin job page comes back at the same address',
+          ...(hasWp ? ['ProjectCheckin creates a new WordPress post'] : []),
+          ...(onGoogle ? ['the job can be posted to Google again'] : []),
+        ]
+        const comesBackText =
+          comesBack.length === 1
+            ? comesBack[0]
+            : `${comesBack.slice(0, -1).join(', ')}${comesBack.length > 2 ? ',' : ''} and ${comesBack[comesBack.length - 1]}`
+        return (
+          <JobConfirmModal
+            title="Unpublish this job?"
+            jobLabel={jobLabelOf(unpublishJob)}
+            danger
+            lines={[
+              'The job page on ProjectCheckin goes offline.',
+              ...(hasWp
+                ? [
+                    'The WordPress post for this job and its photos are removed from your website until you republish.',
+                    'The job is also removed from any page on your website that lists your recent jobs.',
+                  ]
+                : []),
+              ...(onGoogle ? ['The Google post for this job is removed from your Business Profile.'] : []),
+            ]}
+            note={`The job and its photos stay in ProjectCheckin. If you publish it again, ${comesBackText}. To fix a detail or a photo, click Cancel and use Edit Check-In instead; the job stays published while you edit it.`}
+            confirmLabel="Unpublish"
+            busyLabel={'Unpublishing\u2026'}
+            busy={togglingId === unpublishJob.id}
+            error={unpublishError}
+            onConfirm={async () => {
+              const ok = await handleTogglePublish(unpublishJob)
+              if (ok) setUnpublishJob(null)
+              else setUnpublishError('The job could not be unpublished. Please try again.')
+            }}
+            onClose={() => setUnpublishJob(null)}
+          />
+        )
+      })()}
       {publishModal && (
         <PublishModal
           checkIn={publishModal.checkIn}

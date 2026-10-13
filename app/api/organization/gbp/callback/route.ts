@@ -1,6 +1,7 @@
 export const runtime = 'nodejs'
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { refreshGbpBusinessInfo } from '@/lib/gbpBusinessInfo'
 import { cookies } from 'next/headers'
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
@@ -130,6 +131,12 @@ export async function GET(request: NextRequest) {
         gbpConnectedAt: new Date(),
       },
     })
+
+    if (single) {
+      after(async () => {
+        await refreshGbpBusinessInfo(org.id).catch((err) => console.error('GBP address refresh failed:', err))
+      })
+    }
 
     return backToAccount(outcome)
   } catch (error) {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import DashboardShell from '@/components/DashboardShell'
 import '@/styles/dashboard.css'
 
@@ -24,6 +25,11 @@ interface CheckIn {
 export default function MyJobsPage() {
   const [checkIns, setCheckIns] = useState<CheckIn[]>([])
   const [loading, setLoading] = useState(true)
+  const { data: session } = useSession()
+  // Workers (USER role) may edit only their own unpublished jobs. A published
+  // job is live on the business's website and Google, so only an owner or an
+  // admin may change it.
+  const isUserRole = session?.user?.role === 'USER'
 
   useEffect(() => {
     fetch('/api/my-jobs')
@@ -144,23 +150,38 @@ export default function MyJobsPage() {
                   )}
                 </div>
 
-                <Link
-                  href={`/check-in?id=${c.id}`}
-                  style={{
-                    flexShrink: 0,
-                    padding: '6px 14px',
-                    borderRadius: 6,
-                    border: '1px solid var(--border)',
-                    color: 'var(--fg)',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                    background: 'var(--card)',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Edit
-                </Link>
+                {isUserRole && c.isPublic ? (
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      maxWidth: 170,
+                      fontSize: '0.75rem',
+                      color: 'var(--muted)',
+                      lineHeight: 1.4,
+                      textAlign: 'right',
+                    }}
+                  >
+                    Published. Ask an owner or admin to make changes.
+                  </span>
+                ) : (
+                  <Link
+                    href={`/check-in?id=${c.id}`}
+                    style={{
+                      flexShrink: 0,
+                      padding: '6px 14px',
+                      borderRadius: 6,
+                      border: '1px solid var(--border)',
+                      color: 'var(--fg)',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                      background: 'var(--card)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Edit
+                  </Link>
+                )}
               </div>
             ))}
           </div>

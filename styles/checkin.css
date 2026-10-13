@@ -250,6 +250,61 @@
 }
 .ci-preview-remove:hover { background: var(--red); }
 
+/* Saved photos in Edit Check-In share the new-photo tile. A removed photo stays
+   in the grid, dimmed, with Undo until Save Changes. */
+.ci-preview-item.removed img { opacity: .3; }
+.ci-removed-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg, #0F172A);
+}
+.ci-undo {
+  border: 1px solid var(--border);
+  background: var(--card, #fff);
+  color: var(--fg, #0F172A);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ci-new-label {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: var(--sky-text);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: .03em;
+}
+.ci-photo-note {
+  font-size: 12px;
+  line-height: 1.55;
+  border-radius: 8px;
+  padding: 9px 12px;
+  margin-bottom: 8px;
+  background: var(--sky-dim);
+  color: var(--fg, #0F172A);
+  border: 1px solid var(--border);
+}
+.ci-photo-note.warn { background: #FEF2F2; color: #991B1B; border-color: rgba(220,38,38,.25); }
+.ci-photo-status {
+  font-size: 12px;
+  color: var(--muted, #475569);
+  line-height: 1.5;
+  margin-top: 6px;
+}
+
 /* ── Divider ── */
 .ci-divider {
   height: 1px;

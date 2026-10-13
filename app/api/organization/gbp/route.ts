@@ -1,6 +1,8 @@
 export const runtime = 'nodejs'
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { Prisma } from '@prisma/client'
+import { refreshGbpBusinessInfo } from '@/lib/gbpBusinessInfo'
 import { cookies } from 'next/headers'
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
@@ -197,6 +199,14 @@ export async function PATCH(request: NextRequest) {
       select: { gbpLocationId: true, gbpLocationName: true, gbpAutoPost: true, gbpConnectionStatus: true },
     })
 
+    // A newly chosen location: copy its storefront address (or its absence)
+    // from Google so the published business address matches the profile.
+    if (data.gbpLocationId) {
+      after(async () => {
+        await refreshGbpBusinessInfo(org.id).catch((err) => console.error('GBP address refresh failed:', err))
+      })
+    }
+
     return NextResponse.json({ ok: true, ...updated })
   } catch (error) {
     console.error('Error updating Google Business Profile connection:', error)
@@ -236,6 +246,8 @@ export async function DELETE() {
         gbpLocationName: null,
         gbpConnectionStatus: null,
         gbpConnectedAt: null,
+        gbpBusinessAddress: Prisma.DbNull,
+        gbpBusinessInfoFetchedAt: null,
       },
     })
 

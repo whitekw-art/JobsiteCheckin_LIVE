@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { refreshJobAfterEdit } from '@/lib/jobContent'
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -33,6 +34,11 @@ export async function PATCH(request: NextRequest) {
         id: true,
         latitude: true,
         longitude: true,
+        street: true,
+        city: true,
+        state: true,
+        zip: true,
+        doorType: true,
       },
     })
 
@@ -47,7 +53,7 @@ export async function PATCH(request: NextRequest) {
       zip: string | null
       latitude?: number | null
       longitude?: number | null
-      locationSource: 'ADDRESS'
+      locationSource: 'ADDRESS' | null
     } = {
       street,
       city,
@@ -56,15 +62,27 @@ export async function PATCH(request: NextRequest) {
       locationSource: 'ADDRESS',
     }
 
+    // If the address changed but the new one could not be geocoded, clear the
+    // old coordinates rather than leave the map pin on the old house.
+    const addressChanged =
+      street !== checkIn.street || city !== checkIn.city || state !== checkIn.state || (zip || null) !== checkIn.zip
+    if (addressChanged) {
+      updateData.latitude = null
+      updateData.longitude = null
+      updateData.locationSource = null
+    }
+
     if (typeof latitude === 'number' && typeof longitude === 'number') {
       updateData.latitude = latitude
       updateData.longitude = longitude
+      updateData.locationSource = 'ADDRESS'
     } else if (typeof latitude === 'string' && typeof longitude === 'string') {
       const parsedLat = parseFloat(latitude)
       const parsedLng = parseFloat(longitude)
       if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)) {
         updateData.latitude = parsedLat
         updateData.longitude = parsedLng
+        updateData.locationSource = 'ADDRESS'
       }
     }
     const updated = await prisma.checkIn.update({
@@ -79,6 +97,14 @@ export async function PATCH(request: NextRequest) {
         latitude: true,
         longitude: true,
       },
+    })
+
+    // Regenerate the public title and description, and resync WordPress for a
+    // published job (this route used to leave both stale).
+    await refreshJobAfterEdit(checkIn.id, {
+      city: checkIn.city,
+      state: checkIn.state,
+      doorType: checkIn.doorType,
     })
 
     return NextResponse.json({ checkIn: updated })

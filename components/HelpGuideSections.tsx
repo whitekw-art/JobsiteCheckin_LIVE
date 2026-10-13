@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 
 export function GuideBreadcrumb() {
@@ -14,6 +14,27 @@ export function GuideBreadcrumb() {
   )
 }
 
+// Opens a collapsed section when the page address points at it (for example
+// /help/guides/wordpress-publish#wp-103 from an error code link), on load and
+// whenever the hash changes.
+function useOpenOnHash(ids: string[], open: () => void, scrollTarget?: React.RefObject<HTMLDivElement | null>) {
+  const key = ids.join('|')
+  useEffect(() => {
+    if (!key) return
+    const check = () => {
+      const hash = window.location.hash.replace(/^#/, '').toLowerCase()
+      if (hash && key.split('|').includes(hash)) {
+        open()
+        if (scrollTarget?.current) setTimeout(() => scrollTarget.current?.scrollIntoView({ block: 'start' }), 250)
+      }
+    }
+    check()
+    window.addEventListener('hashchange', check)
+    return () => window.removeEventListener('hashchange', check)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+}
+
 function Chev({ open, size = 16 }: { open: boolean; size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
@@ -25,11 +46,13 @@ function Chev({ open, size = 16 }: { open: boolean; size?: number }) {
 
 // Top-level collapsible section (h2-level) for guide pages.
 export function GuideSection({
-  title, defaultOpen = false, children,
-}: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  title, defaultOpen = false, id, openForHashes = [], children,
+}: { title: string; defaultOpen?: boolean; id?: string; openForHashes?: string[]; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen)
+  const ref = useRef<HTMLDivElement>(null)
+  useOpenOnHash([...(id ? [id] : []), ...openForHashes], () => setOpen(true), id ? ref : undefined)
   return (
-    <div style={{ borderTop: '1px solid var(--border)', marginTop: 22, paddingTop: 22 }}>
+    <div id={id} ref={ref} style={{ borderTop: '1px solid var(--border)', marginTop: 22, paddingTop: 22 }}>
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
@@ -48,10 +71,12 @@ export function GuideSection({
 }
 
 // Nested collapsible subsection (h3-level) — used for per-platform breakdowns.
-export function GuideSubsection({ title, children }: { title: string; children: React.ReactNode }) {
+export function GuideSubsection({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useOpenOnHash(id ? [id] : [], () => setOpen(true), ref)
   return (
-    <div>
+    <div id={id} ref={ref} style={{ scrollMarginTop: 80 }}>
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
