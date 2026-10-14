@@ -62,6 +62,7 @@ model Organization {
   showPortfolioViewsMetric Boolean                @default(false)
   googleReviewsCheckedAt   DateTime?
   gbpPlaceId               String?
+  previousSlugs            String[]               @default([])
   Invitations              Invitations[]
   users                    User[]
   checkIns                 CheckIn[]
@@ -153,6 +154,8 @@ model CheckIn {
   gbpPostedAt              DateTime?
   gbpPostStatus            String?
   reviewLinkCode           String?              @unique
+  wpSlug                   String?
+  photoAltText             Json?
   events                   CheckInEvent[]
   reviewRequestEvents      ReviewRequestEvent[]
   googleReview             GoogleReview?

@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation'
+import { jobHeading, jobPath as buildJobPath } from '@/lib/jobUrls'
+import { photoAlt } from '@/lib/photoAlt'
 import { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { parseStoredAddress } from '@/lib/gbpBusinessInfo'
-import { slugify } from '@/lib/slugify'
 import PortfolioClient from './PortfolioClient'
 
 interface PortfolioPageProps {
@@ -136,10 +137,7 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
     const photos = job.photoUrls
       ? job.photoUrls.split(',').map((u) => u.trim()).filter(Boolean)
       : []
-    const citySlug = slugify(job.city || '')
-    const stateSlug = slugify(job.state || '')
-    const doorTypeSlug = slugify(job.doorType || 'job')
-    const jobPath = `/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${doorTypeSlug}-${orgSlug}-${job.id}`
+    const jobPath = buildJobPath(job, orgSlug)
 
     return {
       id: job.id,
@@ -148,6 +146,11 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
       state: job.state || '',
       photos,
       thumbnail: coverOf(photos, job.featuredPhotoUrl),
+      thumbnailAlt: (() => {
+        const cover = coverOf(photos, job.featuredPhotoUrl)
+        return cover ? photoAlt(job, cover, Math.max(0, photos.indexOf(cover)), photos.length) : ''
+      })(),
+      title: jobHeading(job),
       jobPath,
       notes: job.notes || null,
       timestamp: job.timestamp ? job.timestamp.toISOString() : null,

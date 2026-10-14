@@ -302,7 +302,8 @@ export interface WpPostInput {
   title: string
   content: string
   excerpt: string
-  slug: string
+  /** Address ending. On an update, omit it to leave the post's current ending alone. */
+  slug?: string
   categoryIds: number[]
   tagIds: number[]
   featuredMediaId?: number | null
@@ -314,15 +315,15 @@ export interface WpPostInput {
 export async function createPost(
   creds: WpCredentials,
   input: WpPostInput
-): Promise<WpResult<{ id: number; link: string }>> {
-  const res = await wpJson<{ id: number; link: string }>(
+): Promise<WpResult<{ id: number; link: string; slug: string }>> {
+  const res = await wpJson<{ id: number; link: string; slug?: string }>(
     creds,
     '/wp/v2/posts',
     jsonInit('POST', {
       title: input.title,
       content: input.content,
       excerpt: input.excerpt,
-      slug: input.slug,
+      ...(input.slug ? { slug: input.slug } : {}),
       status: 'publish',
       categories: input.categoryIds,
       tags: input.tagIds,
@@ -334,21 +335,24 @@ export async function createPost(
   }
 
   await setSeoMeta(creds, res.data.id, input.seoTitle, input.seoDescription)
-  return { ok: true, data: { id: res.data.id, link: res.data.link } }
+  return { ok: true, data: { id: res.data.id, link: res.data.link, slug: res.data.slug ?? input.slug ?? '' } }
 }
 
 export async function updatePost(
   creds: WpCredentials,
   postId: number,
   input: WpPostInput
-): Promise<WpResult<{ id: number; link: string }>> {
-  const res = await wpJson<{ id: number; link: string }>(
+): Promise<WpResult<{ id: number; link: string; slug: string }>> {
+  const res = await wpJson<{ id: number; link: string; slug?: string }>(
     creds,
     `/wp/v2/posts/${postId}`,
     jsonInit('POST', {
       title: input.title,
       content: input.content,
       excerpt: input.excerpt,
+      // Changing the ending makes WordPress remember the old one and redirect
+      // it (core behavior), so a job edited to a new street keeps its old links.
+      ...(input.slug ? { slug: input.slug } : {}),
       categories: input.categoryIds,
       tags: input.tagIds,
       ...(input.featuredMediaId ? { featured_media: input.featuredMediaId } : {}),
@@ -359,7 +363,27 @@ export async function updatePost(
   }
 
   await setSeoMeta(creds, postId, input.seoTitle, input.seoDescription)
-  return { ok: true, data: { id: res.data.id, link: res.data.link } }
+  return { ok: true, data: { id: res.data.id, link: res.data.link, slug: res.data.slug ?? input.slug ?? '' } }
+}
+
+/**
+ * The id of a post already using this address ending, null when it is free, or
+ * undefined when WordPress could not be asked (the caller then lets WordPress
+ * number the ending itself). Trashed posts are not counted.
+ */
+export async function findPostBySlug(creds: WpCredentials, slug: string): Promise<number | null | undefined> {
+  const res = await wpJson<Array<{ id: number }>>(
+    creds,
+    `/wp/v2/posts?slug=${encodeURIComponent(slug)}&status=publish,draft,pending,private,future&_fields=id`
+  )
+  if (!res.ok || !res.data) return undefined
+  return res.data.length > 0 ? res.data[0].id : null
+}
+
+/** Change the alt text of a photo already in the Media Library. Best-effort. */
+export async function updateMediaAlt(creds: WpCredentials, mediaId: number, altText: string): Promise<boolean> {
+  const res = await wpJson(creds, `/wp/v2/media/${mediaId}`, jsonInit('POST', { alt_text: altText }))
+  return res.ok
 }
 
 /**

@@ -1,6 +1,7 @@
 import { after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { syncCheckIn, rerenderMappingForLocation } from '@/lib/wordpressSync'
+import { jobHeading } from '@/lib/jobUrls'
 
 // Public text derived from a job's own fields. Built in one place so check-in,
 // every edit path and every public surface (job page, WordPress post, widget,
@@ -29,7 +30,9 @@ export function buildJobSeoFields(job: {
   const city = clean(job.city)
   const state = clean(job.state)
 
-  const seoTitle = product && city && state ? `${product} in ${city}, ${state}` : null
+  // The standard job heading, with the street name and without the business
+  // name (WordPress and the job page add the business to the tab title).
+  const seoTitle = product && city && state ? jobHeading({ doorType: product, street, city, state }) : null
   const seoDescription =
     product && street && city && state
       ? `Installed ${article(product)} ${product} at ${street}, ${city}, ${state}.`
@@ -52,13 +55,54 @@ export function homeownerNameTokens(name: string | null | undefined): string[] {
     .filter((t) => t.length >= 3 && !NAME_STOPWORDS.has(t.toLowerCase()))
 }
 
-/** The first homeowner-name word found in the text, or null. Case-insensitive, whole words only. */
-export function findHomeownerName(text: string | null | undefined, name: string | null | undefined): string | null {
+/**
+ * Surnames and first names that are also ordinary words in a job description:
+ * materials, colors, finishes, parts of a door and common place words. A
+ * homeowner named "Grant Wood" must not block a description that says "wood
+ * doors".
+ */
+const COMMON_WORDS = new Set([
+  'wood', 'wooden', 'oak', 'pine', 'cedar', 'maple', 'cherry', 'walnut', 'birch', 'ash', 'elm', 'mahogany', 'teak', 'bamboo',
+  'steel', 'iron', 'copper', 'brass', 'bronze', 'silver', 'gold', 'glass', 'stone', 'brick', 'slate', 'stucco', 'vinyl', 'metal',
+  'black', 'white', 'brown', 'gray', 'grey', 'green', 'blue', 'red', 'tan', 'cream', 'beige', 'ivory', 'rose', 'gray',
+  'hill', 'hills', 'park', 'lake', 'field', 'fields', 'brook', 'brooks', 'ford', 'bridge', 'wells', 'woods', 'forest', 'rivers',
+  'long', 'short', 'little', 'young', 'strong', 'sharp', 'swift', 'bell', 'cook', 'baker', 'carter', 'miller', 'mason', 'porter',
+  'hunter', 'fisher', 'barber', 'turner', 'parker', 'page', 'price', 'ward', 'west', 'north', 'south', 'east', 'king', 'bishop',
+  'door', 'doors', 'barn', 'gate', 'frame', 'track', 'panel', 'hall', 'house', 'home', 'garden', 'grant', 'hope', 'joy', 'faith',
+])
+
+/**
+ * The first homeowner-name word found in the text, or null. Case-insensitive,
+ * whole words only.
+ *
+ * `lenient` is for text that should never contain a name at all (photo
+ * descriptions), where a wrong block is worse than a missed one: a name word
+ * that is also an ordinary word (wood, white, hill) counts only when the
+ * homeowner's first and last name appear together. Free text where a name is
+ * plausible (job notes) uses the strict default.
+ */
+export function findHomeownerName(
+  text: string | null | undefined,
+  name: string | null | undefined,
+  opts: { lenient?: boolean } = {}
+): string | null {
   const body = text || ''
   if (!body) return null
-  for (const token of homeownerNameTokens(name)) {
+  const tokens = homeownerNameTokens(name)
+  const wholeWord = (token: string) => {
     const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    if (new RegExp(`(^|[^A-Za-z])${escaped}([^A-Za-z]|$)`, 'i').test(body)) return token
+    return new RegExp(`(^|[^A-Za-z])${escaped}([^A-Za-z]|$)`, 'i').test(body)
+  }
+  for (const token of tokens) {
+    if (!wholeWord(token)) continue
+    if (!opts.lenient || !COMMON_WORDS.has(token.toLowerCase())) return token
+  }
+  if (opts.lenient && tokens.length >= 2) {
+    const first = tokens[0]
+    const last = tokens[tokens.length - 1]
+    const escapedFirst = first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const escapedLast = last.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    if (new RegExp(`(^|[^A-Za-z])${escapedFirst}\\s+${escapedLast}([^A-Za-z]|$)`, 'i').test(body)) return `${first} ${last}`
   }
   return null
 }

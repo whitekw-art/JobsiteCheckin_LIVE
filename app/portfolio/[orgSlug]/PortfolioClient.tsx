@@ -15,6 +15,8 @@ interface JobData {
   state: string
   photos: string[]
   thumbnail: string | null
+  thumbnailAlt: string
+  title: string
   jobPath: string
   notes: string | null
   timestamp: string | null
@@ -659,7 +661,7 @@ function FeaturedCard({
           <Image
             data-parallax-img
             src={job.thumbnail}
-            alt={`${job.doorType} in ${job.city}, ${job.state}`}
+            alt={job.thumbnailAlt || job.title}
             fill
             className="object-cover transition-transform duration-400"
             sizes="(max-width: 640px) 85vw, (max-width: 1024px) 45vw, 30vw"
@@ -829,7 +831,7 @@ function MasonryCard({
           <Image
             data-parallax-img
             src={job.thumbnail}
-            alt={`${job.doorType} in ${job.city}, ${job.state}`}
+            alt={job.thumbnailAlt || job.title}
             fill
             className="object-cover transition-transform duration-300"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

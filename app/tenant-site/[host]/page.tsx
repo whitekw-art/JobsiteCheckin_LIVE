@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
+import { jobUrl } from '@/lib/jobUrls'
 import { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
-import { slugify } from '@/lib/slugify'
 
 // Fully server-rendered page served on a customer's own subdomain via CNAME
 // (Website Integration for Local SEO — Phase 2). No client JS for content:
@@ -92,10 +92,6 @@ export default async function TenantSitePage({ params }: TenantPageProps) {
     const photos = job.photoUrls
       ? job.photoUrls.split(',').map((u) => u.trim()).filter(Boolean)
       : []
-    const citySlug = slugify(job.city || '')
-    const stateSlug = slugify(job.state || '')
-    const doorTypeSlug = slugify(job.doorType || 'job')
-    const jobSlug = org.slug ? `${doorTypeSlug}-${org.slug}-${job.id}` : `${doorTypeSlug}-${job.id}`
     return {
       id: job.id,
       jobType: (job.doorType || 'Job').trim(),
@@ -104,7 +100,7 @@ export default async function TenantSitePage({ params }: TenantPageProps) {
       description: job.seoDescription || job.notes || null,
       photos,
       date: job.timestamp,
-      pckUrl: `${pckBase}/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${jobSlug}`,
+      pckUrl: jobUrl(job, org.slug, pckBase),
     }
   })
 

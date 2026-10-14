@@ -2,6 +2,8 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { refreshJobAfterEdit, findHomeownerName, HOMEOWNER_NAME_ERROR } from '@/lib/jobContent'
+import { Prisma } from '@prisma/client'
+import { altWithinLimits, cleanAltText, parseAltMap } from '@/lib/photoAlt'
 import { applyPhotoChanges, deleteStoredPhotos, splitPhotoUrls, LAST_PHOTO_ERROR } from '@/lib/jobPhotos'
 
 function cleanPhone(v: string | null | undefined): string | null {
@@ -75,6 +77,7 @@ export async function PATCH(request: NextRequest) {
       homeCustomerPhone,
       homeCustomerEmail,
       aiDescriptionGeneratedAt,
+      photoAltText,
       latitude,
       longitude,
     } = body as {
@@ -94,6 +97,8 @@ export async function PATCH(request: NextRequest) {
       homeCustomerPhone?: string | null
       homeCustomerEmail?: string | null
       aiDescriptionGeneratedAt?: string | null
+      /** The job's full set of photo descriptions, keyed by photo address. */
+      photoAltText?: Record<string, string> | null
       latitude?: number | null
       longitude?: number | null
     }
@@ -127,6 +132,7 @@ export async function PATCH(request: NextRequest) {
         beforePhotoUrl: true,
         afterPhotoUrl: true,
         featuredPhotoUrl: true,
+        photoAltText: true,
       },
     })
     if (!checkIn) {
@@ -179,6 +185,40 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: HOMEOWNER_NAME_ERROR }, { status: 400 })
     }
 
+    // Photo descriptions (alt text). The owner sends the job's full set after
+    // editing it; each must belong to a photo the job keeps, fit the per-photo
+    // limits (25 words; refused, never cut short) and not carry the homeowner's name. A photo that is
+    // removed takes its description with it.
+    const keptPhotos = new Set(photoChange.next.photoUrls)
+    let nextAlts: Record<string, string> = Object.fromEntries(
+      Object.entries(parseAltMap(checkIn.photoAltText)).filter(([url]) => keptPhotos.has(url))
+    )
+    if (photoAltText !== undefined) {
+      if (photoAltText !== null && (typeof photoAltText !== 'object' || Array.isArray(photoAltText))) {
+        return NextResponse.json({ error: 'Photo descriptions are not valid.' }, { status: 400 })
+      }
+      nextAlts = {}
+      for (const [url, text] of Object.entries(photoAltText ?? {})) {
+        if (!keptPhotos.has(url) || typeof text !== 'string') continue
+        const cleaned = cleanAltText(text)
+        if (!cleaned) continue
+        if (!altWithinLimits(cleaned)) {
+          return NextResponse.json(
+            { error: 'Each photo description must be 25 words or fewer. Shorten it and save again.' },
+            { status: 400 }
+          )
+        }
+        if (findHomeownerName(cleaned, nextName ?? checkIn.homeCustomerName, { lenient: true })) {
+          return NextResponse.json(
+            { error: "Remove the homeowner's name from the photo descriptions before saving. Customer names stay in the dashboard only." },
+            { status: 400 }
+          )
+        }
+        nextAlts[url] = cleaned
+      }
+    }
+    const altChanged = JSON.stringify(nextAlts) !== JSON.stringify(parseAltMap(checkIn.photoAltText))
+
     // When the address changes, the old coordinates point at the old place.
     // The client geocodes the new address and sends the result; if it could
     // not, the coordinates are cleared rather than left pointing at the wrong
@@ -213,6 +253,7 @@ export async function PATCH(request: NextRequest) {
         beforePhotoUrl: photoChange.next.beforePhotoUrl,
         afterPhotoUrl: photoChange.next.afterPhotoUrl,
         featuredPhotoUrl: photoChange.next.featuredPhotoUrl,
+        ...(altChanged && { photoAltText: Object.keys(nextAlts).length ? nextAlts : Prisma.DbNull }),
         ...(homeCustomerName !== undefined && { homeCustomerName: homeCustomerName?.trim() || null }),
         ...(homeCustomerPhone !== undefined && { homeCustomerPhone: cleanPhone(homeCustomerPhone) }),
         ...(homeCustomerEmail !== undefined && { homeCustomerEmail: homeCustomerEmail?.trim() || null }),
