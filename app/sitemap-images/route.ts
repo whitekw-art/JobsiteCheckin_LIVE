@@ -1,7 +1,9 @@
 export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
-import { slugify } from '@/lib/slugify'
+import { jobUrl } from '@/lib/jobUrls'
+import { photoAlt } from '@/lib/photoAlt'
+import { escapeXml } from '@/lib/sitemapXml'
 
 export async function GET() {
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
@@ -13,15 +15,19 @@ export async function GET() {
     },
     select: {
       id: true,
+      street: true,
       city: true,
       state: true,
       doorType: true,
       photoUrls: true,
+      photoAltText: true,
       beforePhotoUrl: true,
       afterPhotoUrl: true,
       organization: { select: { slug: true } },
     },
     orderBy: { timestamp: 'desc' },
+    // Google's limit is 50,000 addresses per sitemap file.
+    take: 50000,
   })
 
   const urlBlocks: string[] = []
@@ -35,28 +41,14 @@ export async function GET() {
 
     if (photos.length === 0) continue
 
-    const citySlug = slugify(checkIn.city || '') || 'city'
-    const stateSlug = slugify(checkIn.state || '') || 'state'
-    const doorTypeSlug = slugify(checkIn.doorType || 'job')
-    const orgSlug = checkIn.organization?.slug || ''
-    const location = `${citySlug}-${stateSlug}`
-    const slug = orgSlug
-      ? `${doorTypeSlug}-${orgSlug}-${checkIn.id}`
-      : `${doorTypeSlug}-${checkIn.id}`
-
-    const pageUrl = `${baseUrl}/jobs/${location}/${slug}`
-    const doorLabel = checkIn.doorType || 'Contractor job'
-    const locationLabel = [checkIn.city, checkIn.state].filter(Boolean).join(', ')
-    const altBase = locationLabel
-      ? `${doorLabel} in ${locationLabel}`
-      : doorLabel
+    const pageUrl = jobUrl(checkIn, checkIn.organization?.slug, baseUrl)
 
     const imageNodes = photos
       .map(
         (photoUrl, i) => `
       <image:image>
         <image:loc>${escapeXml(photoUrl)}</image:loc>
-        <image:title>${escapeXml(`${altBase} — photo ${i + 1}`)}</image:title>
+        <image:title>${escapeXml(photoAlt(checkIn, photoUrl, i, photos.length))}</image:title>
       </image:image>`
       )
       .join('')
@@ -80,13 +72,4 @@ ${urlBlocks.join('\n')}
       'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
     },
   })
-}
-
-function escapeXml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
 }

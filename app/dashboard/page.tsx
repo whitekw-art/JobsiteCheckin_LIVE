@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { geocodeJobAddress } from '@/lib/geocode'
-import { slugify } from '@/lib/slugify'
+import { jobUrl } from '@/lib/jobUrls'
 import OnboardingModal from '@/components/OnboardingModal'
 import { savedWalkthroughChapter } from '@/lib/onboardingProgress'
 import { tierHasFeature } from '@/lib/planVersions'
@@ -14,6 +14,7 @@ import CoachMarks, { isCoachTourActive } from '@/components/CoachMarks'
 import { REVEAL_SUPPORT_NAV } from '@/lib/navReveal'
 import { DEMO_JOBS, isDemoJob } from '@/lib/demoJobs'
 import { wpErrorGuideHref } from '@/lib/wpStatus'
+import { PhotoDescriptionEditor, PhotoDescriptionsSection, descriptionsToSave, descriptionsValid, savedDescriptions } from '@/components/PhotoDescriptions'
 import { ReviewBlock, ReviewPill, UnmatchedReviewsPanel, useReviewTracking, type ReviewJob } from '@/components/ReviewTracking'
 
 interface CheckIn {
@@ -32,6 +33,9 @@ interface CheckIn {
   isPublic: boolean
   photoUrls?: string[]
   featuredPhotoUrl?: string | null
+  beforePhotoUrl?: string | null
+  afterPhotoUrl?: string | null
+  photoAltText?: unknown
   homeCustomerName?: string | null
   homeCustomerPhone?: string | null
   homeCustomerEmail?: string | null
@@ -736,6 +740,13 @@ export default function Dashboard() {
   const [aiEditingId,     setAiEditingId]     = useState<string | null>(null)
   const [aiSavingId,      setAiSavingId]      = useState<string | null>(null)
   const [aiGenerateError, setAiGenerateError] = useState<Record<string, string>>({})
+  // Photo descriptions (alt text): the working copy per job, the photos the AI
+  // was asked about but returned nothing usable for, and the edit-without-AI state.
+  const [altEdits, setAltEdits] = useState<Record<string, Record<string, string>>>({})
+  const [altNoResult, setAltNoResult] = useState<Record<string, string[]>>({})
+  const [altEditingId, setAltEditingId] = useState<string | null>(null)
+  const [altSavingId, setAltSavingId] = useState<string | null>(null)
+  const [altError, setAltError] = useState<Record<string, string>>({})
 
   // Customer editing (keyed by checkIn.id)
   const [editCustomers, setEditCustomers] = useState<Record<string, EditCustomer>>({})
@@ -1340,6 +1351,23 @@ export default function Dashboard() {
         setAiGenerateError((prev) => ({ ...prev, [checkIn.id]: data.error ?? 'Generation failed. Try again.' }))
         return
       }
+      // The AI's photo descriptions replace the ones in the boxes for the photos it
+      // described; photos it was not asked about keep what is saved. Nothing is
+      // saved until the owner clicks Save.
+      const described: string[] = Array.isArray(data.describedPhotos) ? data.describedPhotos : []
+      const nextAlts = { ...savedDescriptions(checkIn) }
+      const noResult: string[] = []
+      for (const url of described) {
+        const text = data.photoAlts?.[url]
+        if (text) nextAlts[url] = text
+        else {
+          delete nextAlts[url]
+          noResult.push(url)
+        }
+      }
+      setAltEdits((prev) => ({ ...prev, [checkIn.id]: nextAlts }))
+      setAltNoResult((prev) => ({ ...prev, [checkIn.id]: noResult }))
+      setAltEditingId(null)
       // Enter AI edit mode with generated content
       setEditNotes((prev) => ({ ...prev, [checkIn.id]: data.description }))
       setAiEditingId(checkIn.id)
@@ -1352,23 +1380,49 @@ export default function Dashboard() {
   const handleAiNoteSave = async (checkIn: CheckIn) => {
     if (isDemoJob(checkIn.id)) return
     const notes = editNotes[checkIn.id] ?? ''
+    const photoAltText = descriptionsToSave(altEdits[checkIn.id] ?? savedDescriptions(checkIn))
     setAiSavingId(checkIn.id)
     try {
       const res = await fetch('/api/checkins/update', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: checkIn.id, notes, aiDescriptionGeneratedAt: new Date().toISOString() }),
+        body: JSON.stringify({ id: checkIn.id, notes, photoAltText, aiDescriptionGeneratedAt: new Date().toISOString() }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Failed to save')
       setCheckIns((prev) =>
-        prev.map((c) => c.id === checkIn.id ? { ...c, notes } : c)
+        prev.map((c) => c.id === checkIn.id ? { ...c, notes, photoAltText } : c)
       )
       setAiEditingId(null)
     } catch (err: any) {
       alert(err.message || 'Failed to save')
     } finally {
       setAiSavingId(null)
+    }
+  }
+
+  // Saves edited photo descriptions without running the AI (the Edit photo
+  // descriptions link under a job's notes).
+  const handleAltSave = async (checkIn: CheckIn) => {
+    if (isDemoJob(checkIn.id)) return
+    const photoAltText = descriptionsToSave(altEdits[checkIn.id] ?? savedDescriptions(checkIn))
+    setAltSavingId(checkIn.id)
+    setAltError((prev) => { const n = { ...prev }; delete n[checkIn.id]; return n })
+    try {
+      const res = await fetch('/api/checkins/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkIn.id, photoAltText }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAltError((prev) => ({ ...prev, [checkIn.id]: data.error || 'Failed to save' }))
+        return
+      }
+      setCheckIns((prev) => prev.map((c) => (c.id === checkIn.id ? { ...c, photoAltText } : c)))
+      setAltEditingId(null)
+    } finally {
+      setAltSavingId(null)
     }
   }
 
@@ -1701,15 +1755,7 @@ export default function Dashboard() {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  const getPublicUrl = (checkIn: CheckIn) => {
-    const citySlug = slugify(checkIn.city || '')
-    const stateSlug = slugify(checkIn.state || '')
-    const doorTypeSlug = slugify(checkIn.doorType || 'job')
-    const slug = orgSlug
-      ? `${doorTypeSlug}-${orgSlug}-${checkIn.id}`
-      : `${doorTypeSlug}-${checkIn.id}`
-    return `${baseUrl}/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${slug}`
-  }
+  const getPublicUrl = (checkIn: CheckIn) => jobUrl(checkIn, orgSlug, baseUrl)
 
   const formatDate = (ts: string) => {
     const d = new Date(ts)
@@ -2363,10 +2409,30 @@ export default function Dashboard() {
                                     }
                                     rows={6}
                                   />
+                                  {(checkIn.photoUrls?.length ?? 0) > 0 && (
+                                    <div style={{ marginTop: 14 }}>
+                                      <div className="db-notes-header">
+                                        <span className="db-d-label">Photo descriptions</span>
+                                        <span style={{ fontSize: 11, fontWeight: 600, color: '#7C3AED' }}>AI-generated — edit before saving</span>
+                                      </div>
+                                      <PhotoDescriptionEditor
+                                        job={checkIn}
+                                        values={altEdits[checkIn.id] ?? savedDescriptions(checkIn)}
+                                        onChange={(url, text) =>
+                                          setAltEdits((prev) => ({
+                                            ...prev,
+                                            [checkIn.id]: { ...(prev[checkIn.id] ?? savedDescriptions(checkIn)), [url]: text },
+                                          }))
+                                        }
+                                        tooLong={new Set(altNoResult[checkIn.id] ?? [])}
+                                        disabled={aiSavingId === checkIn.id}
+                                      />
+                                    </div>
+                                  )}
                                   <div className="db-edit-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <button
                                       className="db-btn-save"
-                                      disabled={aiSavingId === checkIn.id}
+                                      disabled={aiSavingId === checkIn.id || !descriptionsValid(altEdits[checkIn.id] ?? savedDescriptions(checkIn))}
                                       onClick={() => handleAiNoteSave(checkIn)}
                                     >
                                       {aiSavingId === checkIn.id ? 'Saving\u2026' : 'Save'}
@@ -2376,6 +2442,7 @@ export default function Dashboard() {
                                       onClick={() => {
                                         setAiEditingId(null)
                                         setEditNotes((prev) => ({ ...prev, [checkIn.id]: checkIn.notes || '' }))
+                                        setAltEdits((prev) => { const n = { ...prev }; delete n[checkIn.id]; return n })
                                       }}
                                     >
                                       Cancel
@@ -2472,7 +2539,32 @@ export default function Dashboard() {
                                 </>
                               )}
                             </div>
-
+                            {/* Saved photo descriptions: collapsed by default, editable without the AI (Titan) */}
+                            {tierHasFeature(planTier, 'ai_job_description') && aiEditingId !== checkIn.id && !isDemoJob(checkIn.id) && (
+                              <PhotoDescriptionsSection
+                                job={checkIn}
+                                editing={altEditingId === checkIn.id}
+                                values={altEdits[checkIn.id] ?? savedDescriptions(checkIn)}
+                                onChange={(url, text) =>
+                                  setAltEdits((prev) => ({
+                                    ...prev,
+                                    [checkIn.id]: { ...(prev[checkIn.id] ?? savedDescriptions(checkIn)), [url]: text },
+                                  }))
+                                }
+                                onEdit={() => {
+                                  setAltEdits((prev) => ({ ...prev, [checkIn.id]: savedDescriptions(checkIn) }))
+                                  setAltEditingId(checkIn.id)
+                                }}
+                                onSave={() => handleAltSave(checkIn)}
+                                onCancel={() => {
+                                  setAltEditingId(null)
+                                  setAltEdits((prev) => { const n = { ...prev }; delete n[checkIn.id]; return n })
+                                  setAltError((prev) => { const n = { ...prev }; delete n[checkIn.id]; return n })
+                                }}
+                                saving={altSavingId === checkIn.id}
+                                error={altError[checkIn.id] ?? null}
+                              />
+                            )}
                           </div>
 
                           {/* Right col: photos + actions */}

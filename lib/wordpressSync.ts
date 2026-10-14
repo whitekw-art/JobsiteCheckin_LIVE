@@ -16,11 +16,15 @@ import {
   getPageContent,
   updatePageContent,
   testConnection,
+  findPostBySlug,
+  updateMediaAlt,
 } from '@/lib/wordpressApi'
 import { WP_SYNC_CLAIM_STALE_MS, wpConnectionActive, wpErrorCodeForKind } from '@/lib/wpStatus'
 import { sendWordPressReconnectEmail } from '@/lib/wordpressEmails'
 import { parseStoredAddress } from '@/lib/gbpBusinessInfo'
 import { publicReviewForJob, type PublicReview } from '@/lib/googleReviews'
+import { jobHeading, slugMatchesBase, streetName, wpSlugBase } from '@/lib/jobUrls'
+import { photoAlt } from '@/lib/photoAlt'
 
 // Orchestration for WordPress native publishing (Phase 3, Website Integration
 // for Local SEO). Decides WHAT syncs and WHEN; lib/wordpressApi.ts does the
@@ -177,6 +181,9 @@ async function getOrgContext(orgId: string): Promise<OrgContext | null> {
 type JobRecord = {
   id: string
   doorType: string | null
+  street: string | null
+  wpSlug: string | null
+  photoAltText: unknown
   city: string | null
   state: string | null
   seoTitle: string | null
@@ -206,6 +213,8 @@ interface SyncedMedia {
   origin: string
   url: string
   role: 'before' | 'after' | 'gallery'
+  /** The alt text last written to the Media Library for this photo. */
+  alt?: string
 }
 
 function parseMedia(raw: string | null): SyncedMedia[] {
@@ -221,6 +230,9 @@ function parseMedia(raw: string | null): SyncedMedia[] {
 const JOB_SELECT = {
   id: true,
   doorType: true,
+  street: true,
+  wpSlug: true,
+  photoAltText: true,
   city: true,
   state: true,
   seoTitle: true,
@@ -239,10 +251,9 @@ const JOB_SELECT = {
   longitude: true,
 } as const
 
+/** "Exterior Barn Doors on Broadway in Nashville, TN": the post title and heading, without the business name. */
 function jobTitle(job: JobRecord): string {
-  const type = (job.doorType || 'Completed Job').trim()
-  const place = [job.city?.trim(), job.state?.trim()].filter(Boolean).join(', ')
-  return place ? `${type} in ${place}` : type
+  return jobHeading(job)
 }
 
 function jobDescription(job: JobRecord): string {
@@ -357,13 +368,27 @@ function reviewHtml(jobId: string, review: PublicReview, businessName: string): 
   )
 }
 
+interface PostExtras {
+  review: PublicReview | null
+  /** Links to the customer's own city archive, service archive and mapped page. */
+  archiveLinks: Array<{ label: string; url: string }>
+}
+
+/** "Broadway, Nashville, TN 37203": the visible location line, without the house number. */
+function locationLine(job: JobRecord): string {
+  return [streetName(job.street), job.city?.trim(), [job.state?.trim(), job.zip?.trim()].filter(Boolean).join(' ')]
+    .filter(Boolean)
+    .join(', ')
+}
+
 function buildContent(
   job: JobRecord,
   org: OrgContext['org'],
   media: SyncedMedia[],
   siteUrl: string,
-  review: PublicReview | null = null
+  extras: PostExtras = { review: null, archiveLinks: [] }
 ): string {
+  const review = extras.review
   const alt = jobTitle(job)
   const before = media.find((m) => m.role === 'before') ?? null
   const after = media.find((m) => m.role === 'after') ?? null
@@ -377,18 +402,28 @@ function buildContent(
   if (before && after) {
     parts.push(
       `<figure class="wp-block-columns" style="display:flex;gap:16px;flex-wrap:wrap">` +
-        `<div style="flex:1 1 240px"><p><strong>Before</strong></p>${photoHtml(before, `${alt} — before`)}</div>` +
-        `<div style="flex:1 1 240px"><p><strong>After</strong></p>${photoHtml(after, `${alt} — after`)}</div>` +
+        `<div style="flex:1 1 240px"><p><strong>Before</strong></p>${photoHtml(before, before.alt || `${alt}, before installation`)}</div>` +
+        `<div style="flex:1 1 240px"><p><strong>After</strong></p>${photoHtml(after, after.alt || `${alt}, after installation`)}</div>` +
         `</figure>`
     )
   }
 
-  for (const p of photos) parts.push(`<figure>${photoHtml(p, alt)}</figure>`)
+  for (const p of photos) parts.push(`<figure>${photoHtml(p, p.alt || alt)}</figure>`)
 
-  const place = [job.city?.trim(), job.state?.trim()].filter(Boolean).join(', ')
+  const place = locationLine(job)
   if (place) parts.push(`<p><strong>Location:</strong> ${escapeHtml(place)}</p>`)
 
   if (review) parts.push(reviewHtml(job.id, review, org.name))
+
+  // Links to this customer's own archives (and the page that showcases this
+  // kind of job), whatever the theme shows (decision 11.4).
+  if (extras.archiveLinks.length) {
+    parts.push(
+      `<p><strong>More from ${escapeHtml(org.name)}:</strong> ` +
+        extras.archiveLinks.map((l) => `<a href="${escapeHtml(l.url)}">${escapeHtml(l.label)}</a>`).join(' · ') +
+        `</p>`
+    )
+  }
 
   // Attribution: the business is credited as the author in the visible line and
   // in schema. The WP post_author field is just plumbing (see spec §3).
@@ -406,9 +441,7 @@ function buildContent(
 
 /** SEO-descriptive media filename — never a raw UUID. */
 function mediaFilename(job: JobRecord, index: number): string {
-  const base = slugify(
-    [job.doorType || 'job', job.city || '', job.state || ''].filter(Boolean).join(' ')
-  )
+  const base = wpSlugBase(job)
   return `${base || 'job'}-${index + 1}.jpg`
 }
 
@@ -442,15 +475,19 @@ async function getDirectCreds(orgId: string): Promise<WpCredentials | null> {
  * (syncCheckIn) and page injection (renderPageMapping).
  */
 async function reconcileJobMedia(creds: WpCredentials, job: JobRecord): Promise<SyncedMedia[]> {
-  const alt = jobTitle(job)
   const previous = parseMedia(job.wpMedia)
   const wanted: Array<{ origin: string; role: SyncedMedia['role']; alt: string }> = []
+  const all = jobPhotoUrls(job)
 
-  if (job.beforePhotoUrl) wanted.push({ origin: job.beforePhotoUrl, role: 'before', alt: `${alt} — before` })
-  if (job.afterPhotoUrl) wanted.push({ origin: job.afterPhotoUrl, role: 'after', alt: `${alt} — after` })
-  for (const url of jobPhotoUrls(job)) {
+  // Alt text is the owner-approved description when the photo has one, else a
+  // plain description built from the job's details (lib/photoAlt.ts).
+  const altFor = (url: string) => photoAlt(job, url, Math.max(0, all.indexOf(url)), all.length)
+
+  if (job.beforePhotoUrl) wanted.push({ origin: job.beforePhotoUrl, role: 'before', alt: altFor(job.beforePhotoUrl) })
+  if (job.afterPhotoUrl) wanted.push({ origin: job.afterPhotoUrl, role: 'after', alt: altFor(job.afterPhotoUrl) })
+  for (const url of all) {
     if (url === job.beforePhotoUrl || url === job.afterPhotoUrl) continue
-    wanted.push({ origin: url, role: 'gallery', alt })
+    wanted.push({ origin: url, role: 'gallery', alt: altFor(url) })
   }
 
   const media: SyncedMedia[] = []
@@ -458,12 +495,18 @@ async function reconcileJobMedia(creds: WpCredentials, job: JobRecord): Promise<
     const want = wanted[i]
     const existing = previous.find((p) => p.origin === want.origin)
     if (existing) {
-      media.push({ ...existing, role: want.role })
+      // WordPress sets a photo's alt text only when it is uploaded, so a changed
+      // description has to be written to the Media Library separately.
+      let alt = existing.alt
+      if (alt !== want.alt) {
+        alt = (await updateMediaAlt(creds, existing.id, want.alt)) ? want.alt : existing.alt
+      }
+      media.push({ ...existing, role: want.role, alt })
       continue
     }
     const r = await uploadMedia(creds, want.origin, mediaFilename(job, i), want.alt)
     if (r.ok && r.data) {
-      media.push({ id: r.data.id, origin: want.origin, url: r.data.sourceUrl, role: want.role })
+      media.push({ id: r.data.id, origin: want.origin, url: r.data.sourceUrl, role: want.role, alt: want.alt })
     }
   }
 
@@ -650,27 +693,61 @@ export async function syncCheckIn(
       media[0]?.id ??
       null
 
-    const title = job.seoTitle?.trim() || jobTitle(job)
+    // The post title and heading leave out the business name: WordPress and SEO
+    // plugins add the site name to the browser title themselves, so only the
+    // Yoast title carries "| Business" (master plan 8.4).
+    const title = jobTitle(job)
     const description = jobDescription(job)
     const excerpt = description.slice(0, 155)
-    const slug = slugify(`${job.doorType || 'job'} ${job.city || ''} ${job.state || ''}`) || `job-${job.id.slice(0, 8)}`
+    const cityTagName = job.city ? [job.city.trim(), job.state?.trim()].filter(Boolean).join(' ') : ''
 
-    const [categoryId, tagId] = await Promise.all([
+    const [categoryId, tagId, serviceArchive, cityArchive] = await Promise.all([
       job.doorType ? ensureCategory(creds, job.doorType.trim()) : Promise.resolve(null),
-      job.city
-        ? ensureTag(creds, [job.city.trim(), job.state?.trim()].filter(Boolean).join(' '))
-        : Promise.resolve(null),
+      cityTagName ? ensureTag(creds, cityTagName) : Promise.resolve(null),
+      job.doorType ? getArchiveLink(creds, 'categories', job.doorType.trim()) : Promise.resolve(null),
+      cityTagName ? getArchiveLink(creds, 'tags', cityTagName) : Promise.resolve(null),
     ])
+
+    const archiveLinks: PostExtras['archiveLinks'] = []
+    if (cityArchive) archiveLinks.push({ label: `Projects in ${[job.city?.trim(), job.state?.trim()].filter(Boolean).join(', ')}`, url: cityArchive })
+    if (serviceArchive && job.doorType) archiveLinks.push({ label: job.doorType.trim(), url: serviceArchive })
+    if (mapping?.wpPageUrl) {
+      const pageLabel =
+        [mapping.matchService, mapping.matchCity ? [mapping.matchCity, mapping.matchState].filter(Boolean).join(', ') : null]
+          .filter(Boolean)
+          .join(' in ') || 'All our projects'
+      archiveLinks.push({ label: pageLabel, url: mapping.wpPageUrl })
+    }
+
+    // The post address ending {service}-{street}-{city}-{state}. It is saved on
+    // the job so an unpublished-and-republished job gets the same ending back,
+    // and rebuilt when the details in it change (WordPress redirects the old
+    // one). A post that already has the right ending is left alone, so an
+    // ending the customer changed by hand in WordPress is not overwritten.
+    const slugBase = wpSlugBase(job) || `job-${job.id.slice(0, 8)}`
+    const keepSaved = slugMatchesBase(job.wpSlug, slugBase)
+    const chooseSlug = async (): Promise<string> => {
+      const candidates = [keepSaved ? job.wpSlug : null, slugBase, job.zip?.trim() ? `${slugBase}-${job.zip.trim().toLowerCase()}` : null]
+      for (const candidate of candidates) {
+        if (!candidate) continue
+        const owner = await findPostBySlug(creds, candidate)
+        // Free, or already this job's own post, or WordPress could not be asked.
+        if (owner === null || owner === undefined || owner === job.wpPostId) return candidate
+      }
+      // Every candidate is taken: WordPress adds its own number.
+      return slugBase
+    }
+    const slug = job.wpPostId && keepSaved ? undefined : await chooseSlug()
 
     const input: WpPostInput = {
       title,
-      content: buildContent(job, org, media, creds.siteUrl, await publicReviewForJob(job.id)),
+      content: buildContent(job, org, media, creds.siteUrl, { review: await publicReviewForJob(job.id), archiveLinks }),
       excerpt,
       slug,
       categoryIds: categoryId ? [categoryId] : [],
       tagIds: tagId ? [tagId] : [],
       featuredMediaId,
-      seoTitle: title,
+      seoTitle: `${title} | ${org.name}`,
       seoDescription: excerpt,
     }
 
@@ -681,7 +758,7 @@ export async function syncCheckIn(
     // The post was deleted by hand in WordPress. Without this, every later
     // edit of the job would fail forever; create a fresh post instead.
     if (!result.ok && job.wpPostId && result.kind === 'not_found') {
-      result = await createPost(creds, input)
+      result = await createPost(creds, { ...input, slug: input.slug ?? (await chooseSlug()) })
     }
 
     if (!result.ok || !result.data) {
@@ -709,6 +786,7 @@ export async function syncCheckIn(
       data: {
         wpPostId: result.data.id,
         wpPostUrl: result.data.link,
+        ...(result.data.slug ? { wpSlug: result.data.slug } : {}),
         wpMedia: media.length ? JSON.stringify(media) : null,
         wpSyncedAt: new Date(),
         wpSyncStatus: 'synced',
@@ -997,7 +1075,7 @@ const SHOWCASE_STYLE = {
 function renderJobCard(job: JobRecord, media: SyncedMedia[]): string {
   const alt = jobTitle(job)
   const lead = media.find((m) => m.role === 'after') ?? media[0] ?? null
-  const place = [job.city?.trim(), job.state?.trim()].filter(Boolean).join(', ')
+  const place = locationLine(job)
   const desc = jobDescription(job)
   const summary = desc.length > 180 ? `${desc.slice(0, 177).trimEnd()}…` : desc
   const postUrl = job.wpPostUrl || ''
@@ -1007,8 +1085,8 @@ function renderJobCard(job: JobRecord, media: SyncedMedia[]): string {
   if (lead) {
     parts.push(
       postUrl
-        ? `<a href="${escapeHtml(postUrl)}">${photoHtml(lead, alt, s.photo)}</a>`
-        : photoHtml(lead, alt, s.photo)
+        ? `<a href="${escapeHtml(postUrl)}">${photoHtml(lead, lead.alt || alt, s.photo)}</a>`
+        : photoHtml(lead, lead.alt || alt, s.photo)
     )
   }
   parts.push(

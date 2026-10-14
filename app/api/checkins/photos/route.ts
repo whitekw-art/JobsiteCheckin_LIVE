@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { applyPhotoChanges, deleteStoredPhotos, splitPhotoUrls, LAST_PHOTO_ERROR } from '@/lib/jobPhotos'
 import { refreshJobAfterEdit } from '@/lib/jobContent'
+import { Prisma } from '@prisma/client'
+import { parseAltMap } from '@/lib/photoAlt'
 
 // Removes one photo from a job (the Job Dashboard's photo X button). Uses the
 // same rules as Edit Check-In: the photo's BEFORE/AFTER tag and cover choice
@@ -44,6 +46,7 @@ export async function PATCH(request: NextRequest) {
         city: true,
         state: true,
         doorType: true,
+        photoAltText: true,
       },
     })
 
@@ -74,6 +77,14 @@ export async function PATCH(request: NextRequest) {
         beforePhotoUrl: change.next.beforePhotoUrl,
         afterPhotoUrl: change.next.afterPhotoUrl,
         featuredPhotoUrl: change.next.featuredPhotoUrl,
+        // The removed photo's description goes with it.
+        ...(checkIn.photoAltText && {
+          photoAltText: (() => {
+            const kept = new Set(change.next.photoUrls)
+            const next = Object.fromEntries(Object.entries(parseAltMap(checkIn.photoAltText)).filter(([url]) => kept.has(url)))
+            return Object.keys(next).length ? next : Prisma.DbNull
+          })(),
+        }),
       },
       select: { id: true, photoUrls: true, featuredPhotoUrl: true, beforePhotoUrl: true, afterPhotoUrl: true },
     })

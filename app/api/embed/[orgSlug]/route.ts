@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { jobSlug as buildJobSlug, jobUrl } from '@/lib/jobUrls'
 import { prisma } from '@/lib/prisma'
-import { slugify } from '@/lib/slugify'
 
 // CORS-open public read-only endpoint. Fetched by browsers on customer
 // websites via widget.v1.js. It requires no login, sets no cookies, and
@@ -134,6 +134,7 @@ export async function GET(
         select: {
           id: true,
           doorType: true,
+          street: true,
           city: true,
           state: true,
           zip: true,
@@ -156,10 +157,7 @@ export async function GET(
     const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://projectcheckin.com').replace(/\/$/, '')
 
     const jobs = checkIns.map((job) => {
-      const citySlug = slugify(job.city || '')
-      const stateSlug = slugify(job.state || '')
-      const doorTypeSlug = slugify(job.doorType || 'job')
-      const jobSlug = org.slug ? `${doorTypeSlug}-${org.slug}-${job.id}` : `${doorTypeSlug}-${job.id}`
+      const jobSlug = buildJobSlug(job)
 
       const allPhotoUrls = job.photoUrls
         ? job.photoUrls.split(',').map((u) => u.trim()).filter(Boolean)
@@ -191,7 +189,7 @@ export async function GET(
         beforePhotoUrl: job.beforePhotoUrl,
         afterPhotoUrl: job.afterPhotoUrl,
         createdAt: job.timestamp ? job.timestamp.toISOString() : null,
-        pckUrl: `${baseUrl}/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${jobSlug}`,
+        pckUrl: jobUrl(job, org.slug, baseUrl),
       }
     })
 

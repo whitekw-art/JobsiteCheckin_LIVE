@@ -44,7 +44,7 @@ export async function PATCH(request: NextRequest) {
     // pages that are already linked from their own site and indexed by Google.
     const current = await prisma.organization.findUnique({
       where: { id: user.organizationId },
-      select: { name: true, slug: true },
+      select: { name: true, slug: true, previousSlugs: true },
     })
 
     let slug = current?.slug ?? ''
@@ -56,10 +56,24 @@ export async function PATCH(request: NextRequest) {
       let suffix = 2
       while (true) {
         const existing = await prisma.organization.findUnique({ where: { slug } })
-        if (!existing || existing.id === user.organizationId) break
+        // An old name another business still redirects from counts as taken.
+        const redirectOwner = await prisma.organization.findFirst({
+          where: { previousSlugs: { has: slug }, id: { not: user.organizationId } },
+          select: { id: true },
+        })
+        if ((!existing || existing.id === user.organizationId) && !redirectOwner) break
         slug = `${baseSlug}-${suffix}`
         suffix++
       }
+    }
+
+    // A renamed business keeps its old address working: the old slug is
+    // remembered, and old job and city addresses redirect to the new one. A
+    // brand-new account with no jobs has nothing published under the old name.
+    let previousSlugs = (current?.previousSlugs ?? []).filter((x) => x !== slug)
+    if (current?.slug && current.slug !== slug) {
+      const hasJobs = (await prisma.checkIn.count({ where: { organizationId: user.organizationId } })) > 0
+      if (hasJobs && !previousSlugs.includes(current.slug)) previousSlugs = [...previousSlugs, current.slug]
     }
 
     const normalizeWebsite = (v?: string) => {
@@ -87,6 +101,7 @@ export async function PATCH(request: NextRequest) {
       data: {
         name:              name.trim(),
         slug,
+        previousSlugs,
         phone:             phone?.trim() || null,
         website:           normalizeWebsite(website),
         trade:             cleanTrade,

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { wpConnectionActive } from '@/lib/wpStatus'
-import { slugify } from '@/lib/slugify'
+import { jobUrl } from '@/lib/jobUrls'
 import { tierHasFeature } from '@/lib/planVersions'
 import { createLocalPost, deleteLocalPost, buildPostSummary, type GbpResult } from '@/lib/gbpApi'
 
@@ -61,6 +61,7 @@ export async function postCheckInToGbp(checkInId: string): Promise<GbpResult<Gbp
     select: {
       id: true,
       doorType: true,
+      street: true,
       city: true,
       state: true,
       notes: true,
@@ -374,6 +375,7 @@ function resolveLinkTarget(
   job: {
     id: string
     doorType: string | null
+    street?: string | null
     city: string | null
     state: string | null
     wpPostUrl: string | null
@@ -411,15 +413,10 @@ function resolveLinkTarget(
 }
 
 function projectCheckinJobUrl(
-  job: { id: string; doorType: string | null; city: string | null; state: string | null },
+  job: { id: string; doorType: string | null; street?: string | null; city: string | null; state: string | null },
   orgSlug: string | null
 ): string {
-  const base = (process.env.NEXT_PUBLIC_APP_URL || 'https://projectcheckin.com').replace(/\/+$/, '')
-  const citySlug = slugify(job.city || '')
-  const stateSlug = slugify(job.state || '')
-  const doorTypeSlug = slugify(job.doorType || 'job')
-  const slug = orgSlug ? `${doorTypeSlug}-${orgSlug}-${job.id}` : `${doorTypeSlug}-${job.id}`
-  return `${base}/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${slug}`
+  return jobUrl(job, orgSlug)
 }
 
 function withUtm(url: string, utm: string): string {

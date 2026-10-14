@@ -1,81 +1,59 @@
-import { notFound } from 'next/navigation'
-import { publicReviewForJob } from '@/lib/googleReviews'
 import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
-import { slugify } from '@/lib/slugify'
 import { parseStoredAddress } from '@/lib/gbpBusinessInfo'
+import { publicReviewForJob } from '@/lib/googleReviews'
+import { appBaseUrl, cityPath, jobHeading, jobPath, jobTabTitle, jobUrl, streetName } from '@/lib/jobUrls'
+import { photoAlt } from '@/lib/photoAlt'
 import { CheckInPageViewTracker } from '@/components/CheckInPageViewTracker'
 import JobDetailClient from './JobDetailClient'
+import type { JobWithOrg } from './resolve'
 
-export async function generateMetadata(
-  { params }: { params: Promise<{ location: string; slug: string }> }
-): Promise<Metadata> {
-  const { slug, location } = await params
+// The job page (phase 3). Rendered by app/jobs/[business]/[[...rest]]/page.tsx
+// once the address has been confirmed current; see resolve.ts.
 
-  const uuidMatch = slug.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)
-  const checkInId = uuidMatch ? uuidMatch[0] : ''
+const photoList = (value: string | null | undefined) =>
+  value ? value.split(',').map((u) => u.trim()).filter(Boolean) : []
 
-  if (!checkInId) {
-    return { title: 'Job Not Found' }
-  }
+/** The owner's chosen cover photo leads the carousel and the link previews. */
+function orderedPhotos(job: JobWithOrg): string[] {
+  const all = photoList(job.photoUrls)
+  return job.featuredPhotoUrl && all.includes(job.featuredPhotoUrl)
+    ? [job.featuredPhotoUrl, ...all.filter((u) => u !== job.featuredPhotoUrl)]
+    : all
+}
 
-  const checkIn = await prisma.checkIn.findUnique({
-    where: { id: checkInId },
-    include: { organization: true },
-  })
-
-  if (!checkIn || !checkIn.isPublic) {
-    return { title: 'Job Not Found' }
-  }
-
-  const { doorType, city, state, seoTitle, seoDescription, photoUrls, organization } = checkIn
+export function jobMetadata(job: JobWithOrg): Metadata {
+  const { doorType, city, state, seoDescription, organization } = job
+  const orgName = organization?.name || ''
+  const title = jobTabTitle(job, orgName)
 
   const article = doorType && /^[aeiou]/i.test(doorType) ? 'an' : 'a'
-
-  const title = seoTitle ||
-    (doorType && city && state ? `${doorType} in ${city}, ${state}` : 'Job Details')
-
-  const description = seoDescription ||
+  const description =
+    seoDescription ||
     (doorType && city && state
-      ? `View ${article} ${doorType} installation completed in ${city}, ${state}${organization?.name ? ` by ${organization.name}` : ''}. See photos, details, and get a free estimate.`
+      ? `View ${article} ${doorType} installation completed in ${city}, ${state}${orgName ? ` by ${orgName}` : ''}. See photos, details, and get a free estimate.`
       : 'View completed job details, photos, and request a free estimate.')
 
-  const allPhotos = photoUrls
-    ? photoUrls.split(',').map((url) => url.trim()).filter(Boolean)
-    : []
-
-  // The owner's chosen cover photo leads, so it's what shows in link previews.
-  const cover = checkIn.featuredPhotoUrl
-  const photos = cover && allPhotos.includes(cover)
-    ? [cover, ...allPhotos.filter((u) => u !== cover)]
-    : allPhotos
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
-  const pageUrl = appUrl ? `${appUrl}/jobs/${location}/${slug}` : undefined
+  const photos = orderedPhotos(job)
+  const pageUrl = jobUrl(job, organization?.slug)
 
   // When this job is also live on the customer's own WordPress site, that copy
-  // is canonical — search authority should accrue to their domain, not ours
-  // (design spec §5). Falls back to this page whenever it isn't synced.
-  const canonicalUrl =
-    checkIn.wpSyncStatus === 'synced' && checkIn.wpPostUrl ? checkIn.wpPostUrl : pageUrl
+  // is canonical: search authority should accrue to their domain, not ours
+  // (design spec 5). Falls back to this page whenever it isn't synced.
+  const canonicalUrl = job.wpSyncStatus === 'synced' && job.wpPostUrl ? job.wpPostUrl : pageUrl
 
   return {
     title,
     description,
-    ...(canonicalUrl && { alternates: { canonical: canonicalUrl } }),
+    alternates: { canonical: canonicalUrl },
     openGraph: {
       title,
       description,
       type: 'website',
-      ...(pageUrl && { url: pageUrl }),
-      ...(organization?.name && { siteName: organization.name }),
+      url: pageUrl,
+      ...(orgName && { siteName: orgName }),
       ...(photos.length > 0 && {
-        images: photos.map((url) => ({
-          url,
-          alt: [doorType, city && state ? `${city}, ${state}` : city || state]
-            .filter(Boolean)
-            .join(' in ') || 'Job photo',
-        })),
+        images: photos.map((url, i) => ({ url, alt: photoAlt(job, url, i, photos.length) })),
       }),
     },
     twitter: {
@@ -87,52 +65,14 @@ export async function generateMetadata(
   }
 }
 
-export default async function JobPage(
-  { params }: { params: Promise<{ location: string; slug: string }> }
-) {
-  const { slug, location } = await params
-
-  const uuidMatch = slug.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)
-  const checkInId = uuidMatch ? uuidMatch[0] : ''
-
-  if (!checkInId) {
-    notFound()
-  }
-
-  const checkIn = await prisma.checkIn.findUnique({
-    where: { id: checkInId },
-    include: {
-      organization: true,
-    },
-  })
-
-  if (!checkIn || !checkIn.isPublic) {
-    notFound()
-  }
+export async function JobView({ job }: { job: JobWithOrg }) {
+  const { doorType, city, state, zip, seoDescription, organization, beforePhotoUrl, afterPhotoUrl } = job
+  const checkInId = job.id
 
   // The customer's Google review, when the owner has linked one (Titan).
-  const review = await publicReviewForJob(checkIn.id)
+  const review = await publicReviewForJob(job.id)
 
-  const {
-    doorType,
-    city,
-    state,
-    zip,
-    seoTitle,
-    seoDescription,
-    photoUrls,
-    organization,
-    beforePhotoUrl,
-    afterPhotoUrl,
-    featuredPhotoUrl,
-  } = checkIn
-
-  const effectiveTitle =
-    seoTitle ||
-    (doorType && city && state
-      ? `${doorType} in ${city}, ${state}`
-      : 'Job Details')
-
+  const heading = jobHeading(job)
   const effectiveArticle = doorType && /^[aeiou]/i.test(doorType) ? 'an' : 'a'
   const effectiveDescription =
     seoDescription ||
@@ -140,19 +80,10 @@ export default async function JobPage(
       ? `View ${effectiveArticle} ${doorType} installation completed in ${city}, ${state}${organization?.name ? ` by ${organization.name}` : ''}. See photos, details, and get a free estimate.`
       : 'View completed job details, photos, and request a free estimate.')
 
-  const allPhotos = photoUrls
-    ? photoUrls
-        .split(',')
-        .map((url) => url.trim())
-        .filter(Boolean)
-    : []
-
-  // The owner's chosen cover photo leads in the visible carousel, same as the
-  // link-preview metadata above — otherwise the cover selection never shows up.
-  const photos =
-    featuredPhotoUrl && allPhotos.includes(featuredPhotoUrl)
-      ? [featuredPhotoUrl, ...allPhotos.filter((u) => u !== featuredPhotoUrl)]
-      : allPhotos
+  const photos = orderedPhotos(job)
+  const photoAlts = photos.map((url, i) => photoAlt(job, url, i, photos.length))
+  const beforeAlt = beforePhotoUrl ? photoAlt(job, beforePhotoUrl, 0, 1) : ''
+  const afterAlt = afterPhotoUrl ? photoAlt(job, afterPhotoUrl, 0, 1) : ''
 
   const businessName = organization?.name || 'Business name unavailable'
   const businessPhone = organization?.phone || ''
@@ -163,86 +94,66 @@ export default async function JobPage(
       : businessWebsite
       ? `https://${businessWebsite}`
       : ''
-
-  // Compute orgSlug for portfolio link
   const orgSlug = organization?.slug || null
 
-  // Fetch related jobs from same organization
+  // Visible location line: street name, city, state and zip, without the house
+  // number (decision 13.2). The house number stays only in the meta description.
+  const street = streetName(job.street)
+  const locationLine = [street, city?.trim(), [state?.trim(), zip?.trim()].filter(Boolean).join(' ')]
+    .filter(Boolean)
+    .join(', ')
+
   const relatedCheckIns = organization
     ? await prisma.checkIn.findMany({
-        where: {
-          organizationId: organization.id,
-          isPublic: true,
-          id: { not: checkInId },
-        },
+        where: { organizationId: organization.id, isPublic: true, id: { not: checkInId } },
         orderBy: { timestamp: 'desc' },
         take: 4,
       })
     : []
 
-  const relatedJobs = relatedCheckIns.map((job) => {
-    const jobPhotos = job.photoUrls
-      ? job.photoUrls.split(',').map((u) => u.trim()).filter(Boolean)
-      : []
-    const citySlug = slugify(job.city || '')
-    const stateSlug = slugify(job.state || '')
-    const doorTypeSlug = slugify(job.doorType || 'job')
-    const relatedJobSlug = orgSlug ? `${doorTypeSlug}-${orgSlug}-${job.id}` : `${doorTypeSlug}-${job.id}`
-    const jobPath = `/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${relatedJobSlug}`
-
+  const relatedJobs = relatedCheckIns.map((related) => {
+    const relatedPhotos = photoList(related.photoUrls)
     return {
-      id: job.id,
-      doorType: job.doorType || 'Job',
-      city: job.city || '',
-      state: job.state || '',
-      thumbnail: jobPhotos[0] || null,
-      jobPath,
-      timestamp: job.timestamp ? job.timestamp.toISOString() : null,
+      id: related.id,
+      title: jobHeading(related),
+      doorType: related.doorType || 'Job',
+      city: related.city || '',
+      state: related.state || '',
+      thumbnail: relatedPhotos[0] || null,
+      thumbnailAlt: relatedPhotos[0] ? photoAlt(related, relatedPhotos[0], 0, relatedPhotos.length) : '',
+      jobPath: jobPath(related, orgSlug),
+      timestamp: related.timestamp ? related.timestamp.toISOString() : null,
     }
   })
 
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
+  const baseUrl = appBaseUrl()
+  const pageUrl = jobUrl(job, orgSlug, baseUrl)
+  const cityLabel = [city?.trim(), state?.trim()].filter(Boolean).join(', ')
 
-  // Build BreadcrumbList JSON-LD
-  const breadcrumbItems: Array<{ '@type': string; position: number; name: string; item: string }> = [
-    { '@type': 'ListItem', position: 1, name: 'Home', item: `${baseUrl}/` },
-  ]
-  if (orgSlug) {
-    breadcrumbItems.push({
-      '@type': 'ListItem',
-      position: 2,
-      name: `${organization?.name || 'Portfolio'}`,
-      item: `${baseUrl}/portfolio/${orgSlug}`,
-    })
-    breadcrumbItems.push({
-      '@type': 'ListItem',
-      position: 3,
-      name: effectiveTitle,
-      item: `${baseUrl}/jobs/${location}/${slug}`,
-    })
-  } else {
-    breadcrumbItems.push({
-      '@type': 'ListItem',
-      position: 2,
-      name: effectiveTitle,
-      item: `${baseUrl}/jobs/${location}/${slug}`,
-    })
-  }
+  // Breadcrumb: business > city > job. The visible trail and the hidden markup
+  // list the same steps. The business step opens the portfolio and the city
+  // step opens the city page.
+  const crumbs: Array<{ name: string; href: string | null }> = []
+  if (orgSlug) crumbs.push({ name: organization?.name || 'Portfolio', href: `/portfolio/${orgSlug}` })
+  if (cityLabel) crumbs.push({ name: cityLabel, href: cityPath(orgSlug, city, state) })
+  crumbs.push({ name: heading, href: null })
 
   const breadcrumbJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
-    itemListElement: breadcrumbItems,
+    itemListElement: crumbs.map((c, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: c.name,
+      item: c.href ? `${baseUrl}${c.href}` : pageUrl,
+    })),
   }
 
   // Structured data. The business and the job are separate entities: the
   // business keeps one stable identity and address on every page (its address
   // copied from its Google Business Profile, or none for a service-area
   // business that hides it), and the job site's location and coordinates
-  // describe the page's own content. Before 2026-10-11 the job's city, zip and
-  // coordinates were attached to the business, so every job page said the
-  // business sat at a different job site.
-  const pageUrl = `${baseUrl}/jobs/${location}/${slug}`
+  // describe the page's own content.
   const businessId = orgSlug ? `${baseUrl}/portfolio/${orgSlug}#business` : `${pageUrl}#business`
   const storefront = parseStoredAddress(organization?.gbpBusinessAddress)
 
@@ -267,82 +178,71 @@ export default async function JobPage(
   const service: Record<string, unknown> = {
     '@type': 'Service',
     '@id': `${pageUrl}#service`,
-    name: effectiveTitle,
+    name: heading,
     description: effectiveDescription,
     provider: { '@id': businessId },
   }
   if (doorType) service.serviceType = doorType
   if (city || state) {
-    service.areaServed = {
-      '@type': 'Place',
-      name: [city, state].filter(Boolean).join(', '),
-    }
+    service.areaServed = { '@type': 'Place', name: cityLabel }
   }
 
   const jobPlace: Record<string, unknown> = { '@type': 'Place' }
-  if (city || state || zip) {
+  if (city || state || zip || street) {
     jobPlace.address = {
       '@type': 'PostalAddress',
+      ...(street && { streetAddress: street }),
       ...(city && { addressLocality: city.trim() }),
       ...(state && { addressRegion: state.trim() }),
       ...(zip && { postalCode: zip.trim() }),
     }
   }
-  if (typeof checkIn.latitude === 'number' && typeof checkIn.longitude === 'number') {
-    jobPlace.geo = {
-      '@type': 'GeoCoordinates',
-      latitude: checkIn.latitude,
-      longitude: checkIn.longitude,
-    }
+  if (typeof job.latitude === 'number' && typeof job.longitude === 'number') {
+    jobPlace.geo = { '@type': 'GeoCoordinates', latitude: job.latitude, longitude: job.longitude }
   }
 
   const webPage: Record<string, unknown> = {
     '@type': 'WebPage',
     '@id': pageUrl,
     url: pageUrl,
-    name: effectiveTitle,
+    name: heading,
     description: effectiveDescription,
     about: { '@id': `${pageUrl}#service` },
     ...(jobPlace.address || jobPlace.geo ? { contentLocation: jobPlace } : {}),
   }
-  if (checkIn.timestamp) webPage.datePublished = checkIn.timestamp.toISOString()
+  if (job.timestamp) webPage.datePublished = job.timestamp.toISOString()
   if (photos.length > 0) {
     webPage.image = photos.map((url, i) => ({
       '@type': 'ImageObject',
       url: url.startsWith('http') ? url : `${baseUrl}${url}`,
-      name: [doorType, city, state].filter(Boolean).join(' - ') || `Job photo ${i + 1}`,
+      name: photoAlts[i],
     }))
   }
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@graph': [webPage, service, business],
-  }
+  const jsonLd = { '@context': 'https://schema.org', '@graph': [webPage, service, business] }
 
   return (
     <main className="min-h-screen bg-surface-50">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, '\\u003c') }} />
       <CheckInPageViewTracker checkInId={checkInId} />
       <JobDetailClient
         checkInId={checkInId}
-        title={effectiveTitle}
+        title={heading}
         description={effectiveDescription}
         doorType={doorType || ''}
         city={city || ''}
         state={state || ''}
         zip={zip || ''}
-        notes={checkIn.notes || null}
-        timestamp={checkIn.timestamp ? checkIn.timestamp.toISOString() : null}
+        locationLine={locationLine}
+        notes={job.notes || null}
+        timestamp={job.timestamp ? job.timestamp.toISOString() : null}
         photos={photos}
+        photoAlts={photoAlts}
         beforePhotoUrl={beforePhotoUrl || null}
         afterPhotoUrl={afterPhotoUrl || null}
+        beforeAlt={beforeAlt}
+        afterAlt={afterAlt}
         businessName={businessName}
         businessPhone={businessPhone}
         normalizedWebsite={normalizedWebsiteHref}
@@ -351,6 +251,7 @@ export default async function JobPage(
         relatedJobs={relatedJobs}
         baseUrl={baseUrl}
         review={review}
+        breadcrumb={crumbs}
       />
     </main>
   )
