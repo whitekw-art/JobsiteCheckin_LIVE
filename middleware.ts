@@ -62,6 +62,7 @@ export default withAuth(
     ]
     const isPublicAssetPath = pathname.startsWith('/temp-photos/') ||
       pathname.startsWith('/widget.') || // embed widget script — loaded by customer websites
+      pathname.startsWith('/review.v1.js') || // review loader — loaded by customers' WordPress posts
       /\.(png|jpg|jpeg|svg|ico|webp|gif)$/i.test(pathname)
 
     // Registration gating — redirect /auth/register to homepage when registration is closed.
@@ -95,6 +96,8 @@ if (
   pathname !== '/' &&
   pathname !== '' &&
   !pathname.startsWith('/api/waitlist') &&
+  // Review request tracking links are opened by the business's customers.
+  !pathname.startsWith('/r/') &&
   !pathname.startsWith('/payments') &&
   !isPublicAssetPath
 ) {

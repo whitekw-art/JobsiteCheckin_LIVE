@@ -309,6 +309,28 @@ export async function getStorefrontAddress(
   }
 }
 
+/**
+ * The location's Google Maps place ID, used to open the business's Google
+ * reviews list ("Read this review on Google"). null when Google has none
+ * (for example an unverified profile).
+ */
+export async function getLocationPlaceId(
+  encryptedRefresh: string,
+  encryptedAccess: string | null,
+  locationName: string
+): Promise<GbpResult<string | null>> {
+  const auth = authorizedClient(encryptedRefresh, encryptedAccess)
+  if (!auth) return { ok: false, needsReconnect: true, error: 'Your Google connection needs to be set up again.' }
+  try {
+    const infoApi = google.mybusinessbusinessinformation({ version: 'v1', auth })
+    const name = locationName.startsWith('locations/') ? locationName : `locations/${locationName}`
+    const res = await infoApi.locations.get({ name, readMask: 'metadata' }, { timeout: REQUEST_TIMEOUT_MS })
+    return { ok: true, data: res.data.metadata?.placeId ?? null }
+  } catch (err) {
+    return { ok: false, ...classify(err, 'We could not read your Google business details.') }
+  }
+}
+
 export interface LocalPostInput {
   /** Post body. Trimmed to ~300 chars by buildPostSummary before it gets here. */
   summary: string
@@ -451,6 +473,117 @@ export async function deleteLocalPost(
     console.error('GBP: localPosts.delete threw', err)
     return { ok: false, error: 'Google could not remove this post right now. Please try again.' }
   }
+}
+
+export interface GbpReview {
+  /** Google's review ID (stable across edits). */
+  reviewId: string
+  reviewerName: string | null
+  /** 1 to 5, or null when Google sends no rating. */
+  starRating: number | null
+  comment: string | null
+  postedAt: Date | null
+  updatedAt: Date | null
+  replyComment: string | null
+  replyUpdatedAt: Date | null
+}
+
+const STAR_VALUES: Record<string, number> = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 }
+
+/** Most pages read in one call (50 reviews each), so one profile cannot run past the time limit. */
+const MAX_REVIEW_PAGES = 40
+
+/**
+ * Every review on the location, newest first, through the v4 reviews endpoint
+ * (no generated client exists for it, as with Local Posts). Content read here
+ * may be kept no more than 30 days (Business Profile API policy), so callers
+ * refresh it on a schedule. `complete` is false when the page cap stopped the
+ * read early, in which case a review missing from the list must not be treated
+ * as deleted on Google.
+ */
+export async function listReviews(
+  encryptedRefresh: string,
+  encryptedAccess: string | null,
+  accountId: string,
+  locationId: string
+): Promise<GbpResult<{ reviews: GbpReview[]; complete: boolean }>> {
+  const auth = authorizedClient(encryptedRefresh, encryptedAccess)
+  if (!auth) return { ok: false, needsReconnect: true, error: 'Your Google connection needs to be set up again.' }
+
+  let accessToken: string | null | undefined
+  try {
+    accessToken = (await auth.getAccessToken()).token
+  } catch (err) {
+    return { ok: false, ...classify(err, 'We could not reach Google to read your reviews.') }
+  }
+  if (!accessToken) {
+    return { ok: false, needsReconnect: true, error: 'Your Google connection is no longer active. Please connect again.' }
+  }
+
+  const account = accountId.startsWith('accounts/') ? accountId : `accounts/${accountId}`
+  const location = locationId.startsWith('locations/') ? locationId : `locations/${locationId}`
+  const toDate = (v: unknown) => {
+    if (typeof v !== 'string') return null
+    const d = new Date(v)
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+
+  const reviews: GbpReview[] = []
+  let pageToken: string | undefined
+  for (let page = 0; page < MAX_REVIEW_PAGES; page++) {
+    const url = new URL(`${V4_BASE}/${account}/${location}/reviews`)
+    url.searchParams.set('pageSize', '50')
+    url.searchParams.set('orderBy', 'updateTime desc')
+    if (pageToken) url.searchParams.set('pageToken', pageToken)
+    try {
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '')
+        if (res.status === 401) {
+          console.warn('GBP: reviews.list rejected, authorization no longer valid', detail.slice(0, 400))
+          return { ok: false, needsReconnect: true, error: 'Your Google connection is no longer active. Please connect again.' }
+        }
+        console.error('GBP: reviews.list failed', res.status, detail.slice(0, 600))
+        return { ok: false, error: 'Google could not return your reviews right now.' }
+      }
+      const json = (await res.json()) as {
+        reviews?: Array<{
+          reviewId?: string
+          name?: string
+          reviewer?: { displayName?: string; isAnonymous?: boolean }
+          starRating?: string
+          comment?: string
+          createTime?: string
+          updateTime?: string
+          reviewReply?: { comment?: string; updateTime?: string }
+        }>
+        nextPageToken?: string
+      }
+      for (const r of json.reviews ?? []) {
+        const id = r.reviewId || r.name?.split('/').pop()
+        if (!id) continue
+        reviews.push({
+          reviewId: id,
+          reviewerName: r.reviewer?.displayName?.trim() || null,
+          starRating: r.starRating ? STAR_VALUES[r.starRating] ?? null : null,
+          comment: r.comment ?? null,
+          postedAt: toDate(r.createTime),
+          updatedAt: toDate(r.updateTime),
+          replyComment: r.reviewReply?.comment ?? null,
+          replyUpdatedAt: toDate(r.reviewReply?.updateTime),
+        })
+      }
+      pageToken = json.nextPageToken || undefined
+      if (!pageToken) return { ok: true, data: { reviews, complete: true } }
+    } catch (err) {
+      console.error('GBP: reviews.list threw', err)
+      return { ok: false, error: 'Google could not return your reviews right now.' }
+    }
+  }
+  return { ok: true, data: { reviews, complete: false } }
 }
 
 /** Best-effort revoke on disconnect. Never blocks clearing our own copy. */

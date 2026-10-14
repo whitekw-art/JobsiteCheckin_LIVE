@@ -20,6 +20,7 @@ import {
 import { WP_SYNC_CLAIM_STALE_MS, wpConnectionActive, wpErrorCodeForKind } from '@/lib/wpStatus'
 import { sendWordPressReconnectEmail } from '@/lib/wordpressEmails'
 import { parseStoredAddress } from '@/lib/gbpBusinessInfo'
+import { publicReviewForJob, type PublicReview } from '@/lib/googleReviews'
 
 // Orchestration for WordPress native publishing (Phase 3, Website Integration
 // for Local SEO). Decides WHAT syncs and WHEN; lib/wordpressApi.ts does the
@@ -322,11 +323,46 @@ function photoHtml(p: SyncedMedia, alt: string, style?: string): string {
   return `<img src="${escapeHtml(p.url)}" alt="${escapeHtml(alt)}" class="wp-image-${p.id}" loading="lazy"${styleAttr} />`
 }
 
+/**
+ * The job's linked Google review (master plan decision 11.2). The post's own
+ * HTML carries only the stars, the date and the link to Google; the reviewer's
+ * name, the comment and the owner's reply are loaded by review.v1.js from
+ * ProjectCheckin, so no copy of the review text is stored on the customer's
+ * site (Google allows API content to be kept no more than 30 days). On a site
+ * connected below Administrator, WordPress strips the script and only the
+ * stars, date and link show. No review or star markup.
+ */
+function reviewHtml(jobId: string, review: PublicReview, businessName: string): string {
+  const app = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://projectcheckin.com').replace(/\/$/, '')
+  const stars = review.starRating ?? 0
+  const starLine =
+    `<span style="color:#F59E0B;letter-spacing:2px" aria-label="${stars} out of 5 stars">` +
+    '★'.repeat(stars) +
+    `</span><span style="color:#D6D3D1;letter-spacing:2px" aria-hidden="true">${'★'.repeat(5 - stars)}</span>`
+  const date = review.postedAt
+    ? new Date(review.postedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+    : null
+  const link = review.reviewsListUrl
+    ? `<p><a href="${escapeHtml(review.reviewsListUrl)}" target="_blank" rel="noopener">Read this review on Google →</a></p>`
+    : ''
+  return (
+    `<h2>Customer Review</h2>` +
+    `<div data-pck-review="${escapeHtml(jobId)}" data-pck-business="${escapeHtml(businessName)}" style="border:1px solid #e7e5e4;border-radius:8px;padding:16px;margin:0 0 16px">` +
+    `<p style="margin:0">${starLine}</p>` +
+    (date ? `<p style="margin:4px 0 0;font-size:0.9em;color:#78716c">Posted on Google on ${escapeHtml(date)}</p>` : '') +
+    `<div data-pck-review-body></div>` +
+    link +
+    `</div>` +
+    `<script src="${app}/review.v1.js" defer></script>`
+  )
+}
+
 function buildContent(
   job: JobRecord,
   org: OrgContext['org'],
   media: SyncedMedia[],
-  siteUrl: string
+  siteUrl: string,
+  review: PublicReview | null = null
 ): string {
   const alt = jobTitle(job)
   const before = media.find((m) => m.role === 'before') ?? null
@@ -351,6 +387,8 @@ function buildContent(
 
   const place = [job.city?.trim(), job.state?.trim()].filter(Boolean).join(', ')
   if (place) parts.push(`<p><strong>Location:</strong> ${escapeHtml(place)}</p>`)
+
+  if (review) parts.push(reviewHtml(job.id, review, org.name))
 
   // Attribution: the business is credited as the author in the visible line and
   // in schema. The WP post_author field is just plumbing (see spec §3).
@@ -626,7 +664,7 @@ export async function syncCheckIn(
 
     const input: WpPostInput = {
       title,
-      content: buildContent(job, org, media, creds.siteUrl),
+      content: buildContent(job, org, media, creds.siteUrl, await publicReviewForJob(job.id)),
       excerpt,
       slug,
       categoryIds: categoryId ? [categoryId] : [],

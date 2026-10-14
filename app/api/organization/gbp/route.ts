@@ -3,6 +3,8 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse, after } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { refreshGbpBusinessInfo } from '@/lib/gbpBusinessInfo'
+import { refreshOrgReviews } from '@/lib/googleReviews'
+import { resyncJobsAfterReviewChange } from '@/lib/reviewResync'
 import { cookies } from 'next/headers'
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
@@ -204,6 +206,12 @@ export async function PATCH(request: NextRequest) {
     if (data.gbpLocationId) {
       after(async () => {
         await refreshGbpBusinessInfo(org.id).catch((err) => console.error('GBP address refresh failed:', err))
+          // First read of the profile's Google reviews (Titan review tracking).
+          const reviews = await refreshOrgReviews(org.id).catch((err) => {
+            console.error('Google review refresh failed:', err)
+            return null
+          })
+          if (reviews) await resyncJobsAfterReviewChange(reviews.changedCheckInIds)
       })
     }
 

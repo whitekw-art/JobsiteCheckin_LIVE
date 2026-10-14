@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import type { PublicReview } from '@/lib/googleReviews'
 import Link from 'next/link'
 import Image from 'next/image'
 import { JobPhoneLink } from '@/components/JobPhoneLink'
@@ -41,6 +42,7 @@ interface JobDetailProps {
   orgPlanTier: string | null
   relatedJobs: RelatedJob[]
   baseUrl: string
+  review?: PublicReview | null
 }
 
 /* ===================================================================
@@ -286,6 +288,7 @@ export default function JobDetailClient({
   orgPlanTier,
   relatedJobs,
   baseUrl,
+  review = null,
 }: JobDetailProps) {
   const canBeforeAfter = tierHasFeature(orgPlanTier, 'before_after_tagging')
   const [featuredIndex, setFeaturedIndex] = useState(0)
@@ -583,6 +586,7 @@ export default function JobDetailClient({
         canBeforeAfter={canBeforeAfter}
         beforePhotoUrl={beforePhotoUrl}
         afterPhotoUrl={afterPhotoUrl}
+        review={review}
       />
 
       {/* ============================================
@@ -657,6 +661,7 @@ function JobDetailsSection({
   location,
   timestamp,
   notes,
+  review,
   checkInId,
   businessName,
   businessPhone,
@@ -671,6 +676,7 @@ function JobDetailsSection({
   location: string
   timestamp: string | null
   notes: string | null
+  review: PublicReview | null
   checkInId: string
   businessName: string
   businessPhone: string
@@ -737,6 +743,68 @@ function JobDetailsSection({
                   }}
                 >
                   {notes}
+                </div>
+              </div>
+            )}
+
+            {/* Customer Review: the Google review the owner linked to this job.
+                Name, stars and comment appear exactly as on Google (Google
+                forbids altering review text). No review or star markup: Google
+                treats reviews a business shows about itself as ineligible. */}
+            {review && (
+              <div className="mt-8">
+                <h2 className="font-display text-lg font-semibold text-surface-800 mb-3">
+                  Customer Review
+                </h2>
+                <div
+                  className="rounded-xl p-4"
+                  style={{ background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(0,0,0,0.06)' }}
+                >
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="font-semibold text-surface-900">{review.reviewerName || 'Google reviewer'}</span>
+                    <span aria-label={`${review.starRating} out of 5 stars`} className="tracking-wider">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <span key={i} aria-hidden="true" style={{ color: i <= (review.starRating ?? 0) ? '#F59E0B' : '#D6D3D1' }}>
+                          ★
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                  {review.postedAt && (
+                    <p className="text-[0.8rem] text-surface-500 mt-1">
+                      Posted on Google on{' '}
+                      {new Date(review.postedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  )}
+                  {review.comment && (
+                    <p
+                      className="mt-3 text-[0.9rem] text-surface-700 leading-relaxed"
+                      style={{ whiteSpace: 'pre-line', overflowWrap: 'break-word' }}
+                    >
+                      {review.comment}
+                    </p>
+                  )}
+                  {review.replyComment && (
+                    <div className="mt-4 pl-4" style={{ borderLeft: '3px solid #e7e5e4' }}>
+                      <p className="text-[0.8rem] font-semibold text-surface-800">Response from {businessName}</p>
+                      <p
+                        className="mt-1 text-[0.85rem] text-surface-600 leading-relaxed"
+                        style={{ whiteSpace: 'pre-line', overflowWrap: 'break-word' }}
+                      >
+                        {review.replyComment}
+                      </p>
+                    </div>
+                  )}
+                  {review.reviewsListUrl && (
+                    <a
+                      href={review.reviewsListUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block mt-4 text-[0.85rem] font-semibold text-primary-700 underline"
+                    >
+                      Read this review on Google &rarr;
+                    </a>
+                  )}
                 </div>
               </div>
             )}
