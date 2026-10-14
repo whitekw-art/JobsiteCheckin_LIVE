@@ -5,7 +5,7 @@ import { hasFeature } from '@/lib/planVersions'
 import { getAiConfig } from '@/lib/aiConfig'
 import OpenAI from 'openai'
 import { ALT_MAX_PHOTOS } from '@/lib/photoAlt'
-import { acceptPhotoAlts, parseReply } from '@/lib/photoAltAi'
+import { acceptPhotoAlts, firstSentenceRule, parseReply } from '@/lib/photoAltAi'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -18,6 +18,7 @@ Requirements:
 - Include the service type, city, state, and a long-tail keyword variant (e.g. "mahogany front door installation in [City], [State]")
 - Include specific product or material details visible in the photos or mentioned in the notes
 - Do NOT invent or fabricate any product details, materials, or specifics not present in the input
+- Open with one sentence that names the service type, the street name, the city and the state
 - Write in third person
 - Do not use bullet points or headers
 - Do not begin with "I" or "We"
@@ -120,6 +121,7 @@ export async function POST(req: Request) {
         state: true,
         zip: true,
         notes: true,
+        street: true,
         photoUrls: true,
         beforePhotoUrl: true,
         afterPhotoUrl: true,
@@ -232,7 +234,7 @@ export async function POST(req: Request) {
 
     // Appended in code so it applies even when the prompt is overridden in the
     // admin panel: job descriptions are public text and must not name people.
-    const systemPrompt = `${await getSystemPrompt()}\n\n${NO_NAMES_RULE}\n\n${PHOTO_ALT_RULES}`
+    const systemPrompt = `${await getSystemPrompt()}\n\n${NO_NAMES_RULE}\n\n${firstSentenceRule(checkIn)}\n\n${PHOTO_ALT_RULES}`
 
     // max_tokens is the hard ceiling on what a run can cost: about 200 tokens for
     // the description, up to ALT_RUN_MAX_WORDS words (about 270 tokens) of photo
