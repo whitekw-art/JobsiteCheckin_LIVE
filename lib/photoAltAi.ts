@@ -1,4 +1,5 @@
 import { findHomeownerName } from '@/lib/jobContent'
+import { streetName } from '@/lib/jobUrls'
 import { ALT_RUN_MAX_WORDS, altWithinLimits, altWordCount, cleanAltText } from '@/lib/photoAlt'
 
 // Reading and vetting the AI's photo descriptions (phase 3, part E). Kept out of
@@ -63,4 +64,25 @@ export function acceptPhotoAlts(
     out[url] = alt
   }
   return out
+}
+
+// The description's first sentence names the product, street, city and state
+// (master plan 3.5), built from the job's own fields and appended in code so an
+// edit to the admin-panel prompt cannot remove it. The street is the street
+// NAME only: the house number never appears in public text.
+export function firstSentenceRule(job: { doorType: string | null; street: string | null; city: string | null; state: string | null }): string {
+  const product = (job.doorType || '').trim()
+  const street = streetName(job.street)
+  const city = (job.city || '').trim()
+  const state = (job.state || '').trim()
+  const parts = [product, street && `on ${street}`, city && `in ${[city, state].filter(Boolean).join(', ')}`].filter(Boolean)
+  if (!product && !street && !city) return ''
+  return `The first sentence of the description must name ${[
+    product && 'the service type',
+    street && 'the street name',
+    city && 'the city',
+    state && 'the state',
+  ]
+    .filter(Boolean)
+    .join(', ')}, for example: "${parts.join(' ')}." Use these exact values: ${[product && `service type "${product}"`, street && `street "${street}"`, city && `city "${city}"`, state && `state "${state}"`].filter(Boolean).join(', ')}. Never include the house number.`
 }

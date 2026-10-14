@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { jobUrl } from '@/lib/jobUrls'
+import { photoAlt } from '@/lib/photoAlt'
 import { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 
@@ -99,6 +100,7 @@ export default async function TenantSitePage({ params }: TenantPageProps) {
       state: job.state?.trim() || '',
       description: job.seoDescription || job.notes || null,
       photos,
+      photoAlts: photos.map((url, i) => photoAlt(job, url, i, photos.length)),
       date: job.timestamp,
       pckUrl: jobUrl(job, org.slug, pckBase),
     }
@@ -241,7 +243,7 @@ export default async function TenantSitePage({ params }: TenantPageProps) {
                       <img
                         key={photo}
                         src={photo}
-                        alt={`${job.jobType}${job.city ? ` in ${job.city}${job.state ? `, ${job.state}` : ''}` : ''} — ${org.name}${i > 0 ? ` (photo ${i + 1})` : ''}`}
+                        alt={job.photoAlts[i] || job.jobType}
                         loading="lazy"
                         style={{ width: 220, height: 160, objectFit: 'cover', borderRadius: 4, border: '1px solid #E2E8F0' }}
                       />
