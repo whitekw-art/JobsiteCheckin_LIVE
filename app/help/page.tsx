@@ -123,6 +123,12 @@ export default function HelpPage() {
           <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '6px 0 20px', lineHeight: 1.6 }}>
             Send finished jobs straight to your Google listing. Covers picking the right Google account, claiming a profile you don&apos;t have yet, and getting one back from whoever set it up.
           </p>
+          <Link href="/help/guides/review-requests" style={{ display: 'block', minHeight: 0, padding: '3px 0', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none' }}>
+            Google Review Requests
+          </Link>
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: '6px 0 20px', lineHeight: 1.6 }}>
+            Send a review request after a job, follow it on the Job Dashboard, link the customer&apos;s Google review to the job and show it on the job&apos;s page.
+          </p>
           <Link href="/help/guides/team-roles" style={{ display: 'block', minHeight: 0, padding: '3px 0', fontSize: 13.5, fontWeight: 700, color: 'var(--sky-text)', textDecoration: 'none' }}>
             Team Roles and Access
           </Link>

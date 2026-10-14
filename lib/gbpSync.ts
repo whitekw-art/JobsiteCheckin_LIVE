@@ -39,7 +39,7 @@ export interface GbpPostOutcome {
  * Never throws: callers include a background `after()` hook, where an
  * unhandled rejection would be invisible.
  */
-async function markGbpNeedsReconnect(organizationId: string): Promise<void> {
+export async function markGbpNeedsReconnect(organizationId: string): Promise<void> {
   await prisma.organization
     .update({
       where: { id: organizationId },

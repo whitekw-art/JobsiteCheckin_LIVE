@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { publicReviewForJob } from '@/lib/googleReviews'
 import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { slugify } from '@/lib/slugify'
@@ -108,6 +109,9 @@ export default async function JobPage(
   if (!checkIn || !checkIn.isPublic) {
     notFound()
   }
+
+  // The customer's Google review, when the owner has linked one (Titan).
+  const review = await publicReviewForJob(checkIn.id)
 
   const {
     doorType,
@@ -346,6 +350,7 @@ export default async function JobPage(
         orgPlanTier={organization?.planTier ?? null}
         relatedJobs={relatedJobs}
         baseUrl={baseUrl}
+        review={review}
       />
     </main>
   )

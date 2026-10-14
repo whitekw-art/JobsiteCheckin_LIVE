@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { ensureReviewLinkCode, recordReviewEvent, reviewTrackingUrl } from '@/lib/reviewTracking'
 import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
 
@@ -67,7 +68,17 @@ export async function GET(request: NextRequest) {
 
       const businessName = checkIn.organization.name
       const firstName = checkIn.homeCustomerName?.split(' ')[0] ?? 'there'
-      const reviewLink = checkIn.organization.gbpReviewLink ?? null
+      // The review link in the email is the job's tracking link (/r/{code}),
+      // which records when the customer opens it and forwards to Google.
+      const savedReviewLink = checkIn.organization.gbpReviewLink ?? null
+      let reviewLink = savedReviewLink
+      if (savedReviewLink) {
+        try {
+          reviewLink = reviewTrackingUrl(await ensureReviewLinkCode(checkIn.id))
+        } catch (err) {
+          console.error(`Could not create a review tracking link for checkIn ${checkIn.id}:`, err)
+        }
+      }
       const jobLocation = [checkIn.city, checkIn.state].filter(Boolean).join(', ')
 
       const filledSubject = subject.replace('{{businessName}}', businessName)
@@ -93,6 +104,15 @@ export async function GET(request: NextRequest) {
           where: { id: checkIn.id },
           data: { followUpEmailSentAt: new Date() },
         })
+
+        // ProjectCheckin sent this email itself, so it counts as a request.
+        if (checkIn.organizationId) {
+          await recordReviewEvent({
+            organizationId: checkIn.organizationId,
+            checkInId: checkIn.id,
+            kind: 'email_auto',
+          }).catch((err) => console.error(`Could not record follow-up email for checkIn ${checkIn.id}:`, err))
+        }
 
         sent++
       } catch (err) {

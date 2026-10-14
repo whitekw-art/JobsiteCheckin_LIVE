@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { geocodeJobAddress } from '@/lib/geocode'
@@ -14,6 +14,7 @@ import CoachMarks, { isCoachTourActive } from '@/components/CoachMarks'
 import { REVEAL_SUPPORT_NAV } from '@/lib/navReveal'
 import { DEMO_JOBS, isDemoJob } from '@/lib/demoJobs'
 import { wpErrorGuideHref } from '@/lib/wpStatus'
+import { ReviewBlock, ReviewPill, UnmatchedReviewsPanel, useReviewTracking, type ReviewJob } from '@/components/ReviewTracking'
 
 interface CheckIn {
   id: string
@@ -759,6 +760,10 @@ export default function Dashboard() {
   const [reviewOverrideEmail, setReviewOverrideEmail] = useState('')
   const [reviewCopied, setReviewCopied] = useState(false)
   const [reviewTextSent, setReviewTextSent] = useState(false)
+  // True while the job's review tracking link (/r/{code}) is being fetched.
+  const [reviewLinkPending, setReviewLinkPending] = useState(false)
+  // Set once review tracking is loaded, so a recorded send refreshes the job's Google Review block.
+  const reviewTrackingReloadRef = useRef<(() => void) | null>(null)
   const [reviewEmailSent, setReviewEmailSent] = useState(false)
 
   // Photo delete
@@ -1490,6 +1495,24 @@ export default function Dashboard() {
     setReviewOverridePhone(cust?.phones?.find((p) => p.num)?.num || '')
     setReviewOverrideEmail(cust?.emails?.find((e) => e.addr)?.addr || '')
     setReviewMessageText(buildReviewMessage(checkIn, custName))
+    // Swap the Google review link for the job's ProjectCheckin tracking link,
+    // which records when the customer opens it and forwards to Google.
+    if (gbpReviewLink && !isDemoJob(checkIn.id)) {
+      setReviewLinkPending(true)
+      fetch('/api/checkins/review-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkIn.id, action: 'link' }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: { url?: string } | null) => {
+          if (d?.url) setReviewMessageText((prev) => prev.split(gbpReviewLink).join(d.url as string))
+        })
+        .catch(() => {})
+        .finally(() => setReviewLinkPending(false))
+    } else {
+      setReviewLinkPending(false)
+    }
     const sigLines = [`Thanks! ${orgName}`]
     if (orgPhone) sigLines.push(orgPhone)
     if (orgEmail) sigLines.push(orgEmail)
@@ -1508,8 +1531,21 @@ export default function Dashboard() {
     }
   }
 
+  // Records one click on Send via Text or Send via Email. The message goes out
+  // from the owner's own phone or email app, so this records the click only.
+  const recordReviewSend = (checkInId: string, action: 'text' | 'email') => {
+    if (isDemoJob(checkInId)) return
+    fetch('/api/checkins/review-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: checkInId, action }),
+    })
+      .then(() => reviewTrackingReloadRef.current?.())
+      .catch(() => {})
+  }
+
   const handleSendReview = () => {
-    if (!reviewModalCheckIn) return
+    if (!reviewModalCheckIn || reviewLinkPending) return
     const { phone, email } = getReviewRecipient(reviewModalCheckIn)
     const fullMessage = `${reviewMessageText}\n\n${reviewSignature}`
     const hasPhone = !!phone
@@ -1519,6 +1555,7 @@ export default function Dashboard() {
       if (!phone) { alert('No phone number saved for this customer. Add it in the Customer Info section.'); return }
       const cleanPhone = phone.replace(/[^0-9+]/g, '')
       window.open(`sms:${cleanPhone}?body=${encodeURIComponent(fullMessage)}`, '_blank')
+      recordReviewSend(reviewModalCheckIn.id, 'text')
       setReviewTextSent(true)
       if (!hasEmail) setReviewModalCheckIn(null)
     }
@@ -1528,6 +1565,7 @@ export default function Dashboard() {
       const subject = encodeURIComponent('We appreciated working with you — quick favor if you have a minute')
       const body = encodeURIComponent(fullMessage)
       window.open(`mailto:${email}?subject=${subject}&body=${body}`)
+      recordReviewSend(reviewModalCheckIn.id, 'email')
       setReviewEmailSent(true)
       if (!hasPhone) setReviewModalCheckIn(null)
     }
@@ -1618,6 +1656,25 @@ export default function Dashboard() {
   const planLabel = planTier
     ? planTier.charAt(0).toUpperCase() + planTier.slice(1) + ' Plan'
     : 'Free Plan'
+
+  // ── Google review tracking (Titan) ─────────────────────────────────────────
+
+  const reviewTracking = useReviewTracking(tierHasFeature(planTier, 'review_request'))
+  reviewTrackingReloadRef.current = reviewTracking.reload
+  const [unmatchedOpen, setUnmatchedOpen] = useState(false)
+  const reviewJobs: ReviewJob[] = useMemo(
+    () =>
+      checkIns
+        .filter((c) => !isDemoJob(c.id))
+        .map((c) => ({
+          id: c.id,
+          address: [c.street, c.city, c.state].filter(Boolean).join(', '),
+          doorType: c.doorType ?? null,
+          date: new Date(c.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          homeCustomerName: c.homeCustomerName ?? null,
+        })),
+    [checkIns]
+  )
 
   // ── Portfolio ──────────────────────────────────────────────────────────────
 
@@ -1870,6 +1927,17 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Google reviews not yet linked to a job, and the needs-reply count (Titan) */}
+          <UnmatchedReviewsPanel
+            data={reviewTracking.data}
+            busy={reviewTracking.busy}
+            error={reviewTracking.error}
+            jobs={reviewJobs}
+            open={unmatchedOpen}
+            onToggle={() => setUnmatchedOpen((v) => !v)}
+            onAct={reviewTracking.act}
+          />
+
           {/* Filter bar */}
           <div className="db-filter-bar" data-tour="jd-filters">
             <div className="db-filter-tabs">
@@ -1994,6 +2062,7 @@ export default function Dashboard() {
                             ) : (
                               <span className="db-photo-pill-empty">No photos</span>
                             )}
+                            <ReviewPill jobId={checkIn.id} data={reviewTracking.data} />
                           </div>
                         </div>
 
@@ -2472,6 +2541,26 @@ export default function Dashboard() {
                                   ? 'Cover photo set — used as the main image on your portfolio, this job’s page, and when it’s shared or published to your website. Works whether the job is published or not.'
                                   : 'No cover photo chosen — the first photo is used automatically.'}
                               </div>
+                            )}
+
+                            {tierHasFeature(planTier, 'review_request') && !isDemoJob(checkIn.id) && (
+                              <ReviewBlock
+                                job={reviewJobs.find((j) => j.id === checkIn.id) ?? {
+                                  id: checkIn.id,
+                                  address,
+                                  doorType: checkIn.doorType ?? null,
+                                  date: null,
+                                  homeCustomerName: checkIn.homeCustomerName ?? null,
+                                }}
+                                data={reviewTracking.data}
+                                busy={reviewTracking.busy}
+                                canConnect={isOwner}
+                                onAct={reviewTracking.act}
+                                onOpenUnmatched={() => {
+                                  setUnmatchedOpen(true)
+                                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                                }}
+                              />
                             )}
 
                             <div className="db-detail-btns" {...(isDetailTourRow ? { 'data-tour': 'jd-actions' } : {})}>
@@ -2986,11 +3075,12 @@ export default function Dashboard() {
                 <button
                   className="rrm-btn-send"
                   onClick={handleSendReview}
+                  disabled={reviewLinkPending}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
                   </svg>
-                  {reviewMethod === 'text' ? 'Send via Text' : 'Send via Email'}
+                  {reviewLinkPending ? 'Preparing link\u2026' : reviewMethod === 'text' ? 'Send via Text' : 'Send via Email'}
                 </button>
                 <button className="rrm-btn-copy" onClick={handleCopyReview}>
                   <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.7">

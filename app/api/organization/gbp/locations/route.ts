@@ -2,6 +2,8 @@ export const runtime = 'nodejs'
 
 import { NextResponse, after } from 'next/server'
 import { refreshGbpBusinessInfo } from '@/lib/gbpBusinessInfo'
+import { refreshOrgReviews } from '@/lib/googleReviews'
+import { resyncJobsAfterReviewChange } from '@/lib/reviewResync'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { tierHasFeature } from '@/lib/planVersions'
@@ -63,6 +65,12 @@ export async function GET() {
       if (single) {
         after(async () => {
           await refreshGbpBusinessInfo(org.id).catch((err) => console.error('GBP address refresh failed:', err))
+          // First read of the profile's Google reviews (Titan review tracking).
+          const reviews = await refreshOrgReviews(org.id).catch((err) => {
+            console.error('Google review refresh failed:', err)
+            return null
+          })
+          if (reviews) await resyncJobsAfterReviewChange(reviews.changedCheckInIds)
         })
       }
     }
