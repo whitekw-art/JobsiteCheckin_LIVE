@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-const VALID_EVENT_TYPES = new Set(['page_view', 'phone_click', 'website_click'])
+// Stored lowercase. The photo trackers send 'PHOTO_CLICK', so the type is
+// lowercased before this check; Reporting reads either case.
+const VALID_EVENT_TYPES = new Set(['page_view', 'phone_click', 'website_click', 'photo_click'])
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +20,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const resolvedEventType = eventType || 'page_view'
+    const resolvedEventType = (eventType || 'page_view').toLowerCase()
     if (!VALID_EVENT_TYPES.has(resolvedEventType)) {
       return NextResponse.json(
         { error: 'Invalid event type' },
