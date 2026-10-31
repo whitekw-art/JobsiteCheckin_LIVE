@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { slugify } from '@/lib/slugify'
+import { wpConnectionActive } from '@/lib/wpStatus'
+import { jobUrl } from '@/lib/jobUrls'
 import { tierHasFeature } from '@/lib/planVersions'
 import { createLocalPost, deleteLocalPost, buildPostSummary, type GbpResult } from '@/lib/gbpApi'
 
@@ -38,7 +39,7 @@ export interface GbpPostOutcome {
  * Never throws: callers include a background `after()` hook, where an
  * unhandled rejection would be invisible.
  */
-async function markGbpNeedsReconnect(organizationId: string): Promise<void> {
+export async function markGbpNeedsReconnect(organizationId: string): Promise<void> {
   await prisma.organization
     .update({
       where: { id: organizationId },
@@ -60,6 +61,7 @@ export async function postCheckInToGbp(checkInId: string): Promise<GbpResult<Gbp
     select: {
       id: true,
       doorType: true,
+      street: true,
       city: true,
       state: true,
       notes: true,
@@ -373,6 +375,7 @@ function resolveLinkTarget(
   job: {
     id: string
     doorType: string | null
+    street?: string | null
     city: string | null
     state: string | null
     wpPostUrl: string | null
@@ -392,7 +395,7 @@ function resolveLinkTarget(
     // 1 — WordPress, strongest: a real post on their own domain. Requires THIS
     // job to have actually synced, not just a live connection — linking to a
     // post that failed to sync would be a dead link on their Google listing.
-    if (org.wpConnectionStatus === 'connected' && job.wpPostUrl) {
+    if (wpConnectionActive(org.wpConnectionStatus) && job.wpPostUrl) {
       return withUtm(job.wpPostUrl, utm)
     }
     // 2 — CNAME subdomain: a real page on their domain, though the jobs index
@@ -410,15 +413,10 @@ function resolveLinkTarget(
 }
 
 function projectCheckinJobUrl(
-  job: { id: string; doorType: string | null; city: string | null; state: string | null },
+  job: { id: string; doorType: string | null; street?: string | null; city: string | null; state: string | null },
   orgSlug: string | null
 ): string {
-  const base = (process.env.NEXT_PUBLIC_APP_URL || 'https://projectcheckin.com').replace(/\/+$/, '')
-  const citySlug = slugify(job.city || '')
-  const stateSlug = slugify(job.state || '')
-  const doorTypeSlug = slugify(job.doorType || 'job')
-  const slug = orgSlug ? `${doorTypeSlug}-${orgSlug}-${job.id}` : `${doorTypeSlug}-${job.id}`
-  return `${base}/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${slug}`
+  return jobUrl(job, orgSlug)
 }
 
 function withUtm(url: string, utm: string): string {

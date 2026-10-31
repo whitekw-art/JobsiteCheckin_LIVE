@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { buildJobSeoFields } from '@/lib/jobContent'
 import { getCurrentUser } from '@/lib/auth'
 import { hasFeature } from '@/lib/planVersions'
 
@@ -77,13 +78,9 @@ export async function POST(request: NextRequest) {
         ? locationSource
         : null
 
-    const seoTitle =
-      doorType && city && state ? `${doorType} in ${city}, ${state}` : null
-
-    const seoDescription =
-      doorType && street && city && state
-        ? `Installed a ${doorType} at ${street}, ${city}, ${state}.`
-        : null
+    // Same builder every edit path uses, so titles never drift between
+    // check-in and later edits (whitespace trimmed, "a"/"an" correct).
+    const { seoTitle, seoDescription } = buildJobSeoFields({ doorType, street, city, state })
 
     const dataToCreate = {
       timestamp,

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { syncCheckIn, unsyncCheckIn } from '@/lib/wordpressSync'
 import { autoPostCheckInIfEnabled, retractCheckInFromGbp, shouldAutoPostOnPublish } from '@/lib/gbpSync'
+import { findHomeownerName, HOMEOWNER_NAME_ERROR } from '@/lib/jobContent'
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,11 +31,18 @@ export async function POST(request: NextRequest) {
         id,
         organizationId: currentUser.organizationId,
       },
-      select: { id: true },
+      select: { id: true, notes: true, homeCustomerName: true },
     })
 
     if (!checkIn) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+
+    // Publishing makes the description public on ProjectCheckin, the
+    // customer's WordPress site, the widget and Google. Customer names stay
+    // in the dashboard only.
+    if (isPublic && findHomeownerName(checkIn.notes, checkIn.homeCustomerName)) {
+      return NextResponse.json({ error: HOMEOWNER_NAME_ERROR }, { status: 400 })
     }
 
     const updated = await prisma.checkIn.update({

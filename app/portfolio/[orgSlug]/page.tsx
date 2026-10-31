@@ -1,7 +1,9 @@
 import { notFound } from 'next/navigation'
+import { jobHeading, jobPath as buildJobPath } from '@/lib/jobUrls'
+import { photoAlt } from '@/lib/photoAlt'
 import { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
-import { slugify } from '@/lib/slugify'
+import { parseStoredAddress } from '@/lib/gbpBusinessInfo'
 import PortfolioClient from './PortfolioClient'
 
 interface PortfolioPageProps {
@@ -82,7 +84,8 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
 
   const jobs = org.checkIns
   const doorTypes = [...new Set(jobs.map((c) => c.doorType).filter((v): v is string => Boolean(v)))]
-  const cities = [...new Set(jobs.map((c) => c.city).filter((v): v is string => Boolean(v)))]
+  // Trimmed before de-duplicating: "Huntsville " and "Huntsville" are one city.
+  const cities = [...new Set(jobs.map((c) => c.city?.trim()).filter((v): v is string => Boolean(v)))]
 
   const normalizedWebsite =
     org.website && org.website.startsWith('http')
@@ -134,10 +137,7 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
     const photos = job.photoUrls
       ? job.photoUrls.split(',').map((u) => u.trim()).filter(Boolean)
       : []
-    const citySlug = slugify(job.city || '')
-    const stateSlug = slugify(job.state || '')
-    const doorTypeSlug = slugify(job.doorType || 'job')
-    const jobPath = `/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${doorTypeSlug}-${orgSlug}-${job.id}`
+    const jobPath = buildJobPath(job, orgSlug)
 
     return {
       id: job.id,
@@ -146,6 +146,11 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
       state: job.state || '',
       photos,
       thumbnail: coverOf(photos, job.featuredPhotoUrl),
+      thumbnailAlt: (() => {
+        const cover = coverOf(photos, job.featuredPhotoUrl)
+        return cover ? photoAlt(job, cover, Math.max(0, photos.indexOf(cover)), photos.length) : ''
+      })(),
+      title: jobHeading(job),
       jobPath,
       notes: job.notes || null,
       timestamp: job.timestamp ? job.timestamp.toISOString() : null,
@@ -162,11 +167,26 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
     })),
   ]
 
+  // Same @id as the business node on every job page, so all pages describe
+  // one business. Its address is the storefront address from the Google
+  // Business Profile, or none for a service-area business that hides it.
+  const storefront = parseStoredAddress(org.gbpBusinessAddress)
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
+    '@id': `${baseUrl}/portfolio/${orgSlug}#business`,
     name: org.name,
     ...(org.phone && { telephone: org.phone }),
+    ...(storefront && {
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: storefront.addressLines.join(', '),
+        ...(storefront.locality && { addressLocality: storefront.locality }),
+        ...(storefront.administrativeArea && { addressRegion: storefront.administrativeArea }),
+        ...(storefront.postalCode && { postalCode: storefront.postalCode }),
+        ...(storefront.regionCode && { addressCountry: storefront.regionCode }),
+      },
+    }),
     ...(normalizedWebsite && { url: normalizedWebsite }),
     ...(cities.length > 0 && {
       areaServed: cities.map((city) => ({

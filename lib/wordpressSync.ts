@@ -15,7 +15,16 @@ import {
   uploadMedia,
   getPageContent,
   updatePageContent,
+  testConnection,
+  findPostBySlug,
+  updateMediaAlt,
 } from '@/lib/wordpressApi'
+import { WP_SYNC_CLAIM_STALE_MS, wpConnectionActive, wpErrorCodeForKind } from '@/lib/wpStatus'
+import { sendWordPressReconnectEmail } from '@/lib/wordpressEmails'
+import { parseStoredAddress } from '@/lib/gbpBusinessInfo'
+import { publicReviewForJob, type PublicReview } from '@/lib/googleReviews'
+import { jobHeading, slugMatchesBase, streetName, wpSlugBase } from '@/lib/jobUrls'
+import { photoAlt } from '@/lib/photoAlt'
 
 // Orchestration for WordPress native publishing (Phase 3, Website Integration
 // for Local SEO). Decides WHAT syncs and WHEN; lib/wordpressApi.ts does the
@@ -23,7 +32,9 @@ import {
 //
 // Sync status values on CheckIn.wpSyncStatus:
 //   'synced'   — live on the customer's WordPress site right now
-//   'failed'   — last sync attempt failed, needs attention
+//   'failed'   — last sync attempt failed, needs attention (shown on the Job
+//                Dashboard with a Post to WordPress button)
+//   'syncing'  — in-flight claim held by one sync (see claimJobForSync)
 //   'revoked'  — was live under an active Titan subscription, pulled down when
 //                they cancelled/downgraded. PERMANENT marker: these are the
 //                jobs restored automatically on any future Titan resubscribe,
@@ -119,6 +130,10 @@ type OrgContext = {
     email: string | null
     planTier: string | null
     wpCreateNewPosts: boolean
+    wpSiteUrl: string | null
+    wpConnectionStatus: string | null
+    wpConnectedAt: Date | null
+    gbpBusinessAddress: unknown
   }
   creds: WpCredentials
 }
@@ -145,10 +160,12 @@ async function getOrgContext(orgId: string): Promise<OrgContext | null> {
       wpUsername: true,
       wpApplicationPassword: true,
       wpConnectionStatus: true,
+      wpConnectedAt: true,
+      gbpBusinessAddress: true,
     },
   })
   if (!org) return null
-  if (org.wpConnectionStatus !== 'connected') return null
+  if (!wpConnectionActive(org.wpConnectionStatus)) return null
   if (!tierHasFeature(org.planTier, 'website_integration')) return null
   if (!org.wpSiteUrl || !org.wpUsername || !org.wpApplicationPassword) return null
 
@@ -164,6 +181,9 @@ async function getOrgContext(orgId: string): Promise<OrgContext | null> {
 type JobRecord = {
   id: string
   doorType: string | null
+  street: string | null
+  wpSlug: string | null
+  photoAltText: unknown
   city: string | null
   state: string | null
   seoTitle: string | null
@@ -177,6 +197,9 @@ type JobRecord = {
   wpPostId: number | null
   wpPostUrl: string | null
   wpMedia: string | null
+  zip: string | null
+  latitude: number | null
+  longitude: number | null
 }
 
 /**
@@ -190,6 +213,8 @@ interface SyncedMedia {
   origin: string
   url: string
   role: 'before' | 'after' | 'gallery'
+  /** The alt text last written to the Media Library for this photo. */
+  alt?: string
 }
 
 function parseMedia(raw: string | null): SyncedMedia[] {
@@ -205,6 +230,9 @@ function parseMedia(raw: string | null): SyncedMedia[] {
 const JOB_SELECT = {
   id: true,
   doorType: true,
+  street: true,
+  wpSlug: true,
+  photoAltText: true,
   city: true,
   state: true,
   seoTitle: true,
@@ -218,12 +246,14 @@ const JOB_SELECT = {
   wpPostId: true,
   wpPostUrl: true,
   wpMedia: true,
+  zip: true,
+  latitude: true,
+  longitude: true,
 } as const
 
+/** "Exterior Barn Doors on Broadway in Nashville, TN": the post title and heading, without the business name. */
 function jobTitle(job: JobRecord): string {
-  const type = (job.doorType || 'Completed Job').trim()
-  const place = [job.city?.trim(), job.state?.trim()].filter(Boolean).join(', ')
-  return place ? `${type} in ${place}` : type
+  return jobHeading(job)
 }
 
 function jobDescription(job: JobRecord): string {
@@ -237,14 +267,23 @@ function jobDescription(job: JobRecord): string {
  */
 function buildJsonLd(job: JobRecord, org: OrgContext['org'], siteUrl: string): string {
   // Stable business identity across every job post on their site, so the posts
-  // all reference one entity instead of each declaring its own.
+  // all reference one entity instead of each declaring its own. The business's
+  // own address comes from its Google Business Profile (none when it hides its
+  // address as a service-area business); the job site's city, zip and exact
+  // coordinates describe where this service was performed, never the business.
   const businessId = `${org.website || siteUrl}#business`
+  const storefront = parseStoredAddress(org.gbpBusinessAddress)
+  const city = job.city?.trim()
+  const state = job.state?.trim()
+  const zip = job.zip?.trim()
+  const hasCoords = typeof job.latitude === 'number' && typeof job.longitude === 'number'
+
   const graph: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'Service',
     name: jobTitle(job),
     ...(jobDescription(job) ? { description: jobDescription(job) } : {}),
-    ...(job.timestamp ? { datePublished: job.timestamp.toISOString() } : {}),
+    ...(job.doorType ? { serviceType: job.doorType.trim() } : {}),
     provider: {
       '@type': 'LocalBusiness',
       '@id': businessId,
@@ -252,16 +291,36 @@ function buildJsonLd(job: JobRecord, org: OrgContext['org'], siteUrl: string): s
       ...(org.website ? { url: org.website } : {}),
       ...(org.phone ? { telephone: org.phone } : {}),
       ...(org.email ? { email: org.email } : {}),
+      ...(storefront
+        ? {
+            address: {
+              '@type': 'PostalAddress',
+              streetAddress: storefront.addressLines.join(', '),
+              ...(storefront.locality ? { addressLocality: storefront.locality } : {}),
+              ...(storefront.administrativeArea ? { addressRegion: storefront.administrativeArea } : {}),
+              ...(storefront.postalCode ? { postalCode: storefront.postalCode } : {}),
+              ...(storefront.regionCode ? { addressCountry: storefront.regionCode } : {}),
+            },
+          }
+        : {}),
     },
-    ...(job.city
+    ...(city || hasCoords
       ? {
           areaServed: {
             '@type': 'Place',
-            address: {
-              '@type': 'PostalAddress',
-              addressLocality: job.city,
-              ...(job.state ? { addressRegion: job.state } : {}),
-            },
+            ...(city
+              ? {
+                  address: {
+                    '@type': 'PostalAddress',
+                    addressLocality: city,
+                    ...(state ? { addressRegion: state } : {}),
+                    ...(zip ? { postalCode: zip } : {}),
+                  },
+                }
+              : {}),
+            ...(hasCoords
+              ? { geo: { '@type': 'GeoCoordinates', latitude: job.latitude, longitude: job.longitude } }
+              : {}),
           },
         }
       : {}),
@@ -275,12 +334,61 @@ function photoHtml(p: SyncedMedia, alt: string, style?: string): string {
   return `<img src="${escapeHtml(p.url)}" alt="${escapeHtml(alt)}" class="wp-image-${p.id}" loading="lazy"${styleAttr} />`
 }
 
+/**
+ * The job's linked Google review (master plan decision 11.2). The post's own
+ * HTML carries only the stars, the date and the link to Google; the reviewer's
+ * name, the comment and the owner's reply are loaded by review.v1.js from
+ * ProjectCheckin, so no copy of the review text is stored on the customer's
+ * site (Google allows API content to be kept no more than 30 days). On a site
+ * connected below Administrator, WordPress strips the script and only the
+ * stars, date and link show. No review or star markup.
+ */
+function reviewHtml(jobId: string, review: PublicReview, businessName: string): string {
+  const app = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://projectcheckin.com').replace(/\/$/, '')
+  const stars = review.starRating ?? 0
+  const starLine =
+    `<span style="color:#F59E0B;letter-spacing:2px" aria-label="${stars} out of 5 stars">` +
+    '★'.repeat(stars) +
+    `</span><span style="color:#D6D3D1;letter-spacing:2px" aria-hidden="true">${'★'.repeat(5 - stars)}</span>`
+  const date = review.postedAt
+    ? new Date(review.postedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+    : null
+  const link = review.reviewsListUrl
+    ? `<p><a href="${escapeHtml(review.reviewsListUrl)}" target="_blank" rel="noopener">Read this review on Google →</a></p>`
+    : ''
+  return (
+    `<h2>Customer Review</h2>` +
+    `<div data-pck-review="${escapeHtml(jobId)}" data-pck-business="${escapeHtml(businessName)}" style="border:1px solid #e7e5e4;border-radius:8px;padding:16px;margin:0 0 16px">` +
+    `<p style="margin:0">${starLine}</p>` +
+    (date ? `<p style="margin:4px 0 0;font-size:0.9em;color:#78716c">Posted on Google on ${escapeHtml(date)}</p>` : '') +
+    `<div data-pck-review-body></div>` +
+    link +
+    `</div>` +
+    `<script src="${app}/review.v1.js" defer></script>`
+  )
+}
+
+interface PostExtras {
+  review: PublicReview | null
+  /** Links to the customer's own city archive, service archive and mapped page. */
+  archiveLinks: Array<{ label: string; url: string }>
+}
+
+/** "Broadway, Nashville, TN 37203": the visible location line, without the house number. */
+function locationLine(job: JobRecord): string {
+  return [streetName(job.street), job.city?.trim(), [job.state?.trim(), job.zip?.trim()].filter(Boolean).join(' ')]
+    .filter(Boolean)
+    .join(', ')
+}
+
 function buildContent(
   job: JobRecord,
   org: OrgContext['org'],
   media: SyncedMedia[],
-  siteUrl: string
+  siteUrl: string,
+  extras: PostExtras = { review: null, archiveLinks: [] }
 ): string {
+  const review = extras.review
   const alt = jobTitle(job)
   const before = media.find((m) => m.role === 'before') ?? null
   const after = media.find((m) => m.role === 'after') ?? null
@@ -294,16 +402,28 @@ function buildContent(
   if (before && after) {
     parts.push(
       `<figure class="wp-block-columns" style="display:flex;gap:16px;flex-wrap:wrap">` +
-        `<div style="flex:1 1 240px"><p><strong>Before</strong></p>${photoHtml(before, `${alt} — before`)}</div>` +
-        `<div style="flex:1 1 240px"><p><strong>After</strong></p>${photoHtml(after, `${alt} — after`)}</div>` +
+        `<div style="flex:1 1 240px"><p><strong>Before</strong></p>${photoHtml(before, before.alt || `${alt}, before installation`)}</div>` +
+        `<div style="flex:1 1 240px"><p><strong>After</strong></p>${photoHtml(after, after.alt || `${alt}, after installation`)}</div>` +
         `</figure>`
     )
   }
 
-  for (const p of photos) parts.push(`<figure>${photoHtml(p, alt)}</figure>`)
+  for (const p of photos) parts.push(`<figure>${photoHtml(p, p.alt || alt)}</figure>`)
 
-  const place = [job.city?.trim(), job.state?.trim()].filter(Boolean).join(', ')
+  const place = locationLine(job)
   if (place) parts.push(`<p><strong>Location:</strong> ${escapeHtml(place)}</p>`)
+
+  if (review) parts.push(reviewHtml(job.id, review, org.name))
+
+  // Links to this customer's own archives (and the page that showcases this
+  // kind of job), whatever the theme shows (decision 11.4).
+  if (extras.archiveLinks.length) {
+    parts.push(
+      `<p><strong>More from ${escapeHtml(org.name)}:</strong> ` +
+        extras.archiveLinks.map((l) => `<a href="${escapeHtml(l.url)}">${escapeHtml(l.label)}</a>`).join(' · ') +
+        `</p>`
+    )
+  }
 
   // Attribution: the business is credited as the author in the visible line and
   // in schema. The WP post_author field is just plumbing (see spec §3).
@@ -321,9 +441,7 @@ function buildContent(
 
 /** SEO-descriptive media filename — never a raw UUID. */
 function mediaFilename(job: JobRecord, index: number): string {
-  const base = slugify(
-    [job.doorType || 'job', job.city || '', job.state || ''].filter(Boolean).join(' ')
-  )
+  const base = wpSlugBase(job)
   return `${base || 'job'}-${index + 1}.jpg`
 }
 
@@ -357,15 +475,19 @@ async function getDirectCreds(orgId: string): Promise<WpCredentials | null> {
  * (syncCheckIn) and page injection (renderPageMapping).
  */
 async function reconcileJobMedia(creds: WpCredentials, job: JobRecord): Promise<SyncedMedia[]> {
-  const alt = jobTitle(job)
   const previous = parseMedia(job.wpMedia)
   const wanted: Array<{ origin: string; role: SyncedMedia['role']; alt: string }> = []
+  const all = jobPhotoUrls(job)
 
-  if (job.beforePhotoUrl) wanted.push({ origin: job.beforePhotoUrl, role: 'before', alt: `${alt} — before` })
-  if (job.afterPhotoUrl) wanted.push({ origin: job.afterPhotoUrl, role: 'after', alt: `${alt} — after` })
-  for (const url of jobPhotoUrls(job)) {
+  // Alt text is the owner-approved description when the photo has one, else a
+  // plain description built from the job's details (lib/photoAlt.ts).
+  const altFor = (url: string) => photoAlt(job, url, Math.max(0, all.indexOf(url)), all.length)
+
+  if (job.beforePhotoUrl) wanted.push({ origin: job.beforePhotoUrl, role: 'before', alt: altFor(job.beforePhotoUrl) })
+  if (job.afterPhotoUrl) wanted.push({ origin: job.afterPhotoUrl, role: 'after', alt: altFor(job.afterPhotoUrl) })
+  for (const url of all) {
     if (url === job.beforePhotoUrl || url === job.afterPhotoUrl) continue
-    wanted.push({ origin: url, role: 'gallery', alt })
+    wanted.push({ origin: url, role: 'gallery', alt: altFor(url) })
   }
 
   const media: SyncedMedia[] = []
@@ -373,12 +495,18 @@ async function reconcileJobMedia(creds: WpCredentials, job: JobRecord): Promise<
     const want = wanted[i]
     const existing = previous.find((p) => p.origin === want.origin)
     if (existing) {
-      media.push({ ...existing, role: want.role })
+      // WordPress sets a photo's alt text only when it is uploaded, so a changed
+      // description has to be written to the Media Library separately.
+      let alt = existing.alt
+      if (alt !== want.alt) {
+        alt = (await updateMediaAlt(creds, existing.id, want.alt)) ? want.alt : existing.alt
+      }
+      media.push({ ...existing, role: want.role, alt })
       continue
     }
     const r = await uploadMedia(creds, want.origin, mediaFilename(job, i), want.alt)
     if (r.ok && r.data) {
-      media.push({ id: r.data.id, origin: want.origin, url: r.data.sourceUrl, role: want.role })
+      media.push({ id: r.data.id, origin: want.origin, url: r.data.sourceUrl, role: want.role, alt: want.alt })
     }
   }
 
@@ -425,13 +553,97 @@ export function pickMapping<T extends MappingLike>(
 }
 
 /**
+ * Claim a job for one sync. A conditional UPDATE, so when two callers race
+ * (a publish hook, an edit hook, a Post to WordPress click) Postgres lets
+ * exactly one through and the other exits without creating a second post.
+ * `wpSyncedAt` doubles as the claim time so a claim left behind by a crash or
+ * a timeout can be reclaimed after WP_SYNC_CLAIM_STALE_MS. The explicit null
+ * branch is required: Prisma's `not` filter does not match NULL.
+ */
+async function claimJobForSync(jobId: string): Promise<boolean> {
+  const claimedAt = new Date()
+  const staleBefore = new Date(claimedAt.getTime() - WP_SYNC_CLAIM_STALE_MS)
+  const claim = await prisma.checkIn.updateMany({
+    where: {
+      id: jobId,
+      OR: [
+        { wpSyncStatus: null },
+        { wpSyncStatus: { not: 'syncing' } },
+        { AND: [{ wpSyncStatus: 'syncing' }, { wpSyncedAt: { lt: staleBefore } }] },
+        { AND: [{ wpSyncStatus: 'syncing' }, { wpSyncedAt: null }] },
+      ],
+    },
+    data: { wpSyncStatus: 'syncing', wpSyncedAt: claimedAt },
+  })
+  return claim.count === 1
+}
+
+/**
+ * The saved Application Password was rejected. Confirm with a second request
+ * before acting, because a host security plugin that briefly locks out logins
+ * can return 401 for a correct password. Then flip the connection to
+ * 'needs_reconnect', but only if it has not been reconnected since this sync
+ * began (wpConnectedAt unchanged); otherwise a slow, stale sync could undo the
+ * customer's fresh reconnect. The conditional UPDATE also makes the owner
+ * email fire once per change, however many syncs fail at the same moment.
+ */
+async function handleRejectedLogin(ctx: OrgContext): Promise<boolean> {
+  const recheck = await testConnection(ctx.creds)
+  if (recheck.ok || recheck.kind !== 'auth') return false
+
+  const flipped = await prisma.organization.updateMany({
+    where: {
+      id: ctx.org.id,
+      wpConnectionStatus: { in: ['connected', 'blocked'] },
+      wpConnectedAt: ctx.org.wpConnectedAt,
+    },
+    data: { wpConnectionStatus: 'needs_reconnect' },
+  })
+  if (flipped.count === 1) {
+    await sendWordPressReconnectEmail(ctx.org.id, ctx.org.wpSiteUrl)
+  }
+  return true
+}
+
+/**
+ * A published job that would normally post, for an org on Titan whose
+ * connection is waiting to be reconnected, is marked 'failed' so the Job
+ * Dashboard shows it. Every other reason for having no context (never
+ * connected, not on Titan, disconnected) is not a failure and marks nothing.
+ */
+async function markFailedIfAwaitingReconnect(job: {
+  id: string
+  organizationId: string
+  wpPostId: number | null
+  city: string | null
+  state: string | null
+  doorType: string | null
+}): Promise<void> {
+  const org = await prisma.organization.findUnique({
+    where: { id: job.organizationId },
+    select: { planTier: true, wpConnectionStatus: true, wpCreateNewPosts: true },
+  })
+  if (!org || org.wpConnectionStatus !== 'needs_reconnect') return
+  if (!tierHasFeature(org.planTier, 'website_integration')) return
+
+  const mappings = await prisma.wordPressPageMapping.findMany({
+    where: { organizationId: job.organizationId },
+  })
+  const wouldPost = pickMapping(mappings, job) != null || job.wpPostId != null || org.wpCreateNewPosts
+  if (!wouldPost) return
+
+  await prisma.checkIn.update({ where: { id: job.id }, data: { wpSyncStatus: 'failed', wpErrorCode: 'WP-101' } })
+}
+
+/**
  * Publish (or re-publish) one job to the customer's WordPress site.
  * Safe to call repeatedly — updates in place when a post already exists.
+ * `busy` means another sync of this same job is already running.
  */
 export async function syncCheckIn(
   checkInId: string,
   opts: { skipMappingRender?: boolean } = {}
-): Promise<{ ok: boolean; error?: string; transient?: boolean }> {
+): Promise<{ ok: boolean; error?: string; transient?: boolean; busy?: boolean }> {
   const job = await prisma.checkIn.findUnique({
     where: { id: checkInId },
     select: { ...JOB_SELECT, isPublic: true, organizationId: true },
@@ -440,7 +652,10 @@ export async function syncCheckIn(
   if (!job.isPublic) return { ok: false, error: 'Job is not published.' }
 
   const ctx = await getOrgContext(job.organizationId)
-  if (!ctx) return { ok: false, error: 'No active WordPress connection.' }
+  if (!ctx) {
+    await markFailedIfAwaitingReconnect({ ...job, organizationId: job.organizationId })
+    return { ok: false, error: 'No active WordPress connection.' }
+  }
 
   const { creds, org } = ctx
 
@@ -461,64 +676,136 @@ export async function syncCheckIn(
   const shouldPost = mapping != null || job.wpPostId != null || org.wpCreateNewPosts
   if (!shouldPost) return { ok: true }
 
-  // Reconcile photos against what we've already uploaded (reuse existing,
-  // upload new, drop removed) — shared with page injection.
-  const media = await reconcileJobMedia(creds, job)
-
-  // Featured image: the customer's explicit pick, else the "after" shot,
-  // else the first photo. Matched on origin, not the WordPress URL.
-  const featuredMediaId =
-    media.find((m) => m.origin === job.featuredPhotoUrl)?.id ??
-    media.find((m) => m.role === 'after')?.id ??
-    media[0]?.id ??
-    null
-
-  const title = job.seoTitle?.trim() || jobTitle(job)
-  const description = jobDescription(job)
-  const excerpt = description.slice(0, 155)
-  const slug = slugify(`${job.doorType || 'job'} ${job.city || ''} ${job.state || ''}`) || `job-${job.id.slice(0, 8)}`
-
-  const [categoryId, tagId] = await Promise.all([
-    job.doorType ? ensureCategory(creds, job.doorType.trim()) : Promise.resolve(null),
-    job.city
-      ? ensureTag(creds, [job.city.trim(), job.state?.trim()].filter(Boolean).join(' '))
-      : Promise.resolve(null),
-  ])
-
-  const input: WpPostInput = {
-    title,
-    content: buildContent(job, org, media, creds.siteUrl),
-    excerpt,
-    slug,
-    categoryIds: categoryId ? [categoryId] : [],
-    tagIds: tagId ? [tagId] : [],
-    featuredMediaId,
-    seoTitle: title,
-    seoDescription: excerpt,
+  if (!(await claimJobForSync(job.id))) {
+    return { ok: false, busy: true, error: 'This job is already being posted to WordPress.' }
   }
 
-  const result = job.wpPostId
-    ? await updatePost(creds, job.wpPostId, input)
-    : await createPost(creds, input)
+  try {
+    // Reconcile photos against what we've already uploaded (reuse existing,
+    // upload new, drop removed) — shared with page injection.
+    const media = await reconcileJobMedia(creds, job)
 
-  if (!result.ok || !result.data) {
+    // Featured image: the customer's explicit pick, else the "after" shot,
+    // else the first photo. Matched on origin, not the WordPress URL.
+    const featuredMediaId =
+      media.find((m) => m.origin === job.featuredPhotoUrl)?.id ??
+      media.find((m) => m.role === 'after')?.id ??
+      media[0]?.id ??
+      null
+
+    // The post title and heading leave out the business name: WordPress and SEO
+    // plugins add the site name to the browser title themselves, so only the
+    // Yoast title carries "| Business" (master plan 8.4).
+    const title = jobTitle(job)
+    const description = jobDescription(job)
+    const excerpt = description.slice(0, 155)
+    const cityTagName = job.city ? [job.city.trim(), job.state?.trim()].filter(Boolean).join(' ') : ''
+
+    const [categoryId, tagId, serviceArchive, cityArchive] = await Promise.all([
+      job.doorType ? ensureCategory(creds, job.doorType.trim()) : Promise.resolve(null),
+      cityTagName ? ensureTag(creds, cityTagName) : Promise.resolve(null),
+      job.doorType ? getArchiveLink(creds, 'categories', job.doorType.trim()) : Promise.resolve(null),
+      cityTagName ? getArchiveLink(creds, 'tags', cityTagName) : Promise.resolve(null),
+    ])
+
+    const archiveLinks: PostExtras['archiveLinks'] = []
+    if (cityArchive) archiveLinks.push({ label: `Projects in ${[job.city?.trim(), job.state?.trim()].filter(Boolean).join(', ')}`, url: cityArchive })
+    if (serviceArchive && job.doorType) archiveLinks.push({ label: job.doorType.trim(), url: serviceArchive })
+    if (mapping?.wpPageUrl) {
+      const pageLabel =
+        [mapping.matchService, mapping.matchCity ? [mapping.matchCity, mapping.matchState].filter(Boolean).join(', ') : null]
+          .filter(Boolean)
+          .join(' in ') || 'All our projects'
+      archiveLinks.push({ label: pageLabel, url: mapping.wpPageUrl })
+    }
+
+    // The post address ending {service}-{street}-{city}-{state}. It is saved on
+    // the job so an unpublished-and-republished job gets the same ending back,
+    // and rebuilt when the details in it change (WordPress redirects the old
+    // one). A post that already has the right ending is left alone, so an
+    // ending the customer changed by hand in WordPress is not overwritten.
+    const slugBase = wpSlugBase(job) || `job-${job.id.slice(0, 8)}`
+    const keepSaved = slugMatchesBase(job.wpSlug, slugBase)
+    const chooseSlug = async (): Promise<string> => {
+      const candidates = [keepSaved ? job.wpSlug : null, slugBase, job.zip?.trim() ? `${slugBase}-${job.zip.trim().toLowerCase()}` : null]
+      for (const candidate of candidates) {
+        if (!candidate) continue
+        const owner = await findPostBySlug(creds, candidate)
+        // Free, or already this job's own post, or WordPress could not be asked.
+        if (owner === null || owner === undefined || owner === job.wpPostId) return candidate
+      }
+      // Every candidate is taken: WordPress adds its own number.
+      return slugBase
+    }
+    const slug = job.wpPostId && keepSaved ? undefined : await chooseSlug()
+
+    const input: WpPostInput = {
+      title,
+      content: buildContent(job, org, media, creds.siteUrl, { review: await publicReviewForJob(job.id), archiveLinks }),
+      excerpt,
+      slug,
+      categoryIds: categoryId ? [categoryId] : [],
+      tagIds: tagId ? [tagId] : [],
+      featuredMediaId,
+      seoTitle: `${title} | ${org.name}`,
+      seoDescription: excerpt,
+    }
+
+    let result = job.wpPostId
+      ? await updatePost(creds, job.wpPostId, input)
+      : await createPost(creds, input)
+
+    // The post was deleted by hand in WordPress. Without this, every later
+    // edit of the job would fail forever; create a fresh post instead.
+    if (!result.ok && job.wpPostId && result.kind === 'not_found') {
+      result = await createPost(creds, { ...input, slug: input.slug ?? (await chooseSlug()) })
+    }
+
+    if (!result.ok || !result.data) {
+      // The code is decided only from what WordPress actually answered; a 401
+      // counts as a rejected login only after the second check confirms it.
+      const loginConfirmedRejected = result.kind === 'auth' ? await handleRejectedLogin(ctx) : false
+      await prisma.checkIn.update({
+        where: { id: job.id },
+        data: {
+          wpSyncStatus: 'failed',
+          wpErrorCode: wpErrorCodeForKind(result.kind, { loginConfirmedRejected }),
+        },
+      })
+      if (result.kind === 'forbidden' && org.wpConnectionStatus === 'connected') {
+        await prisma.organization.updateMany({
+          where: { id: org.id, wpConnectionStatus: 'connected' },
+          data: { wpConnectionStatus: 'blocked' },
+        })
+      }
+      return { ok: false, error: result.error, transient: result.transient }
+    }
+
     await prisma.checkIn.update({
       where: { id: job.id },
-      data: { wpSyncStatus: 'failed' },
+      data: {
+        wpPostId: result.data.id,
+        wpPostUrl: result.data.link,
+        ...(result.data.slug ? { wpSlug: result.data.slug } : {}),
+        wpMedia: media.length ? JSON.stringify(media) : null,
+        wpSyncedAt: new Date(),
+        wpSyncStatus: 'synced',
+        wpErrorCode: null,
+      },
     })
-    return { ok: false, error: result.error, transient: result.transient }
-  }
 
-  await prisma.checkIn.update({
-    where: { id: job.id },
-    data: {
-      wpPostId: result.data.id,
-      wpPostUrl: result.data.link,
-      wpMedia: media.length ? JSON.stringify(media) : null,
-      wpSyncedAt: new Date(),
-      wpSyncStatus: 'synced',
-    },
-  })
+    // A refused (403) connection clears itself once a post goes through.
+    if (org.wpConnectionStatus === 'blocked') {
+      await prisma.organization.updateMany({
+        where: { id: org.id, wpConnectionStatus: 'blocked' },
+        data: { wpConnectionStatus: 'connected' },
+      })
+    }
+  } catch (err) {
+    // Never leave the claim behind on an unexpected error.
+    await prisma.checkIn.update({ where: { id: job.id }, data: { wpSyncStatus: 'failed', wpErrorCode: 'WP-104' } })
+    throw err
+  }
 
   // The post now exists; refresh the showcase on the job's most-specific mapped
   // page so its card (linking to this post) appears/updates. Builder pages
@@ -555,8 +842,14 @@ export async function unsyncCheckIn(
     },
   })
   if (!job?.organizationId) return { ok: true }
-  // Nothing was ever synced for this job.
-  if (!job.wpPostId && job.wpSyncStatus !== 'synced' && !job.wpMedia) return { ok: true }
+  // Nothing was ever synced for this job. A 'failed' or 'syncing' mark is
+  // cleared so an unpublished job never shows as "not posted".
+  if (!job.wpPostId && job.wpSyncStatus !== 'synced' && !job.wpMedia) {
+    if (job.wpSyncStatus === 'failed' || job.wpSyncStatus === 'syncing') {
+      await prisma.checkIn.update({ where: { id: job.id }, data: { wpSyncStatus: null, wpErrorCode: null } })
+    }
+    return { ok: true }
+  }
 
   // Deliberately bypasses getOrgContext's Titan gate (see getDirectCreds):
   // revocation has to work at the exact moment a subscription ends.
@@ -578,6 +871,7 @@ export async function unsyncCheckIn(
       wpMedia: null,
       wpSyncedAt: null,
       wpSyncStatus: reason === 'revoked' ? 'revoked' : null,
+      wpErrorCode: null,
     },
   })
 
@@ -641,6 +935,14 @@ export async function revokeOrgWordPress(orgId: string): Promise<{ removed: numb
     await clearPageMapping(m.id, 'revoked')
     await sleep(BULK_DELAY_MS)
   }
+
+  // 3) Jobs that never reached the site keep no "not posted" mark once the
+  //    connection or the plan is gone, so the Job Dashboard shows nothing for
+  //    a feature the customer no longer has.
+  await prisma.checkIn.updateMany({
+    where: { organizationId: orgId, wpPostId: null, wpSyncStatus: { in: ['failed', 'syncing'] } },
+    data: { wpSyncStatus: null, wpErrorCode: null },
+  })
   return { removed }
 }
 
@@ -737,7 +1039,7 @@ export async function hasActiveWordPressConnection(orgId: string): Promise<boole
     where: { id: orgId },
     select: { wpConnectionStatus: true },
   })
-  return org?.wpConnectionStatus === 'connected'
+  return wpConnectionActive(org?.wpConnectionStatus)
 }
 
 // ── Phase 3b: existing-page injection ────────────────────────────────────────
@@ -773,7 +1075,7 @@ const SHOWCASE_STYLE = {
 function renderJobCard(job: JobRecord, media: SyncedMedia[]): string {
   const alt = jobTitle(job)
   const lead = media.find((m) => m.role === 'after') ?? media[0] ?? null
-  const place = [job.city?.trim(), job.state?.trim()].filter(Boolean).join(', ')
+  const place = locationLine(job)
   const desc = jobDescription(job)
   const summary = desc.length > 180 ? `${desc.slice(0, 177).trimEnd()}…` : desc
   const postUrl = job.wpPostUrl || ''
@@ -783,8 +1085,8 @@ function renderJobCard(job: JobRecord, media: SyncedMedia[]): string {
   if (lead) {
     parts.push(
       postUrl
-        ? `<a href="${escapeHtml(postUrl)}">${photoHtml(lead, alt, s.photo)}</a>`
-        : photoHtml(lead, alt, s.photo)
+        ? `<a href="${escapeHtml(postUrl)}">${photoHtml(lead, lead.alt || alt, s.photo)}</a>`
+        : photoHtml(lead, lead.alt || alt, s.photo)
     )
   }
   parts.push(
@@ -869,14 +1171,26 @@ export async function renderPageMapping(mappingId: string): Promise<{ rendered: 
   }
 
   const page = await getPageContent(creds, mapping.wpPageId, pageType)
-  if (!page.ok || !page.data) return { rendered: 0 }
+  if (!page.ok || !page.data) {
+    await prisma.wordPressPageMapping.update({
+      where: { id: mapping.id },
+      data: { errorCode: wpErrorCodeForKind(page.kind) },
+    })
+    return { rendered: 0 }
+  }
   const spliced = spliceBlock(page.data.raw, block)
   const write = await updatePageContent(creds, mapping.wpPageId, pageType, spliced.content)
-  if (!write.ok) return { rendered: 0 }
+  if (!write.ok) {
+    await prisma.wordPressPageMapping.update({
+      where: { id: mapping.id },
+      data: { errorCode: wpErrorCodeForKind(write.kind) },
+    })
+    return { rendered: 0 }
+  }
 
   await prisma.wordPressPageMapping.update({
     where: { id: mapping.id },
-    data: { markerMode: spliced.markerMode, lastRenderedAt: new Date() },
+    data: { markerMode: spliced.markerMode, lastRenderedAt: new Date(), errorCode: null },
   })
   return { rendered: jobs.length }
 }

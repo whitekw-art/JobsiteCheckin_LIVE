@@ -16,15 +16,34 @@ export interface WpCredentials {
   password: string
 }
 
+/**
+ * Why a request failed, so callers can react to the cause rather than parse
+ * the message. `auth` is the only kind that means the saved Application
+ * Password stopped working; `forbidden` (403) is usually a security plugin, a
+ * host firewall, or a user who lost publishing rights, never proof of a bad
+ * password.
+ */
+export type WpErrorKind =
+  | 'auth'
+  | 'forbidden'
+  | 'rate_limited'
+  | 'not_found'
+  | 'server'
+  | 'network'
+  | 'unreachable'
+  | 'refused'
+
 export interface WpResult<T> {
   ok: boolean
   data?: T
   /** Customer-facing message. Kept to one plain sentence per the design spec. */
   error?: string
-  /** True when the failure looks transient (timeout, 5xx) and is worth retrying. */
+  /** True when the failure looks transient (timeout, 429, 5xx) and is worth retrying. */
   transient?: boolean
   /** HTTP status, when a response was actually received. */
   status?: number
+  /** Cause of the failure. Absent on success. */
+  kind?: WpErrorKind
 }
 
 /** Normalize a customer-entered site URL to a clean https base with no trailing slash. */
@@ -54,7 +73,7 @@ async function wpFetch(
 ): Promise<WpResult<Response>> {
   const target = `${creds.siteUrl}/wp-json${path}`
   const check = await validateSsrfUrl(target)
-  if (!check.ok) return { ok: false, error: 'That website address could not be reached.' }
+  if (!check.ok) return { ok: false, error: 'That website address could not be reached.', kind: 'unreachable' }
 
   try {
     const res = await fetch(target, {
@@ -69,24 +88,39 @@ async function wpFetch(
     })
 
     if (res.status >= 300 && res.status < 400) {
-      return { ok: false, status: res.status, error: 'That website address could not be reached.' }
+      return { ok: false, status: res.status, error: 'That website address could not be reached.', kind: 'unreachable' }
     }
-    if (res.status === 401 || res.status === 403) {
-      return { ok: false, status: res.status, error: 'WordPress rejected the username or Application Password.' }
+    if (res.status === 401) {
+      return { ok: false, status: 401, error: 'WordPress rejected the username or Application Password.', kind: 'auth' }
+    }
+    if (res.status === 403) {
+      // Not folded into 401: a 403 comes from a security plugin, a host
+      // firewall, or a user without publishing rights far more often than
+      // from a bad password, so it must never trigger "reconnect needed".
+      return { ok: false, status: 403, error: 'Your WordPress site refused the request.', kind: 'forbidden' }
     }
     if (res.status === 404) {
-      return { ok: false, status: 404, error: "We couldn't find the WordPress connection on that site." }
+      return { ok: false, status: 404, error: "We couldn't find the WordPress connection on that site.", kind: 'not_found' }
+    }
+    if (res.status === 429) {
+      return {
+        ok: false,
+        status: 429,
+        error: 'Your website is busy right now. Try again in a few minutes.',
+        transient: true,
+        kind: 'rate_limited',
+      }
     }
     if (res.status >= 500) {
-      return { ok: false, status: res.status, error: 'That website is not responding right now.', transient: true }
+      return { ok: false, status: res.status, error: 'That website is not responding right now.', transient: true, kind: 'server' }
     }
     if (!res.ok) {
-      return { ok: false, status: res.status, error: 'WordPress refused the request.' }
+      return { ok: false, status: res.status, error: 'WordPress refused the request.', kind: 'refused' }
     }
     return { ok: true, data: res, status: res.status }
   } catch {
     // AbortSignal.timeout and network failures both land here.
-    return { ok: false, error: 'That website is not responding right now.', transient: true }
+    return { ok: false, error: 'That website is not responding right now.', transient: true, kind: 'network' }
   }
 }
 
@@ -97,12 +131,12 @@ async function wpJson<T>(
 ): Promise<WpResult<T>> {
   const res = await wpFetch(creds, path, init)
   if (!res.ok || !res.data) {
-    return { ok: false, error: res.error, transient: res.transient, status: res.status }
+    return { ok: false, error: res.error, transient: res.transient, status: res.status, kind: res.kind }
   }
   try {
     return { ok: true, data: (await res.data.json()) as T, status: res.status }
   } catch {
-    return { ok: false, error: 'WordPress returned an unexpected response.', status: res.status }
+    return { ok: false, error: 'WordPress returned an unexpected response.', status: res.status, kind: 'refused' }
   }
 }
 
@@ -121,21 +155,31 @@ function jsonInit(method: string, body: unknown): RequestInit {
  */
 export async function testConnection(
   creds: WpCredentials
-): Promise<WpResult<{ userId: number; canPublish: boolean }>> {
-  const me = await wpJson<{ id: number; capabilities?: Record<string, boolean> }>(
+): Promise<WpResult<{ userId: number; canPublish: boolean; canEmbedCode: boolean; role: string | null }>> {
+  const me = await wpJson<{ id: number; capabilities?: Record<string, boolean>; roles?: string[] }>(
     creds,
     '/wp/v2/users/me?context=edit'
   )
-  if (!me.ok || !me.data) return { ok: false, error: me.error, transient: me.transient }
+  if (!me.ok || !me.data) {
+    return { ok: false, error: me.error, transient: me.transient, status: me.status, kind: me.kind }
+  }
 
   const canPublish = me.data.capabilities?.publish_posts === true
   if (!canPublish) {
     return {
       ok: false,
       error: 'That WordPress account does not have permission to publish posts.',
+      kind: 'forbidden',
     }
   }
-  return { ok: true, data: { userId: me.data.id, canPublish } }
+  // Without unfiltered_html (only Administrators, and Editors on single-site
+  // installs, have it), WordPress strips <script> and <iframe> from posts this
+  // account writes: the job's structured data and any embedded map vanish.
+  const canEmbedCode = me.data.capabilities?.unfiltered_html === true
+  // The account's role as WordPress reports it (for example "author"), used
+  // only to name it in the WP-105 warning.
+  const role = Array.isArray(me.data.roles) && me.data.roles.length > 0 ? me.data.roles[0] : null
+  return { ok: true, data: { userId: me.data.id, canPublish, canEmbedCode, role } }
 }
 
 /** Find a category/tag by exact name, creating it if it doesn't exist yet. */
@@ -239,7 +283,7 @@ export async function uploadMedia(
     body: Buffer.from(bytes),
   })
   if (!created.ok || !created.data) {
-    return { ok: false, error: created.error, transient: created.transient }
+    return { ok: false, error: created.error, transient: created.transient, status: created.status, kind: created.kind }
   }
 
   // Alt text is a separate write — it's real on-page SEO content, but a
@@ -258,7 +302,8 @@ export interface WpPostInput {
   title: string
   content: string
   excerpt: string
-  slug: string
+  /** Address ending. On an update, omit it to leave the post's current ending alone. */
+  slug?: string
   categoryIds: number[]
   tagIds: number[]
   featuredMediaId?: number | null
@@ -270,48 +315,75 @@ export interface WpPostInput {
 export async function createPost(
   creds: WpCredentials,
   input: WpPostInput
-): Promise<WpResult<{ id: number; link: string }>> {
-  const res = await wpJson<{ id: number; link: string }>(
+): Promise<WpResult<{ id: number; link: string; slug: string }>> {
+  const res = await wpJson<{ id: number; link: string; slug?: string }>(
     creds,
     '/wp/v2/posts',
     jsonInit('POST', {
       title: input.title,
       content: input.content,
       excerpt: input.excerpt,
-      slug: input.slug,
+      ...(input.slug ? { slug: input.slug } : {}),
       status: 'publish',
       categories: input.categoryIds,
       tags: input.tagIds,
       ...(input.featuredMediaId ? { featured_media: input.featuredMediaId } : {}),
     })
   )
-  if (!res.ok || !res.data) return { ok: false, error: res.error, transient: res.transient }
+  if (!res.ok || !res.data) {
+    return { ok: false, error: res.error, transient: res.transient, status: res.status, kind: res.kind }
+  }
 
   await setSeoMeta(creds, res.data.id, input.seoTitle, input.seoDescription)
-  return { ok: true, data: { id: res.data.id, link: res.data.link } }
+  return { ok: true, data: { id: res.data.id, link: res.data.link, slug: res.data.slug ?? input.slug ?? '' } }
 }
 
 export async function updatePost(
   creds: WpCredentials,
   postId: number,
   input: WpPostInput
-): Promise<WpResult<{ id: number; link: string }>> {
-  const res = await wpJson<{ id: number; link: string }>(
+): Promise<WpResult<{ id: number; link: string; slug: string }>> {
+  const res = await wpJson<{ id: number; link: string; slug?: string }>(
     creds,
     `/wp/v2/posts/${postId}`,
     jsonInit('POST', {
       title: input.title,
       content: input.content,
       excerpt: input.excerpt,
+      // Changing the ending makes WordPress remember the old one and redirect
+      // it (core behavior), so a job edited to a new street keeps its old links.
+      ...(input.slug ? { slug: input.slug } : {}),
       categories: input.categoryIds,
       tags: input.tagIds,
       ...(input.featuredMediaId ? { featured_media: input.featuredMediaId } : {}),
     })
   )
-  if (!res.ok || !res.data) return { ok: false, error: res.error, transient: res.transient }
+  if (!res.ok || !res.data) {
+    return { ok: false, error: res.error, transient: res.transient, status: res.status, kind: res.kind }
+  }
 
   await setSeoMeta(creds, postId, input.seoTitle, input.seoDescription)
-  return { ok: true, data: { id: res.data.id, link: res.data.link } }
+  return { ok: true, data: { id: res.data.id, link: res.data.link, slug: res.data.slug ?? input.slug ?? '' } }
+}
+
+/**
+ * The id of a post already using this address ending, null when it is free, or
+ * undefined when WordPress could not be asked (the caller then lets WordPress
+ * number the ending itself). Trashed posts are not counted.
+ */
+export async function findPostBySlug(creds: WpCredentials, slug: string): Promise<number | null | undefined> {
+  const res = await wpJson<Array<{ id: number }>>(
+    creds,
+    `/wp/v2/posts?slug=${encodeURIComponent(slug)}&status=publish,draft,pending,private,future&_fields=id`
+  )
+  if (!res.ok || !res.data) return undefined
+  return res.data.length > 0 ? res.data[0].id : null
+}
+
+/** Change the alt text of a photo already in the Media Library. Best-effort. */
+export async function updateMediaAlt(creds: WpCredentials, mediaId: number, altText: string): Promise<boolean> {
+  const res = await wpJson(creds, `/wp/v2/media/${mediaId}`, jsonInit('POST', { alt_text: altText }))
+  return res.ok
 }
 
 /**
@@ -445,7 +517,7 @@ export async function getPageContent(
     creds,
     `/wp/v2/${rest}/${pageId}?context=edit&_fields=content`
   )
-  if (!res.ok || !res.data) return { ok: false, error: res.error, transient: res.transient }
+  if (!res.ok || !res.data) return { ok: false, error: res.error, transient: res.transient, status: res.status, kind: res.kind }
   return { ok: true, data: { raw: res.data.content?.raw ?? '' } }
 }
 
@@ -466,6 +538,6 @@ export async function updatePageContent(
     `/wp/v2/${rest}/${pageId}`,
     jsonInit('POST', { content: fullContent })
   )
-  if (!res.ok || !res.data) return { ok: false, error: res.error, transient: res.transient }
+  if (!res.ok || !res.data) return { ok: false, error: res.error, transient: res.transient, status: res.status, kind: res.kind }
   return { ok: true }
 }

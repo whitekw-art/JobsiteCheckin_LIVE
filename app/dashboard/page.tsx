@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { geocodeJobAddress } from '@/lib/geocode'
-import { slugify } from '@/lib/slugify'
+import { jobUrl } from '@/lib/jobUrls'
 import OnboardingModal from '@/components/OnboardingModal'
 import { savedWalkthroughChapter } from '@/lib/onboardingProgress'
 import { tierHasFeature } from '@/lib/planVersions'
@@ -13,6 +13,9 @@ import '@/styles/dashboard.css'
 import CoachMarks, { isCoachTourActive } from '@/components/CoachMarks'
 import { REVEAL_SUPPORT_NAV } from '@/lib/navReveal'
 import { DEMO_JOBS, isDemoJob } from '@/lib/demoJobs'
+import { wpErrorGuideHref } from '@/lib/wpStatus'
+import { PhotoDescriptionEditor, PhotoDescriptionsSection, descriptionsToSave, descriptionsValid, savedDescriptions } from '@/components/PhotoDescriptions'
+import { ReviewBlock, ReviewPill, UnmatchedReviewsPanel, useReviewTracking, type ReviewJob } from '@/components/ReviewTracking'
 
 interface CheckIn {
   id: string
@@ -30,12 +33,20 @@ interface CheckIn {
   isPublic: boolean
   photoUrls?: string[]
   featuredPhotoUrl?: string | null
+  beforePhotoUrl?: string | null
+  afterPhotoUrl?: string | null
+  photoAltText?: unknown
   homeCustomerName?: string | null
   homeCustomerPhone?: string | null
   homeCustomerEmail?: string | null
   gbpPostUrl?: string | null
   gbpPostedAt?: string | null
   gbpPostStatus?: string | null
+  /** Set only for a Titan org with a stored WordPress connection. */
+  wpState?: 'failed' | 'syncing' | null
+  hasWpPost?: boolean
+  /** Exact error code (WP-101 to WP-106) behind a failed job. */
+  wpErrorCode?: string | null
 }
 
 interface EditAddr {
@@ -168,6 +179,94 @@ function PublishModal({
       </div>
     </div>
   )
+}
+
+// Confirmation window for actions on a published job (Edit warning and
+// Unpublish). Same layout as the Publish window; Escape and a click outside
+// act as Cancel.
+function JobConfirmModal({
+  title,
+  jobLabel,
+  lines,
+  note,
+  confirmLabel,
+  busyLabel,
+  danger,
+  busy,
+  error,
+  onConfirm,
+  onClose,
+}: {
+  title: string
+  jobLabel: string
+  lines: string[]
+  note?: string
+  confirmLabel: string
+  busyLabel?: string
+  danger?: boolean
+  busy?: boolean
+  error?: string | null
+  onConfirm: () => void
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !busy) onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [busy, onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={() => { if (!busy) onClose() }}
+    >
+      <div
+        className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        {jobLabel && <p className="text-sm text-gray-500 mt-1">{jobLabel}</p>}
+        {error && (
+          <div className="mt-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
+        <ul className="mt-4 space-y-2">
+          {lines.map((line) => (
+            <li key={line} className="flex items-start gap-2 text-sm text-gray-700">
+              <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${danger ? 'bg-red-500' : 'bg-sky-500'}`} />
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+        {note && <p className="mt-3 text-sm text-gray-600">{note}</p>}
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="px-4 py-2 rounded text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 min-h-[44px]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className={`px-4 py-2 rounded text-sm font-medium text-white disabled:opacity-50 min-h-[44px] ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-sky-600 hover:bg-sky-700'}`}
+          >
+            {busy && busyLabel ? busyLabel : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function jobLabelOf(checkIn: CheckIn): string {
+  return [checkIn.doorType, [checkIn.city, checkIn.state].filter(Boolean).join(', ')]
+    .filter(Boolean)
+    .join(' \u2022 ')
 }
 
 // ── SVG icons ────────────────────────────────────────────────────────────────
@@ -607,6 +706,15 @@ export default function Dashboard() {
   // who has not connected yet still sees the old copy-and-paste window rather
   // than a button that would fail.
   const [gbpLive, setGbpLive] = useState(false)
+
+  // ── WordPress repost (Titan, failed connection only) ──
+  // `wpOrg` is null unless this org is on Titan AND has a stored WordPress
+  // connection; the data route enforces that, so nothing below can show for
+  // any other plan. Only one job posts at a time: while `wpPostingId` is set,
+  // every other Post to WordPress button is locked.
+  const [wpOrg, setWpOrg] = useState<{ status: string | null } | null>(null)
+  const [wpPostingId, setWpPostingId] = useState<string | null>(null)
+  const [wpPostError, setWpPostError] = useState<Record<string, string>>({})
   const [gbpPostingId, setGbpPostingId] = useState<string | null>(null)
   const [gbpRetractingId, setGbpRetractingId] = useState<string | null>(null)
   const [gbpPostError, setGbpPostError] = useState<Record<string, string>>({})
@@ -632,6 +740,13 @@ export default function Dashboard() {
   const [aiEditingId,     setAiEditingId]     = useState<string | null>(null)
   const [aiSavingId,      setAiSavingId]      = useState<string | null>(null)
   const [aiGenerateError, setAiGenerateError] = useState<Record<string, string>>({})
+  // Photo descriptions (alt text): the working copy per job, the photos the AI
+  // was asked about but returned nothing usable for, and the edit-without-AI state.
+  const [altEdits, setAltEdits] = useState<Record<string, Record<string, string>>>({})
+  const [altNoResult, setAltNoResult] = useState<Record<string, string[]>>({})
+  const [altEditingId, setAltEditingId] = useState<string | null>(null)
+  const [altSavingId, setAltSavingId] = useState<string | null>(null)
+  const [altError, setAltError] = useState<Record<string, string>>({})
 
   // Customer editing (keyed by checkIn.id)
   const [editCustomers, setEditCustomers] = useState<Record<string, EditCustomer>>({})
@@ -656,6 +771,10 @@ export default function Dashboard() {
   const [reviewOverrideEmail, setReviewOverrideEmail] = useState('')
   const [reviewCopied, setReviewCopied] = useState(false)
   const [reviewTextSent, setReviewTextSent] = useState(false)
+  // True while the job's review tracking link (/r/{code}) is being fetched.
+  const [reviewLinkPending, setReviewLinkPending] = useState(false)
+  // Set once review tracking is loaded, so a recorded send refreshes the job's Google Review block.
+  const reviewTrackingReloadRef = useRef<(() => void) | null>(null)
   const [reviewEmailSent, setReviewEmailSent] = useState(false)
 
   // Photo delete
@@ -671,6 +790,13 @@ export default function Dashboard() {
     warnings: string[]
     blockingError?: string
   } | null>(null)
+
+  // Confirmation windows on a published job (Keith, 2026-10-11): Edit warns
+  // what changes go live, Unpublish explains what is removed. Both appear
+  // every time.
+  const [editWarnJob, setEditWarnJob] = useState<CheckIn | null>(null)
+  const [unpublishJob, setUnpublishJob] = useState<CheckIn | null>(null)
+  const [unpublishError, setUnpublishError] = useState<string | null>(null)
 
   // Download
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
@@ -781,6 +907,47 @@ export default function Dashboard() {
     }
   }
 
+  // Reposts one job that did not reach the customer's WordPress site.
+  const handleWpPost = async (checkInId: string) => {
+    if (isDemoJob(checkInId) || wpPostingId) return
+    setWpPostingId(checkInId)
+    setWpPostError((prev) => {
+      const next = { ...prev }
+      delete next[checkInId]
+      return next
+    })
+    try {
+      const res = await fetch('/api/checkins/wp-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkInId }),
+      })
+      const data = await res.json().catch(() => null)
+      if (res.ok) {
+        setCheckIns((prev) => prev.map((c) => (c.id === checkInId ? { ...c, wpState: null, hasWpPost: true } : c)))
+        return
+      }
+      if (data?.needsReconnect) {
+        setWpOrg({ status: 'needs_reconnect' })
+      } else if (data?.wpConnectionStatus) {
+        setWpOrg({ status: data.wpConnectionStatus })
+      }
+      if (!data?.needsReconnect && data?.wpConnectionStatus !== 'needs_reconnect') {
+        setWpPostError((prev) => ({
+          ...prev,
+          [checkInId]: data?.error || 'This job did not post to WordPress. Try again in a few minutes.',
+        }))
+      }
+    } catch {
+      setWpPostError((prev) => ({
+        ...prev,
+        [checkInId]: 'This job did not post to WordPress. Try again in a few minutes.',
+      }))
+    } finally {
+      setWpPostingId(null)
+    }
+  }
+
   // Removes the post from Google and resets the job's local state back to
   // postable. Not tier-gated — a downgraded customer still owns whatever they
   // already posted and must be able to take it down.
@@ -844,6 +1011,7 @@ export default function Dashboard() {
         const data = await res.json()
         const loaded: CheckIn[] = data.checkIns || []
         setCheckIns(loaded)
+        setWpOrg(data.wordpress ?? null)
         // Pre-populate editCustomers so review modal has data without requiring card open
         setEditCustomers(
           Object.fromEntries(
@@ -1183,6 +1351,23 @@ export default function Dashboard() {
         setAiGenerateError((prev) => ({ ...prev, [checkIn.id]: data.error ?? 'Generation failed. Try again.' }))
         return
       }
+      // The AI's photo descriptions replace the ones in the boxes for the photos it
+      // described; photos it was not asked about keep what is saved. Nothing is
+      // saved until the owner clicks Save.
+      const described: string[] = Array.isArray(data.describedPhotos) ? data.describedPhotos : []
+      const nextAlts = { ...savedDescriptions(checkIn) }
+      const noResult: string[] = []
+      for (const url of described) {
+        const text = data.photoAlts?.[url]
+        if (text) nextAlts[url] = text
+        else {
+          delete nextAlts[url]
+          noResult.push(url)
+        }
+      }
+      setAltEdits((prev) => ({ ...prev, [checkIn.id]: nextAlts }))
+      setAltNoResult((prev) => ({ ...prev, [checkIn.id]: noResult }))
+      setAltEditingId(null)
       // Enter AI edit mode with generated content
       setEditNotes((prev) => ({ ...prev, [checkIn.id]: data.description }))
       setAiEditingId(checkIn.id)
@@ -1195,23 +1380,49 @@ export default function Dashboard() {
   const handleAiNoteSave = async (checkIn: CheckIn) => {
     if (isDemoJob(checkIn.id)) return
     const notes = editNotes[checkIn.id] ?? ''
+    const photoAltText = descriptionsToSave(altEdits[checkIn.id] ?? savedDescriptions(checkIn))
     setAiSavingId(checkIn.id)
     try {
       const res = await fetch('/api/checkins/update', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: checkIn.id, notes, aiDescriptionGeneratedAt: new Date().toISOString() }),
+        body: JSON.stringify({ id: checkIn.id, notes, photoAltText, aiDescriptionGeneratedAt: new Date().toISOString() }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Failed to save')
       setCheckIns((prev) =>
-        prev.map((c) => c.id === checkIn.id ? { ...c, notes } : c)
+        prev.map((c) => c.id === checkIn.id ? { ...c, notes, photoAltText } : c)
       )
       setAiEditingId(null)
     } catch (err: any) {
       alert(err.message || 'Failed to save')
     } finally {
       setAiSavingId(null)
+    }
+  }
+
+  // Saves edited photo descriptions without running the AI (the Edit photo
+  // descriptions link under a job's notes).
+  const handleAltSave = async (checkIn: CheckIn) => {
+    if (isDemoJob(checkIn.id)) return
+    const photoAltText = descriptionsToSave(altEdits[checkIn.id] ?? savedDescriptions(checkIn))
+    setAltSavingId(checkIn.id)
+    setAltError((prev) => { const n = { ...prev }; delete n[checkIn.id]; return n })
+    try {
+      const res = await fetch('/api/checkins/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkIn.id, photoAltText }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAltError((prev) => ({ ...prev, [checkIn.id]: data.error || 'Failed to save' }))
+        return
+      }
+      setCheckIns((prev) => prev.map((c) => (c.id === checkIn.id ? { ...c, photoAltText } : c)))
+      setAltEditingId(null)
+    } finally {
+      setAltSavingId(null)
     }
   }
 
@@ -1338,6 +1549,24 @@ export default function Dashboard() {
     setReviewOverridePhone(cust?.phones?.find((p) => p.num)?.num || '')
     setReviewOverrideEmail(cust?.emails?.find((e) => e.addr)?.addr || '')
     setReviewMessageText(buildReviewMessage(checkIn, custName))
+    // Swap the Google review link for the job's ProjectCheckin tracking link,
+    // which records when the customer opens it and forwards to Google.
+    if (gbpReviewLink && !isDemoJob(checkIn.id)) {
+      setReviewLinkPending(true)
+      fetch('/api/checkins/review-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: checkIn.id, action: 'link' }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: { url?: string } | null) => {
+          if (d?.url) setReviewMessageText((prev) => prev.split(gbpReviewLink).join(d.url as string))
+        })
+        .catch(() => {})
+        .finally(() => setReviewLinkPending(false))
+    } else {
+      setReviewLinkPending(false)
+    }
     const sigLines = [`Thanks! ${orgName}`]
     if (orgPhone) sigLines.push(orgPhone)
     if (orgEmail) sigLines.push(orgEmail)
@@ -1356,8 +1585,21 @@ export default function Dashboard() {
     }
   }
 
+  // Records one click on Send via Text or Send via Email. The message goes out
+  // from the owner's own phone or email app, so this records the click only.
+  const recordReviewSend = (checkInId: string, action: 'text' | 'email') => {
+    if (isDemoJob(checkInId)) return
+    fetch('/api/checkins/review-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: checkInId, action }),
+    })
+      .then(() => reviewTrackingReloadRef.current?.())
+      .catch(() => {})
+  }
+
   const handleSendReview = () => {
-    if (!reviewModalCheckIn) return
+    if (!reviewModalCheckIn || reviewLinkPending) return
     const { phone, email } = getReviewRecipient(reviewModalCheckIn)
     const fullMessage = `${reviewMessageText}\n\n${reviewSignature}`
     const hasPhone = !!phone
@@ -1367,6 +1609,7 @@ export default function Dashboard() {
       if (!phone) { alert('No phone number saved for this customer. Add it in the Customer Info section.'); return }
       const cleanPhone = phone.replace(/[^0-9+]/g, '')
       window.open(`sms:${cleanPhone}?body=${encodeURIComponent(fullMessage)}`, '_blank')
+      recordReviewSend(reviewModalCheckIn.id, 'text')
       setReviewTextSent(true)
       if (!hasEmail) setReviewModalCheckIn(null)
     }
@@ -1376,6 +1619,7 @@ export default function Dashboard() {
       const subject = encodeURIComponent('We appreciated working with you — quick favor if you have a minute')
       const body = encodeURIComponent(fullMessage)
       window.open(`mailto:${email}?subject=${subject}&body=${body}`)
+      recordReviewSend(reviewModalCheckIn.id, 'email')
       setReviewEmailSent(true)
       if (!hasPhone) setReviewModalCheckIn(null)
     }
@@ -1467,6 +1711,25 @@ export default function Dashboard() {
     ? planTier.charAt(0).toUpperCase() + planTier.slice(1) + ' Plan'
     : 'Free Plan'
 
+  // ── Google review tracking (Titan) ─────────────────────────────────────────
+
+  const reviewTracking = useReviewTracking(tierHasFeature(planTier, 'review_request'))
+  reviewTrackingReloadRef.current = reviewTracking.reload
+  const [unmatchedOpen, setUnmatchedOpen] = useState(false)
+  const reviewJobs: ReviewJob[] = useMemo(
+    () =>
+      checkIns
+        .filter((c) => !isDemoJob(c.id))
+        .map((c) => ({
+          id: c.id,
+          address: [c.street, c.city, c.state].filter(Boolean).join(', '),
+          doorType: c.doorType ?? null,
+          date: new Date(c.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          homeCustomerName: c.homeCustomerName ?? null,
+        })),
+    [checkIns]
+  )
+
   // ── Portfolio ──────────────────────────────────────────────────────────────
 
   const orgSlug = session?.user?.orgSlug
@@ -1492,15 +1755,7 @@ export default function Dashboard() {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  const getPublicUrl = (checkIn: CheckIn) => {
-    const citySlug = slugify(checkIn.city || '')
-    const stateSlug = slugify(checkIn.state || '')
-    const doorTypeSlug = slugify(checkIn.doorType || 'job')
-    const slug = orgSlug
-      ? `${doorTypeSlug}-${orgSlug}-${checkIn.id}`
-      : `${doorTypeSlug}-${checkIn.id}`
-    return `${baseUrl}/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${slug}`
-  }
+  const getPublicUrl = (checkIn: CheckIn) => jobUrl(checkIn, orgSlug, baseUrl)
 
   const formatDate = (ts: string) => {
     const d = new Date(ts)
@@ -1718,6 +1973,17 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Google reviews not yet linked to a job, and the needs-reply count (Titan) */}
+          <UnmatchedReviewsPanel
+            data={reviewTracking.data}
+            busy={reviewTracking.busy}
+            error={reviewTracking.error}
+            jobs={reviewJobs}
+            open={unmatchedOpen}
+            onToggle={() => setUnmatchedOpen((v) => !v)}
+            onAct={reviewTracking.act}
+          />
+
           {/* Filter bar */}
           <div className="db-filter-bar" data-tour="jd-filters">
             <div className="db-filter-tabs">
@@ -1842,6 +2108,7 @@ export default function Dashboard() {
                             ) : (
                               <span className="db-photo-pill-empty">No photos</span>
                             )}
+                            <ReviewPill jobId={checkIn.id} data={reviewTracking.data} />
                           </div>
                         </div>
 
@@ -1859,7 +2126,8 @@ export default function Dashboard() {
                               disabled={togglingId === checkIn.id}
                               onClick={(e) => {
                                 e.stopPropagation()
-                                handleTogglePublish(checkIn)
+                                setUnpublishError(null)
+                                setUnpublishJob(checkIn)
                               }}
                             >
                               {togglingId === checkIn.id ? 'Saving\u2026' : 'Unpublish'}
@@ -2141,10 +2409,30 @@ export default function Dashboard() {
                                     }
                                     rows={6}
                                   />
+                                  {(checkIn.photoUrls?.length ?? 0) > 0 && (
+                                    <div style={{ marginTop: 14 }}>
+                                      <div className="db-notes-header">
+                                        <span className="db-d-label">Photo descriptions</span>
+                                        <span style={{ fontSize: 11, fontWeight: 600, color: '#7C3AED' }}>AI-generated — edit before saving</span>
+                                      </div>
+                                      <PhotoDescriptionEditor
+                                        job={checkIn}
+                                        values={altEdits[checkIn.id] ?? savedDescriptions(checkIn)}
+                                        onChange={(url, text) =>
+                                          setAltEdits((prev) => ({
+                                            ...prev,
+                                            [checkIn.id]: { ...(prev[checkIn.id] ?? savedDescriptions(checkIn)), [url]: text },
+                                          }))
+                                        }
+                                        tooLong={new Set(altNoResult[checkIn.id] ?? [])}
+                                        disabled={aiSavingId === checkIn.id}
+                                      />
+                                    </div>
+                                  )}
                                   <div className="db-edit-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <button
                                       className="db-btn-save"
-                                      disabled={aiSavingId === checkIn.id}
+                                      disabled={aiSavingId === checkIn.id || !descriptionsValid(altEdits[checkIn.id] ?? savedDescriptions(checkIn))}
                                       onClick={() => handleAiNoteSave(checkIn)}
                                     >
                                       {aiSavingId === checkIn.id ? 'Saving\u2026' : 'Save'}
@@ -2154,6 +2442,7 @@ export default function Dashboard() {
                                       onClick={() => {
                                         setAiEditingId(null)
                                         setEditNotes((prev) => ({ ...prev, [checkIn.id]: checkIn.notes || '' }))
+                                        setAltEdits((prev) => { const n = { ...prev }; delete n[checkIn.id]; return n })
                                       }}
                                     >
                                       Cancel
@@ -2250,7 +2539,32 @@ export default function Dashboard() {
                                 </>
                               )}
                             </div>
-
+                            {/* Saved photo descriptions: collapsed by default, editable without the AI (Titan) */}
+                            {tierHasFeature(planTier, 'ai_job_description') && aiEditingId !== checkIn.id && !isDemoJob(checkIn.id) && (
+                              <PhotoDescriptionsSection
+                                job={checkIn}
+                                editing={altEditingId === checkIn.id}
+                                values={altEdits[checkIn.id] ?? savedDescriptions(checkIn)}
+                                onChange={(url, text) =>
+                                  setAltEdits((prev) => ({
+                                    ...prev,
+                                    [checkIn.id]: { ...(prev[checkIn.id] ?? savedDescriptions(checkIn)), [url]: text },
+                                  }))
+                                }
+                                onEdit={() => {
+                                  setAltEdits((prev) => ({ ...prev, [checkIn.id]: savedDescriptions(checkIn) }))
+                                  setAltEditingId(checkIn.id)
+                                }}
+                                onSave={() => handleAltSave(checkIn)}
+                                onCancel={() => {
+                                  setAltEditingId(null)
+                                  setAltEdits((prev) => { const n = { ...prev }; delete n[checkIn.id]; return n })
+                                  setAltError((prev) => { const n = { ...prev }; delete n[checkIn.id]; return n })
+                                }}
+                                saving={altSavingId === checkIn.id}
+                                error={altError[checkIn.id] ?? null}
+                              />
+                            )}
                           </div>
 
                           {/* Right col: photos + actions */}
@@ -2319,6 +2633,26 @@ export default function Dashboard() {
                                   ? 'Cover photo set — used as the main image on your portfolio, this job’s page, and when it’s shared or published to your website. Works whether the job is published or not.'
                                   : 'No cover photo chosen — the first photo is used automatically.'}
                               </div>
+                            )}
+
+                            {tierHasFeature(planTier, 'review_request') && !isDemoJob(checkIn.id) && (
+                              <ReviewBlock
+                                job={reviewJobs.find((j) => j.id === checkIn.id) ?? {
+                                  id: checkIn.id,
+                                  address,
+                                  doorType: checkIn.doorType ?? null,
+                                  date: null,
+                                  homeCustomerName: checkIn.homeCustomerName ?? null,
+                                }}
+                                data={reviewTracking.data}
+                                busy={reviewTracking.busy}
+                                canConnect={isOwner}
+                                onAct={reviewTracking.act}
+                                onOpenUnmatched={() => {
+                                  setUnmatchedOpen(true)
+                                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                                }}
+                              />
                             )}
 
                             <div className="db-detail-btns" {...(isDetailTourRow ? { 'data-tour': 'jd-actions' } : {})}>
@@ -2461,6 +2795,84 @@ export default function Dashboard() {
                                   </>
                                 )
                               )}
+                              {/* WordPress: shown only on a published job that did not
+                                  reach the site, for a Titan org with a stored
+                                  connection (wpOrg is null otherwise). */}
+                              {wpOrg && checkIn.isPublic && checkIn.wpState && (
+                                wpPostingId === checkIn.id || checkIn.wpState === 'syncing' ? (
+                                  <span className="db-btn-ghost db-btn-wp-busy">
+                                    <span className="db-gbp-spinner" />Posting to WordPress&hellip;
+                                  </span>
+                                ) : wpOrg.status === 'needs_reconnect' ? (
+                                  <span className="db-wp-msg">
+                                    <a
+                                      href={wpErrorGuideHref('WP-101')}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="db-gbp-reconnect"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      WP-101
+                                    </a>{' '}
+                                    {checkIn.hasWpPost
+                                      ? 'Latest changes not posted to WordPress.'
+                                      : 'Not posted to WordPress.'}{' '}
+                                    {isOwner ? (
+                                      <>
+                                        ProjectCheckin can no longer log into your site.{' '}
+                                        <a
+                                          href="/account?tab=connections&card=wordpress"
+                                          className="db-gbp-reconnect"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          Reconnect WordPress
+                                        </a>
+                                        , then return here to post this job.
+                                      </>
+                                    ) : (
+                                      <span className="db-wp-msg-plain">
+                                        Ask your account owner to reconnect WordPress, then post this job.
+                                      </span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <>
+                                    <button
+                                      className="db-btn-ghost db-btn-gbp-failed"
+                                      disabled={wpPostingId !== null}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleWpPost(checkIn.id)
+                                      }}
+                                    >
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                                      Post to WordPress
+                                    </button>
+                                    <span className="db-wp-msg">
+                                      {checkIn.wpErrorCode && !wpPostError[checkIn.id] && wpPostingId === null && (
+                                        <>
+                                          <a
+                                            href={wpErrorGuideHref(checkIn.wpErrorCode)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="db-gbp-reconnect"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            {checkIn.wpErrorCode}
+                                          </a>{' '}
+                                        </>
+                                      )}
+                                      {wpPostError[checkIn.id]
+                                        ? wpPostError[checkIn.id]
+                                        : wpPostingId !== null
+                                          ? 'Locked until the current post finishes.'
+                                          : checkIn.hasWpPost
+                                            ? 'Latest changes not posted to WordPress. The earlier version is still on your site.'
+                                            : 'Not posted to WordPress.'}
+                                    </span>
+                                  </>
+                                )
+                              )}
                               {tierHasFeature(planTier, 'review_request') && (
                               <button
                                 {...(isDetailTourRow ? { 'data-tour': 'jd-review' } : {})}
@@ -2477,7 +2889,13 @@ export default function Dashboard() {
                               <Link
                                 href={`/check-in?id=${checkIn.id}`}
                                 className="db-btn-ghost"
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (checkIn.isPublic && !isDemoJob(checkIn.id)) {
+                                    e.preventDefault()
+                                    setEditWarnJob(checkIn)
+                                  }
+                                }}
                               >
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -2533,6 +2951,69 @@ export default function Dashboard() {
           onExit={() => setShowOnboarding(false)}
         />
       )}
+      {editWarnJob && (
+        <JobConfirmModal
+          title="Edit a published job?"
+          jobLabel={jobLabelOf(editWarnJob)}
+          lines={[
+            wpOrg
+              ? 'Changes you save go live on your website and on ProjectCheckin right away.'
+              : 'Changes you save go live on your ProjectCheckin job page right away.',
+            "Google reads the updated page again, and the page can move up or down in Google's search results.",
+            ...(editWarnJob.gbpPostStatus === 'posted'
+              ? ['The Google post for this job keeps its current photos and text until you click Remove from Google on the job card.']
+              : []),
+          ]}
+          confirmLabel="Continue"
+          onConfirm={() => {
+            const id = editWarnJob.id
+            setEditWarnJob(null)
+            window.location.href = `/check-in?id=${id}`
+          }}
+          onClose={() => setEditWarnJob(null)}
+        />
+      )}
+      {unpublishJob && (() => {
+        const hasWp = Boolean(wpOrg && unpublishJob.hasWpPost)
+        const onGoogle = unpublishJob.gbpPostStatus === 'posted'
+        const comesBack = [
+          'the ProjectCheckin job page comes back at the same address',
+          ...(hasWp ? ['ProjectCheckin creates a new WordPress post'] : []),
+          ...(onGoogle ? ['the job can be posted to Google again'] : []),
+        ]
+        const comesBackText =
+          comesBack.length === 1
+            ? comesBack[0]
+            : `${comesBack.slice(0, -1).join(', ')}${comesBack.length > 2 ? ',' : ''} and ${comesBack[comesBack.length - 1]}`
+        return (
+          <JobConfirmModal
+            title="Unpublish this job?"
+            jobLabel={jobLabelOf(unpublishJob)}
+            danger
+            lines={[
+              'The job page on ProjectCheckin goes offline.',
+              ...(hasWp
+                ? [
+                    'The WordPress post for this job and its photos are removed from your website until you republish.',
+                    'The job is also removed from any page on your website that lists your recent jobs.',
+                  ]
+                : []),
+              ...(onGoogle ? ['The Google post for this job is removed from your Business Profile.'] : []),
+            ]}
+            note={`The job and its photos stay in ProjectCheckin. If you publish it again, ${comesBackText}. To fix a detail or a photo, click Cancel and use Edit Check-In instead; the job stays published while you edit it.`}
+            confirmLabel="Unpublish"
+            busyLabel={'Unpublishing\u2026'}
+            busy={togglingId === unpublishJob.id}
+            error={unpublishError}
+            onConfirm={async () => {
+              const ok = await handleTogglePublish(unpublishJob)
+              if (ok) setUnpublishJob(null)
+              else setUnpublishError('The job could not be unpublished. Please try again.')
+            }}
+            onClose={() => setUnpublishJob(null)}
+          />
+        )
+      })()}
       {publishModal && (
         <PublishModal
           checkIn={publishModal.checkIn}
@@ -2686,11 +3167,12 @@ export default function Dashboard() {
                 <button
                   className="rrm-btn-send"
                   onClick={handleSendReview}
+                  disabled={reviewLinkPending}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
                   </svg>
-                  {reviewMethod === 'text' ? 'Send via Text' : 'Send via Email'}
+                  {reviewLinkPending ? 'Preparing link\u2026' : reviewMethod === 'text' ? 'Send via Text' : 'Send via Email'}
                 </button>
                 <button className="rrm-btn-copy" onClick={handleCopyReview}>
                   <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.7">

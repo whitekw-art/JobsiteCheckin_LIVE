@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import type { PublicReview } from '@/lib/googleReviews'
 import Link from 'next/link'
 import Image from 'next/image'
 import { JobPhoneLink } from '@/components/JobPhoneLink'
@@ -13,6 +14,9 @@ import { tierHasFeature } from '@/lib/planVersions'
 
 interface RelatedJob {
   id: string
+  /** The job's heading in the standard format, without the business name. */
+  title: string
+  thumbnailAlt: string
   doorType: string
   city: string
   state: string
@@ -29,11 +33,17 @@ interface JobDetailProps {
   city: string
   state: string
   zip: string
+  /** "Broadway, Nashville, TN 37203": street name without the house number. */
+  locationLine: string
   notes: string | null
   timestamp: string | null
   photos: string[]
+  /** Alt text for each entry in `photos`. */
+  photoAlts: string[]
   beforePhotoUrl: string | null
   afterPhotoUrl: string | null
+  beforeAlt: string
+  afterAlt: string
   businessName: string
   businessPhone: string
   normalizedWebsite: string
@@ -41,6 +51,9 @@ interface JobDetailProps {
   orgPlanTier: string | null
   relatedJobs: RelatedJob[]
   baseUrl: string
+  review?: PublicReview | null
+  /** Business > city > job. A null href marks the current page. */
+  breadcrumb: Array<{ name: string; href: string | null }>
 }
 
 /* ===================================================================
@@ -150,7 +163,7 @@ const ArrowLeftIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
    BEFORE / AFTER REVEAL WIDGET
    =================================================================== */
 
-function BeforeAfterReveal({ beforeUrl, afterUrl }: { beforeUrl: string; afterUrl: string }) {
+function BeforeAfterReveal({ beforeUrl, afterUrl, beforeAlt, afterAlt }: { beforeUrl: string; afterUrl: string; beforeAlt: string; afterAlt: string }) {
   const [pos, setPos] = useState(50)
   const containerRef = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
@@ -206,7 +219,7 @@ function BeforeAfterReveal({ beforeUrl, afterUrl }: { beforeUrl: string; afterUr
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={afterUrl}
-        alt="After"
+        alt={afterAlt}
         draggable={false}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }}
       />
@@ -221,7 +234,7 @@ function BeforeAfterReveal({ beforeUrl, afterUrl }: { beforeUrl: string; afterUr
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={beforeUrl}
-          alt="Before"
+          alt={beforeAlt}
           draggable={false}
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
         />
@@ -274,11 +287,15 @@ export default function JobDetailClient({
   city,
   state,
   zip,
+  locationLine,
   notes,
   timestamp,
   photos,
+  photoAlts,
   beforePhotoUrl,
   afterPhotoUrl,
+  beforeAlt,
+  afterAlt,
   businessName,
   businessPhone,
   normalizedWebsite,
@@ -286,6 +303,8 @@ export default function JobDetailClient({
   orgPlanTier,
   relatedJobs,
   baseUrl,
+  review = null,
+  breadcrumb,
 }: JobDetailProps) {
   const canBeforeAfter = tierHasFeature(orgPlanTier, 'before_after_tagging')
   const [featuredIndex, setFeaturedIndex] = useState(0)
@@ -294,8 +313,6 @@ export default function JobDetailClient({
   const thumbnailStripRef = useRef<HTMLDivElement>(null)
 
   const location = [city, state].filter(Boolean).join(', ')
-  const fullLocation = [city, state, zip].filter(Boolean).join(', ')
-  const photoAltBase = [doorType, location].filter(Boolean).join(' in ') || 'Contractor job photo'
 
   // Keyboard support for lightbox
   useEffect(() => {
@@ -489,7 +506,7 @@ export default function JobDetailClient({
                 >
                   <Image
                     src={photos[featuredIndex]}
-                    alt={`${photoAltBase} - photo ${featuredIndex + 1}`}
+                    alt={photoAlts[featuredIndex] || title}
                     fill
                     className="object-contain"
                     sizes="(max-width: 1024px) 100vw, 66vw"
@@ -552,7 +569,7 @@ export default function JobDetailClient({
                     >
                       <Image
                         src={url}
-                        alt={`${photoAltBase} - thumbnail ${i + 1}`}
+                        alt={photoAlts[i] || title}
                         width={80}
                         height={80}
                         className="w-full h-full object-cover"
@@ -572,7 +589,7 @@ export default function JobDetailClient({
       <JobDetailsSection
         title={title}
         doorType={doorType}
-        fullLocation={fullLocation}
+        locationLine={locationLine}
         location={location}
         timestamp={timestamp}
         notes={notes}
@@ -583,6 +600,10 @@ export default function JobDetailClient({
         canBeforeAfter={canBeforeAfter}
         beforePhotoUrl={beforePhotoUrl}
         afterPhotoUrl={afterPhotoUrl}
+        beforeAlt={beforeAlt}
+        afterAlt={afterAlt}
+        review={review}
+        breadcrumb={breadcrumb}
       />
 
       {/* ============================================
@@ -632,10 +653,8 @@ export default function JobDetailClient({
       {lightboxOpen && photos.length > 0 && (
         <Lightbox
           photos={photos}
+          photoAlts={photoAlts}
           currentIndex={lightboxIndex}
-          doorType={doorType}
-          city={city}
-          state={state}
           onClose={() => setLightboxOpen(false)}
           onPrev={() => setLightboxIndex((prev) => (prev - 1 + photos.length) % photos.length)}
           onNext={() => setLightboxIndex((prev) => (prev + 1) % photos.length)}
@@ -653,10 +672,11 @@ export default function JobDetailClient({
 function JobDetailsSection({
   title,
   doorType,
-  fullLocation,
+  locationLine,
   location,
   timestamp,
   notes,
+  review,
   checkInId,
   businessName,
   businessPhone,
@@ -664,13 +684,17 @@ function JobDetailsSection({
   canBeforeAfter,
   beforePhotoUrl,
   afterPhotoUrl,
+  beforeAlt,
+  afterAlt,
+  breadcrumb,
 }: {
   title: string
   doorType: string
-  fullLocation: string
+  locationLine: string
   location: string
   timestamp: string | null
   notes: string | null
+  review: PublicReview | null
   checkInId: string
   businessName: string
   businessPhone: string
@@ -678,6 +702,9 @@ function JobDetailsSection({
   canBeforeAfter: boolean
   beforePhotoUrl: string | null
   afterPhotoUrl: string | null
+  beforeAlt: string
+  afterAlt: string
+  breadcrumb: Array<{ name: string; href: string | null }>
 }) {
   const { ref, inView } = useInView()
 
@@ -692,6 +719,26 @@ function JobDetailsSection({
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
           {/* Left column: details */}
           <div className="flex-1 min-w-0">
+            {breadcrumb.length > 0 && (
+              <nav aria-label="Breadcrumb" className="mb-4">
+                <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8rem] text-surface-500">
+                  {breadcrumb.map((c, i) => (
+                    <li key={`${c.name}-${i}`} className="inline-flex items-center gap-2 min-w-0">
+                      {i > 0 && <span aria-hidden="true">&rsaquo;</span>}
+                      {c.href ? (
+                        <Link href={c.href} className="hover:text-primary-600 underline-offset-2 hover:underline min-h-0 min-w-0">
+                          {c.name}
+                        </Link>
+                      ) : (
+                        <span aria-current="page" className="text-surface-700 font-medium">
+                          {c.name}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+            )}
             <h1 className="font-display text-[1.8rem] sm:text-[2.2rem] lg:text-[2.6rem] font-bold text-surface-900 tracking-tight leading-[1.1]">
               {title}
             </h1>
@@ -701,7 +748,7 @@ function JobDetailsSection({
               {location && (
                 <span className="inline-flex items-center gap-1.5 text-[0.85rem] text-surface-600">
                   <MapPinIcon className="w-4 h-4 text-primary-500" />
-                  {fullLocation}
+                  {locationLine}
                 </span>
               )}
               {timestamp && (
@@ -740,6 +787,69 @@ function JobDetailsSection({
                 </div>
               </div>
             )}
+
+            {/* Customer Review: the Google review the owner linked to this job.
+                Name, stars and comment appear exactly as on Google (Google
+                forbids altering review text). No review or star markup: Google
+                treats reviews a business shows about itself as ineligible. */}
+            {review && (
+              <div className="mt-8">
+                <h2 className="font-display text-lg font-semibold text-surface-800 mb-3">
+                  Customer Review
+                </h2>
+                <div
+                  className="rounded-xl p-4"
+                  style={{ background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(0,0,0,0.06)' }}
+                >
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="font-semibold text-surface-900">{review.reviewerName || 'Google reviewer'}</span>
+                    <span aria-label={`${review.starRating} out of 5 stars`} className="tracking-wider">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <span key={i} aria-hidden="true" style={{ color: i <= (review.starRating ?? 0) ? '#F59E0B' : '#D6D3D1' }}>
+                          ★
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                  {review.postedAt && (
+                    <p className="text-[0.8rem] text-surface-500 mt-1">
+                      Posted on Google on{' '}
+                      {new Date(review.postedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  )}
+                  {review.comment && (
+                    <p
+                      className="mt-3 text-[0.9rem] text-surface-700 leading-relaxed"
+                      style={{ whiteSpace: 'pre-line', overflowWrap: 'break-word' }}
+                    >
+                      {review.comment}
+                    </p>
+                  )}
+                  {review.replyComment && (
+                    <div className="mt-4 pl-4" style={{ borderLeft: '3px solid #e7e5e4' }}>
+                      <p className="text-[0.8rem] font-semibold text-surface-800">Response from {businessName}</p>
+                      <p
+                        className="mt-1 text-[0.85rem] text-surface-600 leading-relaxed"
+                        style={{ whiteSpace: 'pre-line', overflowWrap: 'break-word' }}
+                      >
+                        {review.replyComment}
+                      </p>
+                    </div>
+                  )}
+                  {review.reviewsListUrl && (
+                    <a
+                      href={review.reviewsListUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block mt-4 text-[0.85rem] font-semibold text-primary-700 underline"
+                    >
+                      Read this review on Google &rarr;
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
           </div>
 
           {/* Right column: contact card + before/after */}
@@ -800,7 +910,7 @@ function JobDetailsSection({
                     boxShadow: '0 4px 20px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)',
                   }}
                 >
-                  <BeforeAfterReveal beforeUrl={beforePhotoUrl} afterUrl={afterPhotoUrl} />
+                  <BeforeAfterReveal beforeUrl={beforePhotoUrl} afterUrl={afterPhotoUrl} beforeAlt={beforeAlt} afterAlt={afterAlt} />
                 </div>
               )}
             </div>
@@ -891,7 +1001,7 @@ function RelatedJobCard({ job, index }: { job: RelatedJob; index: number }) {
         {job.thumbnail ? (
           <Image
             src={job.thumbnail}
-            alt={[job.doorType, [job.city, job.state].filter(Boolean).join(', ')].filter(Boolean).join(' in ') || 'Contractor job photo'}
+            alt={job.thumbnailAlt || job.title}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-300"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
@@ -908,7 +1018,7 @@ function RelatedJobCard({ job, index }: { job: RelatedJob; index: number }) {
           {job.doorType}
         </span>
         <div className="mt-2 font-display text-[0.9rem] font-semibold text-surface-900 leading-tight group-hover:text-primary-600 transition-colors duration-200">
-          {job.doorType} in {[job.city, job.state].filter(Boolean).join(', ')}
+          {job.title}
         </div>
         <div className="flex items-center gap-1.5 mt-1 text-[0.72rem] text-surface-500">
           <span>{[job.city, job.state].filter(Boolean).join(', ')}</span>
@@ -1009,27 +1119,21 @@ function CtaBand({
 
 function Lightbox({
   photos,
+  photoAlts,
   currentIndex,
-  doorType,
-  city,
-  state,
   onClose,
   onPrev,
   onNext,
   onGoTo,
 }: {
   photos: string[]
+  photoAlts: string[]
   currentIndex: number
-  doorType: string
-  city: string
-  state: string
   onClose: () => void
   onPrev: () => void
   onNext: () => void
   onGoTo: (i: number) => void
 }) {
-  const location = [city, state].filter(Boolean).join(', ')
-  const photoAltBase = [doorType, location].filter(Boolean).join(' in ') || 'Contractor job photo'
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center"
@@ -1088,7 +1192,7 @@ function Lightbox({
       >
         <img
           src={photos[currentIndex]}
-          alt={`${photoAltBase} - photo ${currentIndex + 1}`}
+          alt={photoAlts[currentIndex] || 'Job photo'}
           className="max-w-full max-h-[85vh] object-contain rounded-lg"
         />
       </div>

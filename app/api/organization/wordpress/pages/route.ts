@@ -2,6 +2,7 @@ export const runtime = 'nodejs'
 
 import { NextRequest, NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { wpConnectionActive } from '@/lib/wpStatus'
 import { getCurrentUser } from '@/lib/auth'
 import { tierHasFeature } from '@/lib/planVersions'
 import { decryptCredential } from '@/lib/wpCredentials'
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
     if ('error' in g) return g.error
     const { org } = g
 
-    if (org.wpConnectionStatus !== 'connected') {
+    if (!wpConnectionActive(org.wpConnectionStatus)) {
       return NextResponse.json({ error: 'Connect your WordPress site first.' }, { status: 400 })
     }
     const creds = orgCreds(org)
@@ -184,7 +185,27 @@ export async function PATCH(request: NextRequest) {
     if ('error' in g) return g.error
     const { org } = g
 
-    const body = (await request.json()) as { wpCreateNewPosts?: boolean }
+    const body = (await request.json()) as { wpCreateNewPosts?: boolean; rerenderId?: string }
+
+    // "Try again" on a mapping row: redraw that one page now and report the
+    // result (errorCode is null when it worked).
+    if (typeof body.rerenderId === 'string' && body.rerenderId) {
+      const mapping = await prisma.wordPressPageMapping.findFirst({
+        where: { id: body.rerenderId, organizationId: org.id },
+        select: { id: true, builderBlocked: true },
+      })
+      if (!mapping) return NextResponse.json({ error: 'Page not found.' }, { status: 404 })
+      if (mapping.builderBlocked) {
+        return NextResponse.json({ errorCode: 'WP-201' }, { status: 400 })
+      }
+      await renderPageMapping(mapping.id)
+      const after = await prisma.wordPressPageMapping.findUnique({
+        where: { id: mapping.id },
+        select: { errorCode: true, lastRenderedAt: true },
+      })
+      return NextResponse.json({ errorCode: after?.errorCode ?? null, lastRenderedAt: after?.lastRenderedAt ?? null })
+    }
+
     if (typeof body.wpCreateNewPosts !== 'boolean') {
       return NextResponse.json({ error: 'Invalid value.' }, { status: 400 })
     }

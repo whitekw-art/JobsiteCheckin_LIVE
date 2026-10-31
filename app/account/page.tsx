@@ -1,6 +1,21 @@
 'use client'
 
 import { Suspense, useEffect, useState, useCallback, FormEvent } from 'react'
+import { wpConnectionActive, wpErrorGuideHref } from '@/lib/wpStatus'
+
+// A WordPress error code that opens its entry in the WordPress guide.
+function WpCodeLink({ code }: { code: string }) {
+  return (
+    <a
+      href={wpErrorGuideHref(code)}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ fontFamily: 'monospace', fontWeight: 700, color: 'inherit', textDecoration: 'underline', whiteSpace: 'nowrap' }}
+    >
+      {code}
+    </a>
+  )
+}
 import { useSession, signOut } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import DashboardShell from '@/components/DashboardShell'
@@ -1100,10 +1115,20 @@ function AccountPageContent() {
     wpPageType: string
     builderBlocked: boolean
     markerMode: string
+    errorCode?: string | null
   }
   type LocationOpt = { city: string; state: string | null }
   const [wpMappings,       setWpMappings]       = useState<PageMapping[]>([])
   const [wpCreateNewPosts, setWpCreateNewPosts] = useState(true)
+  // WordPress error codes (WP-1xx): which codes the failed jobs carry, whether
+  // the connected account is below Administrator (WP-105), the WP-105 prompt
+  // shown before saving a connection, the Change account form, and the page
+  // being redrawn by Try again.
+  const [wpFailedCodes,    setWpFailedCodes]    = useState<string[]>([])
+  const [wpLimitedAccount, setWpLimitedAccount] = useState(false)
+  const [wpLimitedPrompt,  setWpLimitedPrompt]  = useState<{ role: string | null } | null>(null)
+  const [wpChangeOpen,     setWpChangeOpen]     = useState(false)
+  const [wpRetryingId,     setWpRetryingId]     = useState<string | null>(null)
   const [wpLocations,      setWpLocations]      = useState<LocationOpt[]>([])
   const [wpServices,       setWpServices]       = useState<string[]>([])
   const [wpAddOpen,        setWpAddOpen]        = useState(false)
@@ -1129,12 +1154,14 @@ function AccountPageContent() {
         setWpUsername(d.wpUsername ?? '')
         setWpSyncedCount(d.syncedCount ?? 0)
         setWpFailedCount(d.failedCount ?? 0)
+        setWpFailedCodes(Array.isArray(d.failedCodes) ? d.failedCodes : [])
+        setWpLimitedAccount(Boolean(d.wpLimitedAccount))
         if (d.wpSiteUrl) setWpSiteUrl(d.wpSiteUrl)
       })
       .catch(() => {})
   }, [hasWebsiteIntegration])
 
-  async function handleConnectWordPress() {
+  async function handleConnectWordPress(confirmLimited = false) {
     setWpError(null)
     setWpSaving(true)
     try {
@@ -1145,20 +1172,82 @@ function AccountPageContent() {
           siteUrl: wpSiteUrl,
           username: wpUsername,
           applicationPassword: wpPassword,
+          confirmLimited,
         }),
       })
       const data = await res.json().catch(() => null)
+      // WP-105: the login works but the account is below Administrator.
+      // Nothing was saved; the customer chooses another account or continues.
+      if (res.status === 409 && data?.code === 'WP-105') {
+        setWpLimitedPrompt({ role: data.role ?? null })
+        return
+      }
       if (!res.ok) throw new Error(data?.error || 'Connection failed — double-check your site address and Application Password, then try again.')
       setWpStatus('connected')
       setWpConnectedUrl(data.wpSiteUrl)
+      setWpLimitedAccount(Boolean(data.wpLimitedAccount))
+      setWpLimitedPrompt(null)
+      setWpChangeOpen(false)
       setWpPassword('') // never keep the credential in component state after use
     } catch (err: any) {
       setWpError(err.message)
-      setWpStatus('failed')
+      // A failed reconnect keeps the reconnect steps on screen for the stored site.
+      setWpStatus((prev) => (prev === 'needs_reconnect' ? prev : 'failed'))
     } finally {
       setWpSaving(false)
     }
   }
+
+  // Try again on a mapping row: redraw that one page now.
+  async function handleRetryMapping(id: string) {
+    setWpRetryingId(id)
+    try {
+      const res = await fetch('/api/organization/wordpress/pages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rerenderId: id }),
+      })
+      const data = await res.json().catch(() => null)
+      if (data && 'errorCode' in data) {
+        setWpMappings((prev) => prev.map((m) => (m.id === id ? { ...m, errorCode: data.errorCode ?? null } : m)))
+      }
+    } catch {
+      // The row keeps its previous code; the customer can try again.
+    } finally {
+      setWpRetryingId(null)
+    }
+  }
+
+  // WP-105 prompt, shown after the login works but before anything is saved.
+  const wpRoleName = wpLimitedPrompt?.role
+    ? wpLimitedPrompt.role.charAt(0).toUpperCase() + wpLimitedPrompt.role.slice(1)
+    : null
+  const wpLimitedPromptBlock = wpLimitedPrompt ? (
+    <div style={{ background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '11px 14px', marginTop: 12, marginBottom: 12, fontSize: 12, color: '#92400E', lineHeight: 1.65 }}>
+      <WpCodeLink code="WP-105" />{' '}
+      {wpRoleName
+        ? `The account ${wpUsername} is ${/^[aeiou]/i.test(wpRoleName) ? 'an' : 'a'} ${wpRoleName} in WordPress.`
+        : `The account ${wpUsername} does not have full publishing rights in WordPress.`}{' '}
+      WordPress removes scripts and maps from posts written by accounts below Administrator, so your job posts would publish without their map and without the hidden details that describe each job to Google. Connect with an Administrator account to keep them. On a single-site WordPress install, an Editor account also works.
+      <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => { setWpLimitedPrompt(null); setWpUsername(''); setWpPassword('') }}
+          style={{ background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 700, color: 'var(--t1)', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+        >
+          Use a different account
+        </button>
+        <button
+          type="button"
+          disabled={wpSaving}
+          onClick={() => handleConnectWordPress(true)}
+          style={{ background: 'none', border: 'none', padding: '7px 4px', fontSize: 12, fontWeight: 700, color: '#92400E', textDecoration: 'underline', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+        >
+          Connect anyway
+        </button>
+      </div>
+    </div>
+  ) : null
 
   async function handleDisconnectWordPress() {
     setWpDisconnecting(true)
@@ -1247,7 +1336,7 @@ function AccountPageContent() {
       setWpAddLocation('')
       setWpAddService('')
       if (d?.builderNotice) {
-        setWpNotice("That page was built with a page builder, so we'll create new posts for those jobs instead. No action needed.")
+        setWpNotice('WP-201: That page was built with a page builder, so ProjectCheckin cannot add the job list to it. Your jobs still publish as their own posts. To show the list, map a page made in the standard WordPress editor (see WP-201 in the WordPress guide).')
       } else if (d?.overlapWarning) {
         setWpNotice('Heads up: another page already targets the same location and service. The most specific match wins.')
       }
@@ -2892,21 +2981,115 @@ function AccountPageContent() {
               title="Publish Into Your WordPress Site"
               titleExtra={<TierLabel label="Best" />}
               sub="Real posts in your own theme — the deepest local-SEO integration we offer."
-              status={wpStatus === 'connected' ? <ActiveTag /> : undefined}
-              accent={wpStatus === 'connected'}
+              status={
+                wpStatus === 'needs_reconnect' ? <StatusDot state="disabled" label="Reconnect needed" />
+                : wpConnectionActive(wpStatus) ? <ActiveTag />
+                : undefined
+              }
+              accent={wpConnectionActive(wpStatus)}
               open={!!openCards['wordpress']}
               onToggle={() => toggleCard('wordpress')}
               cardStyle={{ marginBottom: 0 }}
             >
 
-              {wpStatus === 'connected' ? (
-                /* State: connected */
+              {wpStatus === 'needs_reconnect' ? (
+                /* State: the saved Application Password was rejected */
                 <div style={{ padding: '16px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--red-bg, #FEF2F2)', color: 'var(--red, #DC2626)' }}>
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
-                      Connected
+                      Reconnect needed
                     </span>
+                    <button
+                      onClick={() => {
+                        if (confirm('ProjectCheckin can no longer log into this site, so it cannot remove the job posts and photos it published there. They will stay on your site until you delete them in WordPress. Nothing is deleted from ProjectCheckin. Continue?')) {
+                          handleDisconnectWordPress()
+                        }
+                      }}
+                      disabled={wpDisconnecting}
+                      style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--red, #DC2626)', cursor: wpDisconnecting ? 'default' : 'pointer', padding: 0 }}
+                    >
+                      {wpDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--t3)', fontFamily: 'monospace', letterSpacing: '-0.2px', marginTop: 7 }}>{wpConnectedUrl}</div>
+
+                  <div style={{ background: 'var(--red-bg, #FEF2F2)', border: '1px solid rgba(220,38,38,.22)', borderRadius: 8, padding: '11px 14px', marginTop: 12, fontSize: 12, color: 'var(--red, #DC2626)', lineHeight: 1.65 }}>
+                    <WpCodeLink code="WP-101" />{' '}<strong>ProjectCheckin can no longer log into your WordPress site.</strong> This usually means the Application Password was deleted or regenerated, or the WordPress username changed. Jobs already on your site stay there. Jobs published since then are saved in ProjectCheckin and marked on your Job Dashboard.
+                    <ol style={{ margin: '8px 0 0 18px', padding: 0 }}>
+                      <li style={{ marginTop: 3 }}>In WordPress, go to Users, then Profile, then Application Passwords, and add a new one.</li>
+                      <li style={{ marginTop: 3 }}>Paste it below, check your username, and click Reconnect.</li>
+                      <li style={{ marginTop: 3 }}>Open your Job Dashboard and click Post to WordPress on each job marked as not posted.</li>
+                    </ol>
+                  </div>
+
+                  {wpError && (
+                    <div style={{ fontSize: 12.5, color: 'var(--red, #DC2626)', lineHeight: 1.5, marginTop: 12 }}>{wpError}</div>
+                  )}
+
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginTop: 14, marginBottom: 6 }}>Site address</label>
+                  <input
+                    type="text"
+                    value={wpConnectedUrl ?? ''}
+                    readOnly
+                    style={{ width: '100%', background: 'var(--surface-3)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--t3)', outline: 'none' }}
+                  />
+                  <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5, marginTop: 6, marginBottom: 14 }}>
+                    To connect a different site, use Disconnect first.
+                  </div>
+
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>WordPress username</label>
+                  <input
+                    type="text"
+                    value={wpUsername}
+                    onChange={(e) => setWpUsername(e.target.value)}
+                    autoComplete="off"
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', outline: 'none', marginBottom: 14 }}
+                  />
+
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>New Application Password</label>
+                  <input
+                    type="password"
+                    value={wpPassword}
+                    onChange={(e) => setWpPassword(e.target.value)}
+                    placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"
+                    autoComplete="new-password"
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--t1)', outline: 'none', marginBottom: 14 }}
+                  />
+
+                  {wpLimitedPromptBlock}
+                  <button
+                    // wpSiteUrl already holds the stored address (loaded with the
+                    // card); the route refuses any other site.
+                    onClick={() => handleConnectWordPress()}
+                    disabled={wpSaving || !wpUsername.trim() || !wpPassword.trim()}
+                    style={{ background: 'var(--sky-text)', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: wpSaving ? 'default' : 'pointer', opacity: wpSaving || !wpUsername.trim() || !wpPassword.trim() ? 0.6 : 1 }}
+                  >
+                    {wpSaving ? 'Reconnecting…' : 'Reconnect'}
+                  </button>
+                </div>
+              ) : wpConnectionActive(wpStatus) ? (
+                /* State: connected (or connected but refused, 'blocked') */
+                <div style={{ padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {wpStatus === 'blocked' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: '#FFFBEB', color: '#92400E' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                        Connected, jobs blocked
+                      </span>
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--green-bg)', color: 'var(--green)' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                        Connected
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { setWpChangeOpen((o) => !o); setWpLimitedPrompt(null); setWpPassword('') }}
+                      style={{ background: 'none', border: 'none', fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--sky-text)', cursor: 'pointer', padding: 0 }}
+                    >
+                      Change account
+                    </button>
                     <button
                       onClick={() => {
                         if (confirm('Disconnecting removes the job posts and photos we published from your WordPress site. Nothing is deleted from ProjectCheckin. Continue?')) {
@@ -2921,15 +3104,62 @@ function AccountPageContent() {
                   </div>
                   <div style={{ fontSize: 11.5, color: 'var(--t3)', fontFamily: 'monospace', letterSpacing: '-0.2px', marginTop: 7 }}>{wpConnectedUrl}</div>
 
+                  {wpLimitedAccount && (
+                    <div style={{ background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', marginTop: 12, fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
+                      <WpCodeLink code="WP-105" />{' '}This site is connected with an account below Administrator, so WordPress removes scripts and maps from the job posts it writes. To keep them, click Change account and connect an Administrator account.
+                    </div>
+                  )}
+
+                  {wpChangeOpen && (
+                    <div style={{ border: '1px dashed var(--border-2)', borderRadius: 9, padding: 14, background: 'var(--surface-2)', marginTop: 12 }}>
+                      <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.55, marginBottom: 10 }}>
+                        Connect a different WordPress account, or the same site at its new address. Your job posts stay on the site.
+                      </div>
+                      {wpError && <div style={{ fontSize: 12.5, color: 'var(--red, #DC2626)', lineHeight: 1.5, marginBottom: 10 }}>{wpError}</div>}
+                      <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Site address</label>
+                      <input type="text" value={wpSiteUrl} onChange={(e) => setWpSiteUrl(e.target.value)} style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--t1)', outline: 'none', marginBottom: 12 }} />
+                      <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>WordPress username</label>
+                      <input type="text" value={wpUsername} onChange={(e) => setWpUsername(e.target.value)} autoComplete="off" style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', outline: 'none', marginBottom: 6 }} />
+                      <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5, marginBottom: 12 }}>Use a WordPress account with the Administrator role. On a single-site WordPress install, an Editor account also works.</div>
+                      <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Application Password</label>
+                      <input type="password" value={wpPassword} onChange={(e) => setWpPassword(e.target.value)} placeholder="xxxx xxxx xxxx xxxx xxxx xxxx" autoComplete="new-password" style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: 'monospace', color: 'var(--t1)', outline: 'none', marginBottom: 12 }} />
+                      {wpLimitedPromptBlock}
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button type="button" onClick={() => handleConnectWordPress()} disabled={wpSaving || !wpUsername.trim() || !wpPassword.trim()} style={{ background: 'var(--sky-text)', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: 'pointer', opacity: wpSaving || !wpUsername.trim() || !wpPassword.trim() ? 0.6 : 1 }}>
+                          {wpSaving ? 'Saving…' : 'Save'}
+                        </button>
+                        <button type="button" onClick={() => { setWpChangeOpen(false); setWpLimitedPrompt(null); setWpPassword(''); setWpError(null) }} style={{ background: 'none', border: 'none', fontSize: 13, fontWeight: 600, color: 'var(--t2)', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <p style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.6, marginTop: 10, marginBottom: 0 }}>
                     {wpSyncedCount > 0
                       ? `${wpSyncedCount} ${wpSyncedCount === 1 ? 'job is' : 'jobs are'} live on your site. New jobs you publish appear automatically.`
                       : 'New jobs you publish will appear on your site automatically. Jobs published before you connected are not included.'}
                   </p>
 
-                  {wpFailedCount > 0 && (
+                  {wpStatus === 'blocked' ? (
                     <div style={{ background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', marginTop: 12, fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
-                      {wpFailedCount} {wpFailedCount === 1 ? 'job' : 'jobs'} couldn&apos;t be published to your site. Reconnect below with a new Application Password and we&apos;ll try again automatically.
+                      <WpCodeLink code="WP-102" />{' '}<strong>Your WordPress site refused ProjectCheckin&apos;s request.</strong> A security plugin, your web host&apos;s firewall, or a WordPress user that no longer has permission to publish are the usual causes. Ask your web host or website developer to allow ProjectCheckin to use the WordPress REST API, and confirm the connected user can publish posts. Then repost the marked jobs from your{' '}
+                      <a href="/dashboard" style={{ color: 'var(--sky-text)', fontWeight: 700 }}>Job Dashboard</a>.
+                    </div>
+                  ) : wpFailedCount > 0 && (
+                    <div style={{ background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 13px', marginTop: 12, fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
+                      <strong>{wpFailedCount} {wpFailedCount === 1 ? 'job' : 'jobs'} did not post to your WordPress site.</strong> This can happen when your web host was busy or your site was briefly unavailable. Open your{' '}
+                      <a href="/dashboard" style={{ color: 'var(--sky-text)', fontWeight: 700 }}>Job Dashboard</a>{' '}
+                      and click Post to WordPress on each job marked as not posted.
+                      {wpFailedCodes.length > 0 && (
+                        <div style={{ marginTop: 6 }}>
+                          {wpFailedCodes.length === 1 ? 'Error code: ' : 'Error codes: '}
+                          {wpFailedCodes.map((c, i) => (
+                            <span key={c}>{i > 0 ? ', ' : ''}<WpCodeLink code={c} /></span>
+                          ))}
+                          . Each code opens its fix in the WordPress guide.
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -2990,7 +3220,19 @@ function AccountPageContent() {
                             {m.builderBlocked ? (
                               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 12px', marginTop: 10, fontSize: 11.5, color: '#92400E', lineHeight: 1.55 }}>
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                                <span>This page was built with a page builder, which we can&apos;t reliably add content to yet. We&apos;ll follow best practice to create a new page. No action required.</span>
+                                <span><WpCodeLink code="WP-201" />{' '}This page was built with a page builder such as Divi, Elementor or WPBakery, so ProjectCheckin cannot add the job list to it. Your jobs still publish as their own posts. To show the list, create a page in the standard WordPress editor and map that page instead.</span>
+                              </div>
+                            ) : m.errorCode ? (
+                              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', justifyContent: 'space-between', background: '#FFFBEB', border: '1px solid rgba(217,119,6,.25)', borderRadius: 8, padding: '10px 12px', marginTop: 10, fontSize: 11.5, color: '#92400E', lineHeight: 1.55 }}>
+                                <span><WpCodeLink code={m.errorCode} />{' '}The job list on this page was not updated the last time ProjectCheckin tried. The page still shows the list from the last update. The code opens its cause and fix in the WordPress guide.</span>
+                                <button
+                                  type="button"
+                                  disabled={wpRetryingId === m.id}
+                                  onClick={() => handleRetryMapping(m.id)}
+                                  style={{ flexShrink: 0, background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 7, padding: '5px 10px', fontSize: 11.5, fontWeight: 700, color: 'var(--t1)', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                                >
+                                  {wpRetryingId === m.id ? 'Trying…' : 'Try again'}
+                                </button>
                               </div>
                             ) : null}
                           </div>
@@ -3123,8 +3365,11 @@ function AccountPageContent() {
                     onChange={(e) => setWpUsername(e.target.value)}
                     placeholder="your-wordpress-username"
                     autoComplete="off"
-                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', outline: 'none', marginBottom: 14 }}
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'var(--t1)', outline: 'none', marginBottom: 6 }}
                   />
+                  <div style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5, marginBottom: 14 }}>
+                    Use a WordPress account with the Administrator role. On a single-site WordPress install, an Editor account also works.
+                  </div>
 
                   <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'block', marginBottom: 6 }}>Application Password</label>
                   <input
@@ -3173,8 +3418,9 @@ function AccountPageContent() {
                     <span>Jobs you publish while connected stay live on your WordPress site as long as you&apos;re on the Titan plan. If you ever need to downgrade or cancel, nothing will be deleted from ProjectCheckin, but job content will no longer be displayed on your site. Everything is restored to your site automatically the moment you resubscribe to Titan.</span>
                   </div>
 
+                  {wpLimitedPromptBlock}
                   <button
-                    onClick={handleConnectWordPress}
+                    onClick={() => handleConnectWordPress()}
                     disabled={wpSaving}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", cursor: wpSaving ? 'default' : 'pointer', background: 'var(--sky-text)', color: '#fff', border: 'none' }}
                   >
@@ -3462,7 +3708,7 @@ function AccountPageContent() {
             </p>
             <ul style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.7, paddingLeft: 18, marginBottom: 14 }}>
               <li>Higher-tier features will be turned off</li>
-              {wpStatus === 'connected' && (
+              {wpConnectionActive(wpStatus) && (
                 <li>
                   Job posts and photos published to <strong>{wpConnectedUrl}</strong> will no longer be
                   displayed on your site

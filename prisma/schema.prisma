@@ -42,6 +42,7 @@ model Organization {
   wpConnectionStatus       String?
   wpConnectedAt            DateTime?
   wpCreateNewPosts         Boolean                @default(true)
+  wpLimitedAccount         Boolean                @default(false)
   gscAccessToken           String?
   gscRefreshToken          String?
   gscPropertyUrl           String?
@@ -55,13 +56,20 @@ model Organization {
   gbpConnectionStatus      String?
   gbpConnectedAt           DateTime?
   gbpAutoPost              Boolean                @default(true)
+  gbpBusinessAddress       Json?
+  gbpBusinessInfoFetchedAt DateTime?
   showEngagementMetrics    Boolean                @default(false)
   showPortfolioViewsMetric Boolean                @default(false)
+  googleReviewsCheckedAt   DateTime?
+  gbpPlaceId               String?
+  previousSlugs            String[]               @default([])
   Invitations              Invitations[]
   users                    User[]
   checkIns                 CheckIn[]
   photos                   Photo[]
   wordPressPageMappings    WordPressPageMapping[]
+  reviewRequestEvents      ReviewRequestEvent[]
+  googleReviews            GoogleReview[]
 }
 
 // Phase 3b — existing-page injection. Each row maps jobs matching a location
@@ -80,6 +88,7 @@ model WordPressPageMapping {
   wpPageType     String // 'page' | 'post'
   builderBlocked Boolean      @default(false) // detected page builder → inject disabled, job falls back to a new post
   markerMode     String       @default("append") // 'marker' (customer placed one) | 'append'
+  errorCode      String? // last WordPress error code for this page (WP-1xx), null when the last render worked
   lastRenderedAt DateTime?
   createdAt      DateTime     @default(now())
 
@@ -105,15 +114,15 @@ model User {
 }
 
 model CheckIn {
-  id                       String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                       String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   installer                String
   street                   String?
   notes                    String?
   latitude                 Float?
   longitude                Float?
-  timestamp                DateTime?      @db.Timestamptz(6)
+  timestamp                DateTime?            @db.Timestamptz(6)
   organizationId           String?
-  organization             Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization             Organization?        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userId                   String?
   city                     String?
   state                    String?
@@ -122,28 +131,34 @@ model CheckIn {
   doorType                 String?
   zip                      String?
   photoUrls                String?
-  isPublic                 Boolean        @default(false)
+  isPublic                 Boolean              @default(false)
   locationSource           String?
   homeCustomerName         String?
   homeCustomerPhone        String?
   homeCustomerEmail        String?
-  publishedAt              DateTime?      @db.Timestamptz(6)
-  followUpEmailSentAt      DateTime?      @db.Timestamptz(6)
+  publishedAt              DateTime?            @db.Timestamptz(6)
+  followUpEmailSentAt      DateTime?            @db.Timestamptz(6)
   beforePhotoUrl           String?
   afterPhotoUrl            String?
   aiDescriptionGeneratedAt DateTime?
-  aiDescriptionCount       Int            @default(0)
+  aiDescriptionCount       Int                  @default(0)
   featuredPhotoUrl         String?
   wpPostId                 Int?
   wpPostUrl                String?
   wpMedia                  String?
   wpSyncedAt               DateTime?
   wpSyncStatus             String?
+  wpErrorCode              String?
   gbpPostName              String?
   gbpPostUrl               String?
   gbpPostedAt              DateTime?
   gbpPostStatus            String?
+  reviewLinkCode           String?              @unique
+  wpSlug                   String?
+  photoAltText             Json?
   events                   CheckInEvent[]
+  reviewRequestEvents      ReviewRequestEvent[]
+  googleReview             GoogleReview?
 
   @@index([organizationId])
 }
@@ -366,4 +381,53 @@ enum Role {
 enum user_role_enum {
   owner
   employee
+}
+
+// One row per recorded review request: a click on Send via Text or Send via
+// Email in the Request a Google Review window ('text', 'email'), an automatic
+// follow-up email ('email_auto'), or a visit to the job's tracking link
+// ('link_open'). The owner's own phone or email app sends the message, so a
+// row records the click, never delivery.
+model ReviewRequestEvent {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  checkInId      String       @db.Uuid
+  checkIn        CheckIn      @relation(fields: [checkInId], references: [id], onDelete: Cascade)
+  kind           String
+  userId         String?
+  createdAt      DateTime     @default(now())
+
+  @@index([checkInId])
+  @@index([organizationId, createdAt])
+}
+
+// A Google review read from the business's profile. Google's API policy
+// allows its content to be kept for no more than 30 days, so the name, stars,
+// comment and reply are erased when a review has not been confirmed with
+// Google for 29 days (confirmedWithGoogleAt); googleReviewId and the job link
+// are kept permanently. state: 'unmatched' | 'linked' | 'hidden'.
+model GoogleReview {
+  id                    String       @id @default(uuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  googleReviewId        String       @unique
+  checkInId             String?      @unique @db.Uuid
+  checkIn               CheckIn?     @relation(fields: [checkInId], references: [id], onDelete: SetNull)
+  state                 String       @default("unmatched")
+  reviewerName          String?
+  starRating            Int?
+  comment               String?
+  replyComment          String?
+  replyUpdatedAt        DateTime?
+  postedAt              DateTime?
+  googleUpdatedAt       DateTime?
+  confirmedWithGoogleAt DateTime?
+  linkedAt              DateTime?
+  linkedByUserId        String?
+  // Jobs the owner said this review is not for ("Not this job").
+  dismissedCheckInIds   String[]     @default([])
+  createdAt             DateTime     @default(now())
+
+  @@index([organizationId, state])
 }

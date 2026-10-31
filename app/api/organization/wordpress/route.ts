@@ -29,6 +29,7 @@ async function requireOwnerWithFeature() {
       wpUsername: true,
       wpConnectionStatus: true,
       wpConnectedAt: true,
+      wpLimitedAccount: true,
     },
   })
   if (!org) {
@@ -47,9 +48,15 @@ export async function GET() {
     if ('error' in gate) return gate.error
     const { org } = gate
 
-    const [syncedCount, failedCount] = await Promise.all([
+    const [syncedCount, failedCount, failedCodeRows] = await Promise.all([
       prisma.checkIn.count({ where: { organizationId: org.id, wpSyncStatus: 'synced' } }),
-      prisma.checkIn.count({ where: { organizationId: org.id, wpSyncStatus: 'failed' } }),
+      // Published jobs only: an unpublished job is never shown as "not posted".
+      prisma.checkIn.count({ where: { organizationId: org.id, isPublic: true, wpSyncStatus: 'failed' } }),
+      prisma.checkIn.findMany({
+        where: { organizationId: org.id, isPublic: true, wpSyncStatus: 'failed', wpErrorCode: { not: null } },
+        select: { wpErrorCode: true },
+        distinct: ['wpErrorCode'],
+      }),
     ])
 
     return NextResponse.json({
@@ -59,6 +66,9 @@ export async function GET() {
       wpConnectedAt: org.wpConnectedAt,
       syncedCount,
       failedCount,
+      // The exact codes of the jobs that did not post, for the card's notice.
+      failedCodes: failedCodeRows.map((r) => r.wpErrorCode).filter(Boolean),
+      wpLimitedAccount: org.wpLimitedAccount,
     })
   } catch (error) {
     console.error('Error loading WordPress connection:', error)
@@ -87,6 +97,8 @@ export async function POST(request: NextRequest) {
       siteUrl?: string
       username?: string
       applicationPassword?: string
+      // Set when the customer chose "Connect anyway" after the WP-105 warning.
+      confirmLimited?: boolean
     }
 
     const siteUrl = normalizeSiteUrl(body.siteUrl || '')
@@ -102,15 +114,55 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Reconnecting must stay on the same site. Every job's stored post id
+    // belongs to the site it was posted to, so switching sites here would
+    // point later edits at the wrong site's posts. Disconnect first instead.
+    // The same site may move between http and https or gain or lose "www."
+    // (WP-106); those count as the same site so the customer can update the
+    // address without disconnecting, which would delete every post.
+    const sameSiteKey = (u: string) => {
+      try {
+        const x = new URL(normalizeSiteUrl(u))
+        return `${x.hostname.toLowerCase().replace(/^www\./, '')}${x.pathname.replace(/\/+$/, '').toLowerCase()}`
+      } catch {
+        return u.toLowerCase()
+      }
+    }
+    if (org.wpSiteUrl && org.wpConnectionStatus && org.wpConnectionStatus !== 'failed') {
+      if (sameSiteKey(org.wpSiteUrl) !== sameSiteKey(siteUrl)) {
+        return NextResponse.json(
+          { error: 'To connect a different site, disconnect this one first.' },
+          { status: 400 }
+        )
+      }
+    }
+
     const test = await testConnection({ siteUrl, username, password })
     if (!test.ok) {
-      await prisma.organization.update({
-        where: { id: org.id },
-        data: { wpConnectionStatus: 'failed' },
-      })
+      // A failed reconnect attempt leaves 'needs_reconnect' in place so the
+      // card keeps showing the reconnect steps for the stored site.
+      if (org.wpConnectionStatus !== 'needs_reconnect') {
+        await prisma.organization.update({
+          where: { id: org.id },
+          data: { wpConnectionStatus: 'failed' },
+        })
+      }
       return NextResponse.json(
         { error: test.error || 'Connection failed — double-check your site address and Application Password, then try again.' },
         { status: 400 }
+      )
+    }
+
+    // WP-105: the account is below Administrator, so WordPress would strip
+    // scripts and maps from every job post. Checked before anything is saved,
+    // because the backfill of past jobs starts as soon as a connect succeeds.
+    // Uses WordPress's own unfiltered_html capability, which is exact on single
+    // sites and on multisite networks.
+    const canEmbedCode = test.data?.canEmbedCode === true
+    if (!canEmbedCode && !body.confirmLimited) {
+      return NextResponse.json(
+        { code: 'WP-105', limitedAccount: true, role: test.data?.role ?? null },
+        { status: 409 }
       )
     }
 
@@ -130,6 +182,7 @@ export async function POST(request: NextRequest) {
         wpApplicationPassword: encrypted,
         wpConnectionStatus: 'connected',
         wpConnectedAt: new Date(),
+        wpLimitedAccount: !canEmbedCode,
       },
     })
 
@@ -148,6 +201,7 @@ export async function POST(request: NextRequest) {
       wpSiteUrl: siteUrl,
       wpUsername: username,
       wpConnectionStatus: 'connected',
+      wpLimitedAccount: !canEmbedCode,
     })
   } catch (error) {
     console.error('Error saving WordPress connection:', error)
@@ -175,6 +229,7 @@ export async function DELETE() {
         wpApplicationPassword: null,
         wpConnectionStatus: null,
         wpConnectedAt: null,
+        wpLimitedAccount: false,
       },
     })
 

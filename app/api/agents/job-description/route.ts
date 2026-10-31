@@ -4,6 +4,8 @@ import { getCurrentUser } from '@/lib/auth'
 import { hasFeature } from '@/lib/planVersions'
 import { getAiConfig } from '@/lib/aiConfig'
 import OpenAI from 'openai'
+import { ALT_MAX_PHOTOS } from '@/lib/photoAlt'
+import { acceptPhotoAlts, firstSentenceRule, parseReply } from '@/lib/photoAltAi'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -16,10 +18,50 @@ Requirements:
 - Include the service type, city, state, and a long-tail keyword variant (e.g. "mahogany front door installation in [City], [State]")
 - Include specific product or material details visible in the photos or mentioned in the notes
 - Do NOT invent or fabricate any product details, materials, or specifics not present in the input
+- Open with one sentence that names the service type, the street name, the city and the state
 - Write in third person
 - Do not use bullet points or headers
 - Do not begin with "I" or "We"
 - Output only the description — no preamble, no explanation`
+
+const NO_NAMES_RULE =
+  'Never include any person\'s name: not the homeowner, the customer, their family, or any crew member, even if a name appears in the notes. Refer to them as "the homeowner" or "the crew" instead.'
+
+// Appended in code, after the (admin-editable) prompt, so the reply format and
+// the photo-description rules cannot be removed by editing the prompt.
+const PHOTO_ALT_RULES = `Reply with JSON only, in this shape: {"description": "...", "photos": [{"index": 1, "alt": "..."}]}.
+"description" is the job description written exactly as instructed above, as plain text. Ignore any instruction above about output format; the JSON shape here is the only format.
+"photos" has one entry for each attached photo, using the photo numbers given in the message. Each "alt" describes only what is plainly visible in that one photo, as one finished phrase of 25 words or fewer (for example: "Cedar barn doors closed across a detached garage opening, hung on a black steel track"). Rules for every "alt":
+- Describe objects, materials, colors and the setting only. Say "appears to be" when you are not sure.
+- Never include a name, a house number, a street address, a license plate, any other readable text or numbers, or who a person is.
+- Do not mention that it is a before or after photo, and do not repeat the city or the business name.
+- The phrase must be complete and make sense on its own, within 25 words. Count the words and shorten the phrase yourself if it runs over.
+- If a photo is too dark or unclear to describe, leave its "alt" empty.`
+
+const RESPONSE_FORMAT = {
+  type: 'json_schema' as const,
+  json_schema: {
+    name: 'job_description',
+    strict: true,
+    schema: {
+      type: 'object',
+      properties: {
+        description: { type: 'string' },
+        photos: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: { index: { type: 'integer' }, alt: { type: 'string' } },
+            required: ['index', 'alt'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['description', 'photos'],
+      additionalProperties: false,
+    },
+  },
+}
 
 async function getSystemPrompt(): Promise<string> {
   try {
@@ -79,7 +121,12 @@ export async function POST(req: Request) {
         state: true,
         zip: true,
         notes: true,
+        street: true,
         photoUrls: true,
+        beforePhotoUrl: true,
+        afterPhotoUrl: true,
+        featuredPhotoUrl: true,
+        homeCustomerName: true,
         aiDescriptionCount: true,
       },
     })
@@ -148,7 +195,18 @@ export async function POST(req: Request) {
       ? checkIn.photoUrls.split(',').map((u) => u.trim()).filter(Boolean)
       : []
 
-    // Assemble user message with text + optional vision content blocks
+    // The photos sent: the before and after photos first (so a tagged photo saved
+    // sixth or later is still seen), then the cover photo, then the rest, at most
+    // ALT_MAX_PHOTOS to control cost.
+    const sent = [
+      ...new Set(
+        [checkIn.beforePhotoUrl, checkIn.afterPhotoUrl, checkIn.featuredPhotoUrl, ...photoUrls].filter(
+          (u): u is string => !!u && photoUrls.includes(u)
+        )
+      ),
+    ].slice(0, ALT_MAX_PHOTOS)
+
+    // Assemble user message with text + labelled vision content blocks
     type ContentBlock =
       | { type: 'text'; text: string }
       | { type: 'image_url'; image_url: { url: string; detail: 'low' } }
@@ -159,8 +217,8 @@ export async function POST(req: Request) {
         text: [
           businessBlock ? `BUSINESS CONTEXT:\n${businessBlock}` : '',
           `JOB CONTEXT:\n${jobBlock}`,
-          photoUrls.length > 0
-            ? `Photos attached (${photoUrls.length}): describe any visible products, materials, hardware, or finishes to include in the description.`
+          sent.length > 0
+            ? `Photos attached (${sent.length}), numbered 1 to ${sent.length}: describe any visible products, materials, hardware, or finishes to include in the description.`
             : 'No photos available.',
         ]
           .filter(Boolean)
@@ -168,26 +226,35 @@ export async function POST(req: Request) {
       },
     ]
 
-    // Add photo URLs as vision content blocks (max 5 to control cost)
-    for (const url of photoUrls.slice(0, 5)) {
+    sent.forEach((url, i) => {
+      const role = url === checkIn.beforePhotoUrl ? ' (the BEFORE photo)' : url === checkIn.afterPhotoUrl ? ' (the AFTER photo)' : ''
+      userContent.push({ type: 'text', text: `Photo ${i + 1}${role}:` })
       userContent.push({ type: 'image_url', image_url: { url, detail: 'low' } })
-    }
+    })
 
-    const systemPrompt = await getSystemPrompt()
+    // Appended in code so it applies even when the prompt is overridden in the
+    // admin panel: job descriptions are public text and must not name people.
+    const systemPrompt = `${await getSystemPrompt()}\n\n${NO_NAMES_RULE}\n\n${firstSentenceRule(checkIn)}\n\n${PHOTO_ALT_RULES}`
 
+    // max_tokens is the hard ceiling on what a run can cost: about 200 tokens for
+    // the description, up to ALT_RUN_MAX_WORDS words (about 270 tokens) of photo
+    // descriptions and a little JSON. The words are also cut in code below.
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userContent },
       ],
-      max_tokens: 300,
+      response_format: RESPONSE_FORMAT,
+      max_tokens: 700,
     })
 
-    const description = completion.choices[0]?.message?.content?.trim() ?? ''
-    if (!description) {
+    const reply = parseReply(completion.choices[0]?.message?.content?.trim() ?? '')
+    if (!reply?.description) {
       return NextResponse.json({ error: 'No description generated' }, { status: 500 })
     }
+    const description = reply.description
+    const photoAlts = acceptPhotoAlts(sent, reply.photos, checkIn.homeCustomerName)
 
     // Increment per-job counter + update org daily history
     await Promise.all([
@@ -201,7 +268,7 @@ export async function POST(req: Request) {
       }),
     ])
 
-    return NextResponse.json({ description })
+    return NextResponse.json({ description, photoAlts, describedPhotos: sent })
   } catch (error) {
     console.error('job-description error:', error)
     return NextResponse.json({ error: 'Generation failed' }, { status: 500 })

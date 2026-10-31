@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { jobSlug as buildJobSlug, jobUrl } from '@/lib/jobUrls'
 import { prisma } from '@/lib/prisma'
-import { slugify } from '@/lib/slugify'
 
 // CORS-open public read-only endpoint. Fetched by browsers on customer
-// websites via widget.v1.js — no authentication, no cookies, no PII.
+// websites via widget.v1.js. It requires no login, sets no cookies, and
+// returns no personal information.
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -11,6 +12,21 @@ const CORS_HEADERS = {
 }
 
 const PAGE_SIZE = 20
+
+// widget.v1.js only ever asks for offsets that are multiples of PAGE_SIZE
+// ("Load more" sends jobs.length, and the button hides on the last page).
+// Far above any real customer's job count.
+const MAX_OFFSET = 5000
+
+// Vercel's CDN only stores a function response when told to by s-maxage or a
+// CDN-specific header — a plain max-age is honored by browsers alone, which
+// left every new visitor's request reaching the database. Vercel keeps one
+// copy per URL for 4 minutes and each browser keeps it 1 more, so a publish,
+// unpublish or edit reaches customer websites within 5 minutes at most.
+const CACHE_HEADERS = {
+  'Cache-Control': 'public, max-age=60',
+  'Vercel-CDN-Cache-Control': 'max-age=240',
+}
 
 function joinList(items: string[]): string {
   if (items.length <= 1) return items[0] ?? ''
@@ -64,8 +80,28 @@ export async function GET(
   try {
     const { orgSlug } = await params
 
-    const rawOffset = parseInt(request.nextUrl.searchParams.get('offset') || '0', 10)
-    const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? rawOffset : 0
+    // The CDN cache key includes the full query string, so any variation the
+    // widget never sends (an unknown parameter, an odd or huge offset) would
+    // skip the cache and reach the database. Reject those before any query.
+    const query = request.nextUrl.searchParams
+    const rawOffset = query.get('offset')
+    const offset = rawOffset === null ? 0 : Number(rawOffset)
+    const unexpectedParam = [...query.keys()].some((k) => k !== 'offset')
+    if (
+      unexpectedParam ||
+      query.getAll('offset').length > 1 ||
+      // Canonical digits only: "020" or "0020" would each be a fresh cache key.
+      (rawOffset !== null && String(offset) !== rawOffset) ||
+      !Number.isInteger(offset) ||
+      offset < 0 ||
+      offset % PAGE_SIZE !== 0 ||
+      offset > MAX_OFFSET
+    ) {
+      return NextResponse.json(
+        { error: 'Invalid request' },
+        { status: 400, headers: CORS_HEADERS }
+      )
+    }
 
     const org = await prisma.organization.findUnique({
       where: { slug: orgSlug },
@@ -85,7 +121,7 @@ export async function GET(
     if (!org) {
       return NextResponse.json(
         { error: 'Organization not found' },
-        { status: 404, headers: CORS_HEADERS }
+        { status: 404, headers: { ...CORS_HEADERS, ...CACHE_HEADERS } }
       )
     }
 
@@ -98,6 +134,7 @@ export async function GET(
         select: {
           id: true,
           doorType: true,
+          street: true,
           city: true,
           state: true,
           zip: true,
@@ -120,10 +157,7 @@ export async function GET(
     const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://projectcheckin.com').replace(/\/$/, '')
 
     const jobs = checkIns.map((job) => {
-      const citySlug = slugify(job.city || '')
-      const stateSlug = slugify(job.state || '')
-      const doorTypeSlug = slugify(job.doorType || 'job')
-      const jobSlug = org.slug ? `${doorTypeSlug}-${org.slug}-${job.id}` : `${doorTypeSlug}-${job.id}`
+      const jobSlug = buildJobSlug(job)
 
       const allPhotoUrls = job.photoUrls
         ? job.photoUrls.split(',').map((u) => u.trim()).filter(Boolean)
@@ -155,7 +189,7 @@ export async function GET(
         beforePhotoUrl: job.beforePhotoUrl,
         afterPhotoUrl: job.afterPhotoUrl,
         createdAt: job.timestamp ? job.timestamp.toISOString() : null,
-        pckUrl: `${baseUrl}/jobs/${citySlug || 'city'}-${stateSlug || 'state'}/${jobSlug}`,
+        pckUrl: jobUrl(job, org.slug, baseUrl),
       }
     })
 
@@ -178,7 +212,7 @@ export async function GET(
       {
         headers: {
           ...CORS_HEADERS,
-          'Cache-Control': 'public, max-age=300',
+          ...CACHE_HEADERS,
         },
       }
     )
