@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { encode } from 'next-auth/jwt'
 import { prisma } from '@/lib/prisma'
+import { SESSION_IDLE_SECONDS } from '@/lib/sessionPolicy'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-11-17.clover',
@@ -57,9 +58,11 @@ export async function GET(req: NextRequest) {
       orgSlug: user.organization?.slug ?? undefined,
       onboardingComplete: user.organization?.onboardingComplete ?? true,
       planTier: user.organization?.planTier ?? undefined,
+      // Same session limits as a normal sign-in (lib/sessionPolicy.ts).
+      loginAt: Date.now(),
     },
     secret: process.env.NEXTAUTH_SECRET!,
-    maxAge: 30 * 24 * 60 * 60,
+    maxAge: SESSION_IDLE_SECONDS,
   })
 
   const isProd = process.env.NODE_ENV === 'production'
@@ -73,7 +76,7 @@ export async function GET(req: NextRequest) {
     secure: isProd,
     sameSite: 'lax',
     path: '/',
-    maxAge: 30 * 24 * 60 * 60,
+    maxAge: SESSION_IDLE_SECONDS,
   })
 
   return response

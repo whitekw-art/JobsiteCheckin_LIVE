@@ -14,7 +14,12 @@ export async function POST(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
 
-    if (!currentUser || !currentUser.organizationId) {
+    // Signed out (for example the session timed out): a 401, so the form can
+    // tell the person to sign in again instead of naming an organization problem.
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (!currentUser.organizationId) {
       return NextResponse.json(
         { error: 'User is not associated with an organization' },
         { status: 400 }

@@ -9,6 +9,7 @@ import DashboardShell from '@/components/DashboardShell'
 import BeforeAfterCamera from '@/components/BeforeAfterCamera'
 import { tierHasFeature } from '@/lib/planVersions'
 import { OTHER_OPTION, normalizeProductOptions, defaultProductsForTrade } from '@/lib/tradeProducts'
+import { loadCheckInDraft, saveDraftText, saveDraftPhotos, deleteCheckInDraft, draftHasContent } from '@/lib/checkinDraft'
 import '@/styles/checkin.css'
 
 function formatPhone(v: string): string {
@@ -20,7 +21,7 @@ function formatPhone(v: string): string {
 }
 
 function CheckInContent() {
-  const { data: session } = useSession()
+  const { data: session, status: sessionStatus } = useSession()
   const searchParams = useSearchParams()
   const editId = searchParams.get('id')
   const [installer, setInstaller] = useState('')
@@ -60,12 +61,19 @@ function CheckInContent() {
   const [productOptions, setProductOptions] = useState<string[]>([])
   const [productsLoaded, setProductsLoaded] = useState(false)
   const [isOtherProduct, setIsOtherProduct] = useState(false)
+  // Draft saved on this device (lib/checkinDraft.ts), New Check-In only.
+  // draftReady stays false until the saved draft has been read, so the empty
+  // form shown while loading can never overwrite it.
+  const [draftReady, setDraftReady] = useState(false)
+  const [draftRestored, setDraftRestored] = useState(false)
+  const [showDeleteDraft, setShowDeleteDraft] = useState(false)
 
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const libraryInputRef = useRef<HTMLInputElement>(null)
 
   const userRole = session?.user?.role
   const isUserRole = userRole === 'USER'
+  const draftUserId = !editId && sessionStatus === 'authenticated' ? session?.user?.id || null : null
   const planTier = (session?.user as any)?.planTier as string | undefined
   const canBeforeAfter = tierHasFeature(planTier, 'before_after_tagging')
 
@@ -140,6 +148,56 @@ function CheckInContent() {
       })
       .catch(() => {})
   }, [editId])
+
+  // Restore this person's saved draft once, when a New Check-In opens.
+  useEffect(() => {
+    if (!draftUserId || draftReady) return
+    let cancelled = false
+    loadCheckInDraft(draftUserId).then((d) => {
+      if (cancelled) return
+      if (d) {
+        if (!isUserRole) setInstaller(d.installer)
+        setStreet(d.street); setCity(d.city); setState(d.state); setZip(d.zip)
+        setDoorType(d.doorType); setIsOtherProduct(d.isOtherProduct); setNotes(d.notes)
+        setHomeCustomerName(d.homeCustomerName); setHomeCustomerPhone(d.homeCustomerPhone); setHomeCustomerEmail(d.homeCustomerEmail)
+        setPhotoLocation(d.photoLocation)
+        setPhotos(d.photos.map((p) => p.file))
+        setPhotoPreviews(d.photos.map((p) => URL.createObjectURL(p.file)))
+        setPhotoTags(d.photos.map((p) => p.tag))
+        setDraftRestored(true)
+      }
+      setDraftReady(true)
+    })
+    return () => { cancelled = true }
+  }, [draftUserId, draftReady, isUserRole])
+
+  // Save the draft shortly after each change; an empty form removes it.
+  // Text and photos are saved separately so typing never rewrites the photos.
+  const draftText = {
+    installer, street, city, state, zip, doorType, isOtherProduct, notes,
+    homeCustomerName, homeCustomerPhone, homeCustomerEmail, photoLocation,
+  }
+  const draftNotEmpty = draftHasContent({ ...draftText, photos: photos.map((file) => ({ file, tag: null })) }, isUserRole)
+
+  useEffect(() => {
+    if (!draftUserId || !draftReady) return
+    const timer = setTimeout(() => {
+      if (draftNotEmpty) saveDraftText(draftUserId, { v: 1, savedAt: Date.now(), ...draftText })
+      else deleteCheckInDraft(draftUserId)
+    }, 500)
+    return () => clearTimeout(timer)
+    // draftText is rebuilt every render; its fields are listed instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftUserId, draftReady, draftNotEmpty, installer, street, city, state, zip, doorType, isOtherProduct, notes,
+      homeCustomerName, homeCustomerPhone, homeCustomerEmail, photoLocation])
+
+  useEffect(() => {
+    if (!draftUserId || !draftReady || !draftNotEmpty) return
+    const timer = setTimeout(() => {
+      saveDraftPhotos(draftUserId, photos.map((file, i) => ({ file, tag: photoTags[i] ?? null })))
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [draftUserId, draftReady, draftNotEmpty, photos, photoTags])
 
   // ── EXIF GPS extraction (unchanged from original) ─────────────────────────
   const extractExifLocation = (file: File): Promise<{ lat: number; lng: number } | null> => {
@@ -327,6 +385,24 @@ function CheckInContent() {
 
   const beforeIndex = photoTags.indexOf('before')
 
+  // Empties a New Check-In (after a successful submit, or Delete Draft).
+  const resetNewCheckIn = () => {
+    photoPreviews.forEach((url) => URL.revokeObjectURL(url))
+    setInstaller(isUserRole ? session?.user?.name || '' : '')
+    setStreet(''); setCity(''); setState(''); setZip('')
+    setDoorType(''); setIsOtherProduct(false); setNotes('')
+    setHomeCustomerName(''); setHomeCustomerPhone(''); setHomeCustomerEmail('')
+    setPhotos([]); setPhotoPreviews([]); setPhotoTags([]); setPhotoLocation(null)
+    setDraftRestored(false)
+    if (draftUserId) deleteCheckInDraft(draftUserId)
+  }
+
+  const confirmDeleteDraft = () => {
+    resetNewCheckIn()
+    setShowDeleteDraft(false)
+    setMessage('')
+  }
+
   // ── Submit (logic unchanged) ──────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     console.log('HANDLE_SUBMIT_RUNNING')
@@ -338,6 +414,9 @@ function CheckInContent() {
     }
     setIsSubmitting(true)
     setMessage('')
+    const signedOutMessage = editId
+      ? 'You were signed out. Sign in again, then reopen this job to save your changes.'
+      : 'You were signed out. Sign in again and open New Check-In; your draft is saved on this device.'
 
     const gpsPromise = navigator.geolocation
       ? new Promise<{ lat: number; lng: number } | null>((resolve) => {
@@ -415,7 +494,13 @@ function CheckInContent() {
         const formData = new FormData()
         formData.append('photo', compressed)
         const uploadRes = await fetch('/api/upload-photo', { method: 'POST', body: formData })
-        const uploadData = await uploadRes.json()
+        const uploadData = await uploadRes.json().catch(() => null)
+        // Stop at the first failed photo; continuing would save the job
+        // without it. The form and its draft stay as they are.
+        if (uploadRes.status === 401) throw new Error(signedOutMessage)
+        if (!uploadRes.ok || !uploadData?.photoUrl) {
+          throw new Error(uploadData?.error || 'A photo did not upload. Please try again.')
+        }
         uploadedUrls.push(uploadData.photoUrl)
       }
 
@@ -482,6 +567,7 @@ function CheckInContent() {
           })
 
       const resData = await res.json().catch(() => null)
+      if (res.status === 401) throw new Error(signedOutMessage)
       if (!res.ok) {
         throw new Error(resData?.error || 'Failed to submit check-in')
       }
@@ -489,11 +575,7 @@ function CheckInContent() {
       setMessageType('success')
       setMessage(editId ? 'Job updated successfully!' : 'Check-in submitted successfully!')
       if (!editId) {
-        setInstaller(isUserRole ? session?.user?.name || '' : '')
-        setStreet(''); setCity(''); setState(''); setZip('')
-        setDoorType(''); setNotes('')
-        setHomeCustomerName(''); setHomeCustomerPhone(''); setHomeCustomerEmail('')
-        setPhotos([]); setPhotoPreviews([]); setPhotoTags([]); setPhotoLocation(null)
+        resetNewCheckIn()
       } else {
         setPhotos([]); setPhotoPreviews([]); setPhotoTags([])
         setOriginalAddress([street, city, state, zip].map((v) => v.trim()).join('|'))
@@ -549,10 +631,56 @@ function CheckInContent() {
         onClose={() => setShowBeforeAfterCamera(false)}
       />
     )}
+    {showDeleteDraft && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        onClick={() => setShowDeleteDraft(false)}
+        onKeyDown={(e) => { if (e.key === 'Escape') setShowDeleteDraft(false) }}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-draft-title"
+          className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h2 id="delete-draft-title" className="text-lg font-semibold text-gray-900">Are you sure?</h2>
+          <p className="mt-3 text-sm text-gray-700">
+            The information and photos in this draft will be deleted and cannot be recovered.
+          </p>
+          <div className="mt-6 flex justify-end gap-3">
+            <button
+              type="button"
+              autoFocus
+              onClick={() => setShowDeleteDraft(false)}
+              className="px-4 py-2 rounded text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 min-h-[44px]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmDeleteDraft}
+              className="px-4 py-2 rounded text-sm font-medium text-white bg-red-600 hover:bg-red-700 min-h-[44px]"
+            >
+              Delete Draft
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     <DashboardShell title={editId ? 'Edit Check-In' : 'New Check-In'}>
       <div className="ci-card">
         <div className="ci-body">
           <form className="ci-form" onSubmit={handleSubmit}>
+
+            {!editId && draftRestored && (
+              <div className="ci-photo-note" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span>Draft restored</span>
+                <button type="button" className="ci-undo" onClick={() => setShowDeleteDraft(true)}>
+                  Delete Draft?
+                </button>
+              </div>
+            )}
 
             {/* Installer */}
             <div className="ci-field" data-tour="ci-installer">
@@ -953,10 +1081,19 @@ function CheckInContent() {
   )
 }
 
+// A fresh form for each job being edited and for New Check-In. Without the
+// key, the sidebar's New Check-In link (a client-side navigation from
+// /check-in?id=...) kept the edited job's details on screen, and the saved
+// draft would then have stored them as a new check-in.
+function CheckInForJob() {
+  const id = useSearchParams().get('id')
+  return <CheckInContent key={id ?? 'new'} />
+}
+
 export default function CheckInPage() {
   return (
     <Suspense>
-      <CheckInContent />
+      <CheckInForJob />
     </Suspense>
   )
 }
