@@ -33,5 +33,7 @@ declare module 'next-auth/jwt' {
     companyName?: string
     onboardingComplete?: boolean
     planTier?: string | null
+    /** Sign-in time in milliseconds, for the 12-hour absolute limit. */
+    loginAt?: number
   }
 }

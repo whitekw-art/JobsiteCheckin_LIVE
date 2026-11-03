@@ -1,5 +1,6 @@
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
+import { sessionPastAbsoluteLimit } from '@/lib/sessionPolicy'
 
 // Hostnames the app itself is served on. Anything else is a customer's
 // CNAME'd subdomain (Website Integration Phase 2) and gets the hosted
@@ -17,7 +18,11 @@ function isAppHost(host: string): boolean {
 
 export default withAuth(
   function middleware(req) {
-    const token = req.nextauth.token
+    // A token past the 12-hour absolute limit counts as signed out here too:
+    // middleware only decodes the token and never runs the jwt callback that
+    // enforces the limit for API routes. (The 30-minute idle limit is the
+    // token's own expiry, which decoding already rejects.)
+    const token = sessionPastAbsoluteLimit(req.nextauth.token?.loginAt) ? null : req.nextauth.token
     const rawPathname = req.nextUrl.pathname
     const pathname = rawPathname.replace(/\/$/, '')
 
