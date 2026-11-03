@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcrypt'
 import { loginRatelimit } from '@/lib/rate-limit'
 import { normalizeEmail } from '@/lib/emailValidation'
+import { SESSION_IDLE_SECONDS, sessionPastAbsoluteLimit } from '@/lib/sessionPolicy'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -140,6 +141,19 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id
         token.role = user.role
         token.organizationId = user.organizationId
+        token.loginAt = Date.now()
+      } else if (typeof token.loginAt !== 'number') {
+        // Tokens issued before the 12-hour limit existed carry no sign-in
+        // time. Their clock starts now, so nobody is signed out all at once.
+        token.loginAt = Date.now()
+      }
+
+      // 12-hour absolute limit. Throwing makes NextAuth clear the session
+      // cookie and return no session, so getServerSession and the browser
+      // both see the person as signed out. middleware.ts checks the same
+      // limit, because it reads the token without running this callback.
+      if (sessionPastAbsoluteLimit(token.loginAt)) {
+        throw new Error('SESSION_ABSOLUTE_LIMIT')
       }
 
       if (!token.email) return token
@@ -167,5 +181,10 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/auth/signin',
   },
-  session: { strategy: 'jwt' },
+  // 30-minute idle limit: the cookie and the token inside it expire 30 minutes
+  // after they were last re-issued. With the JWT strategy NextAuth re-issues
+  // them on every /api/auth/session request (updateAge applies only to
+  // database sessions), so the window slides with activity; see
+  // components/SessionActivity.tsx.
+  session: { strategy: 'jwt', maxAge: SESSION_IDLE_SECONDS, updateAge: 0 },
 }
