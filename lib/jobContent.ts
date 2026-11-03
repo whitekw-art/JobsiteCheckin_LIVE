@@ -1,7 +1,7 @@
 import { after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { syncCheckIn, rerenderMappingForLocation } from '@/lib/wordpressSync'
-import { jobHeading } from '@/lib/jobUrls'
+import { jobHeading, streetName, houseNumber } from '@/lib/jobUrls'
 
 // Public text derived from a job's own fields. Built in one place so check-in,
 // every edit path and every public surface (job page, WordPress post, widget,
@@ -26,13 +26,17 @@ export function buildJobSeoFields(job: {
   state: string | null | undefined
 }): { seoTitle: string | null; seoDescription: string | null } {
   const product = clean(job.doorType)
-  const street = clean(job.street).replace(/[.,\s]+$/, '')
+  // Street NAME only: the house number is never published. This sentence is
+  // the public fallback description (meta and share descriptions, schema, and
+  // the visible text on WordPress, the widget, the custom subdomain and Google
+  // posts when the job has no notes).
+  const street = streetName(job.street).replace(/[.,\s]+$/, '')
   const city = clean(job.city)
   const state = clean(job.state)
 
   // The standard job heading, with the street name and without the business
   // name (WordPress and the job page add the business to the tab title).
-  const seoTitle = product && city && state ? jobHeading({ doorType: product, street, city, state }) : null
+  const seoTitle = product && city && state ? jobHeading({ doorType: product, street: job.street, city, state }) : null
   const seoDescription =
     product && street && city && state
       ? `Installed ${article(product)} ${product} at ${street}, ${city}, ${state}.`
@@ -109,6 +113,28 @@ export function findHomeownerName(
 
 export const HOMEOWNER_NAME_ERROR =
   "Remove the homeowner's name from the job description before it goes public. Customer names stay in the dashboard only."
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * True when the text contains this job's house number written with its street,
+ * for example "101 Platform" for the job at "101 Platform Wy N". Requiring the
+ * first word of the street name after the number avoids blocking measurements
+ * such as "101 inches". Case-insensitive; also matches "101, Platform".
+ */
+export function findHouseNumber(text: string | null | undefined, street: string | null | undefined): boolean {
+  const body = clean(text)
+  const number = houseNumber(street)
+  const firstWord = streetName(street).split(' ')[0]
+  if (!body || !number || !firstWord) return false
+  const re = new RegExp(`(^|[^\\w])${escapeRegExp(number)}[\\s,.-]+${escapeRegExp(firstWord)}(?![\\w])`, 'i')
+  return re.test(body)
+}
+
+export const HOUSE_NUMBER_ERROR =
+  "Remove the house number from the job description before it goes public. The street name can stay; the house number stays in the dashboard only."
 
 /**
  * After any edit to a job's details: regenerate its public title and

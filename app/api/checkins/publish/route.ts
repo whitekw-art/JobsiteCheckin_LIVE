@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { syncCheckIn, unsyncCheckIn } from '@/lib/wordpressSync'
 import { autoPostCheckInIfEnabled, retractCheckInFromGbp, shouldAutoPostOnPublish } from '@/lib/gbpSync'
-import { findHomeownerName, HOMEOWNER_NAME_ERROR } from '@/lib/jobContent'
+import { findHomeownerName, HOMEOWNER_NAME_ERROR, findHouseNumber, HOUSE_NUMBER_ERROR } from '@/lib/jobContent'
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
         id,
         organizationId: currentUser.organizationId,
       },
-      select: { id: true, notes: true, homeCustomerName: true },
+      select: { id: true, notes: true, homeCustomerName: true, street: true },
     })
 
     if (!checkIn) {
@@ -43,6 +43,10 @@ export async function POST(request: NextRequest) {
     // in the dashboard only.
     if (isPublic && findHomeownerName(checkIn.notes, checkIn.homeCustomerName)) {
       return NextResponse.json({ error: HOMEOWNER_NAME_ERROR }, { status: 400 })
+    }
+    // The house number stays private too (street name only in public text).
+    if (isPublic && findHouseNumber(checkIn.notes, checkIn.street)) {
+      return NextResponse.json({ error: HOUSE_NUMBER_ERROR }, { status: 400 })
     }
 
     const updated = await prisma.checkIn.update({
