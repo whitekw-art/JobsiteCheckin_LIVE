@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { findHomeownerName, HOMEOWNER_NAME_ERROR, findHouseNumber, HOUSE_NUMBER_ERROR } from '@/lib/jobContent'
 
 const EDIT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
@@ -28,6 +29,10 @@ export async function PATCH(
         id: true,
         timestamp: true,
         photoUrls: true,
+        isPublic: true,
+        notes: true,
+        street: true,
+        homeCustomerName: true,
       },
     })
 
@@ -48,6 +53,20 @@ export async function PATCH(
 
     const body = await request.json()
     const { street, city, state, zip, notes, doorType, latitude, longitude, addPhotoUrls, removePhotoUrl } = body
+
+    // A published job's notes are public text, so they get the same privacy
+    // checks as the owner's edit and publish routes. The notes must leave out
+    // the homeowner's name and the house number.
+    if (checkIn.isPublic) {
+      const nextNotes = notes !== undefined ? notes : checkIn.notes
+      const nextStreet = street !== undefined ? street : checkIn.street
+      if (findHomeownerName(nextNotes, checkIn.homeCustomerName)) {
+        return NextResponse.json({ error: HOMEOWNER_NAME_ERROR }, { status: 400 })
+      }
+      if (findHouseNumber(nextNotes, nextStreet)) {
+        return NextResponse.json({ error: HOUSE_NUMBER_ERROR }, { status: 400 })
+      }
+    }
 
     const updateData: Record<string, unknown> = {}
 

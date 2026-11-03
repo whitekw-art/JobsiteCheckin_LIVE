@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { refreshJobAfterEdit, findHomeownerName, HOMEOWNER_NAME_ERROR } from '@/lib/jobContent'
+import { refreshJobAfterEdit, findHomeownerName, HOMEOWNER_NAME_ERROR, findHouseNumber, HOUSE_NUMBER_ERROR } from '@/lib/jobContent'
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -24,7 +24,7 @@ export async function PATCH(request: NextRequest) {
 
     const checkIn = await prisma.checkIn.findFirst({
       where: { id, organizationId: currentUser.organizationId },
-      select: { id: true, isPublic: true, homeCustomerName: true, city: true, state: true, doorType: true },
+      select: { id: true, isPublic: true, homeCustomerName: true, street: true, city: true, state: true, doorType: true },
     })
 
     if (!checkIn) {
@@ -34,6 +34,9 @@ export async function PATCH(request: NextRequest) {
     const nextNotes = typeof notes === 'string' ? notes : ''
     if (checkIn.isPublic && findHomeownerName(nextNotes, checkIn.homeCustomerName)) {
       return NextResponse.json({ error: HOMEOWNER_NAME_ERROR }, { status: 400 })
+    }
+    if (checkIn.isPublic && findHouseNumber(nextNotes, checkIn.street)) {
+      return NextResponse.json({ error: HOUSE_NUMBER_ERROR }, { status: 400 })
     }
 
     const updated = await prisma.checkIn.update({
