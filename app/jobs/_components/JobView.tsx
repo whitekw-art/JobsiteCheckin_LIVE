@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { parseStoredAddress } from '@/lib/gbpBusinessInfo'
 import { publicReviewForJob } from '@/lib/googleReviews'
-import { appBaseUrl, cityPath, jobHeading, jobPath, jobTabTitle, jobUrl, streetName } from '@/lib/jobUrls'
+import { appBaseUrl, cityPath, jobHeading, jobPath, jobTabTitle, jobUrl, streetName, publicZip } from '@/lib/jobUrls'
 import { photoAlt } from '@/lib/photoAlt'
 import { CheckInPageViewTracker } from '@/components/CheckInPageViewTracker'
 import JobDetailClient from './JobDetailClient'
@@ -96,10 +96,10 @@ export async function JobView({ job }: { job: JobWithOrg }) {
       : ''
   const orgSlug = organization?.slug || null
 
-  // Visible location line: street name, city, state and zip, without the house
-  // number (decision 13.2). The house number stays only in the meta description.
+  // Visible location line: street name, city, state and the 5-digit ZIP. The
+  // house number is never published, and a ZIP+4 stays in structured data only.
   const street = streetName(job.street)
-  const locationLine = [street, city?.trim(), [state?.trim(), zip?.trim()].filter(Boolean).join(' ')]
+  const locationLine = [street, city?.trim(), [state?.trim(), publicZip(zip)].filter(Boolean).join(' ')]
     .filter(Boolean)
     .join(', ')
 

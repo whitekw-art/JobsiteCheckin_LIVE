@@ -58,6 +58,29 @@ export function streetName(street: string | null | undefined): string {
   return titleCaseIfShouting(s)
 }
 
+/**
+ * The house number at the start of a street address, or '' when there is none:
+ * "101 Platform Wy N" gives "101", "412A Broadway" gives "412A". Used only to
+ * keep it out of public text; the house number is never published.
+ */
+export function houseNumber(street: string | null | undefined): string {
+  const s = clean(street).split(',')[0].trim()
+  if (/^p\.?\s*o\.?\s*box\b/i.test(s)) return ''
+  const m = s.match(/^(\d+[a-z]?)(?=[\s-–])/i)
+  return m ? m[1] : ''
+}
+
+/**
+ * The ZIP code as shown on public pages: the 5-digit ZIP only. A ZIP+4
+ * ("37203-6489") can narrow a location to one block, so the extra four digits
+ * stay in structured data and are never displayed.
+ */
+export function publicZip(zip: string | null | undefined): string {
+  const z = clean(zip)
+  const m = z.match(/^(\d{5})(?:[-\s]?\d{4})?$/)
+  return m ? m[1] : z
+}
+
 export interface JobFields {
   id: string
   doorType?: string | null

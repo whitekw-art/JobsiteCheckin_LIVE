@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { refreshJobAfterEdit, findHomeownerName, HOMEOWNER_NAME_ERROR } from '@/lib/jobContent'
+import { refreshJobAfterEdit, findHomeownerName, HOMEOWNER_NAME_ERROR, findHouseNumber, HOUSE_NUMBER_ERROR } from '@/lib/jobContent'
 import { Prisma } from '@prisma/client'
 import { altWithinLimits, cleanAltText, parseAltMap } from '@/lib/photoAlt'
 import { applyPhotoChanges, deleteStoredPhotos, splitPhotoUrls, LAST_PHOTO_ERROR } from '@/lib/jobPhotos'
@@ -183,6 +183,11 @@ export async function PATCH(request: NextRequest) {
     const nextName = homeCustomerName !== undefined ? homeCustomerName : checkIn.homeCustomerName
     if (checkIn.isPublic && findHomeownerName(nextNotes, nextName)) {
       return NextResponse.json({ error: HOMEOWNER_NAME_ERROR }, { status: 400 })
+    }
+    // Checked against the street being saved now, or the stored one.
+    const nextStreet = street !== undefined ? street : checkIn.street
+    if (checkIn.isPublic && findHouseNumber(nextNotes, nextStreet)) {
+      return NextResponse.json({ error: HOUSE_NUMBER_ERROR }, { status: 400 })
     }
 
     // Photo descriptions (alt text). The owner sends the job's full set after

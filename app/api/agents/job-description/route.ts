@@ -5,6 +5,7 @@ import { hasFeature } from '@/lib/planVersions'
 import { getAiConfig } from '@/lib/aiConfig'
 import OpenAI from 'openai'
 import { ALT_MAX_PHOTOS } from '@/lib/photoAlt'
+import { publicZip } from '@/lib/jobUrls'
 import { acceptPhotoAlts, firstSentenceRule, parseReply } from '@/lib/photoAltAi'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -181,7 +182,8 @@ export async function POST(req: Request) {
       .join('\n')
 
     // Build job context block
-    const location = [checkIn.city, checkIn.state, checkIn.zip].filter(Boolean).join(', ')
+    // 5-digit ZIP only: this text can become the public description.
+    const location = [checkIn.city, checkIn.state, publicZip(checkIn.zip)].filter(Boolean).join(', ')
     const jobBlock = [
       checkIn.doorType ? `Service type: ${checkIn.doorType}` : '',
       location ? `Location: ${location}` : '',

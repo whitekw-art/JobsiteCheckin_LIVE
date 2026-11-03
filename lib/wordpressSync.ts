@@ -23,7 +23,7 @@ import { WP_SYNC_CLAIM_STALE_MS, wpConnectionActive, wpErrorCodeForKind } from '
 import { sendWordPressReconnectEmail } from '@/lib/wordpressEmails'
 import { parseStoredAddress } from '@/lib/gbpBusinessInfo'
 import { publicReviewForJob, type PublicReview } from '@/lib/googleReviews'
-import { jobHeading, slugMatchesBase, streetName, wpSlugBase } from '@/lib/jobUrls'
+import { jobHeading, publicZip, slugMatchesBase, streetName, wpSlugBase } from '@/lib/jobUrls'
 import { photoAlt } from '@/lib/photoAlt'
 
 // Orchestration for WordPress native publishing (Phase 3, Website Integration
@@ -374,9 +374,9 @@ interface PostExtras {
   archiveLinks: Array<{ label: string; url: string }>
 }
 
-/** "Broadway, Nashville, TN 37203": the visible location line, without the house number. */
+/** "Broadway, Nashville, TN 37203": the visible location line, without the house number and with the 5-digit ZIP only. */
 function locationLine(job: JobRecord): string {
-  return [streetName(job.street), job.city?.trim(), [job.state?.trim(), job.zip?.trim()].filter(Boolean).join(' ')]
+  return [streetName(job.street), job.city?.trim(), [job.state?.trim(), publicZip(job.zip)].filter(Boolean).join(' ')]
     .filter(Boolean)
     .join(', ')
 }
@@ -727,7 +727,7 @@ export async function syncCheckIn(
     const slugBase = wpSlugBase(job) || `job-${job.id.slice(0, 8)}`
     const keepSaved = slugMatchesBase(job.wpSlug, slugBase)
     const chooseSlug = async (): Promise<string> => {
-      const candidates = [keepSaved ? job.wpSlug : null, slugBase, job.zip?.trim() ? `${slugBase}-${job.zip.trim().toLowerCase()}` : null]
+      const candidates = [keepSaved ? job.wpSlug : null, slugBase, publicZip(job.zip) ? `${slugBase}-${publicZip(job.zip).toLowerCase()}` : null]
       for (const candidate of candidates) {
         if (!candidate) continue
         const owner = await findPostBySlug(creds, candidate)
